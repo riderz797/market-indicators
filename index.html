@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Indicators Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            padding: 40px 20px;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .indicators-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .indicator-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .indicator-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .indicator-card h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #1e3c72;
+        }
+
+        .indicator-card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .indicator-card .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .indicator-card.featured {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .indicator-card.featured h2,
+        .indicator-card.featured p {
+            color: white;
+        }
+
+        .indicator-card.featured .badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 30px 20px;
+            opacity: 0.8;
+        }
+
+        footer p {
+            margin-bottom: 10px;
+        }
+
+        .last-updated {
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+
+            .indicators-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .indicator-card.featured {
+                grid-column: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Market Indicators Dashboard</h1>
+            <p>Real-time financial and cryptocurrency market analysis</p>
+        </header>
+
+        <div class="indicators-grid">
+            <!-- Featured Indicator -->
+            <a href="indicators/fci/financial_conditions_index.html" class="indicator-card featured">
+                <h2>Financial Conditions Index</h2>
+                <p>Comprehensive macro analysis tracking 10 key components including Fed Balance Sheet, TGA, RRP, High Yield spreads, Real Yield, VIX, Yield Curve, DXY, Risk/Gold ratios, and SOFR-IORB spread. Provides a weighted z-score view of overall financial conditions.</p>
+                <span class="badge">FEATURED</span>
+            </a>
+
+            <!-- BTC Indicators -->
+            <a href="indicators/btc/btc_mean_reversion.html" class="indicator-card">
+                <h2>BTC Mean Reversion</h2>
+                <p>Bitcoin mean reversion analysis identifying overbought and oversold conditions based on historical price patterns and statistical deviations.</p>
+                <span class="badge">BTC</span>
+            </a>
+
+            <a href="indicators/btc/btc_liquidity_comparison.html" class="indicator-card">
+                <h2>BTC Liquidity Comparison</h2>
+                <p>Compares Bitcoin price action with various global liquidity metrics to identify correlation patterns and potential trend shifts.</p>
+                <span class="badge">BTC</span>
+            </a>
+
+            <a href="indicators/btc/btc_liquidity_backtest.html" class="indicator-card">
+                <h2>BTC Liquidity Backtest</h2>
+                <p>Historical backtest analysis of Bitcoin's relationship with liquidity conditions across different market cycles.</p>
+                <span class="badge">BTC</span>
+            </a>
+
+            <a href="indicators/btc/btc_ism_backtest.html" class="indicator-card">
+                <h2>BTC ISM Backtest</h2>
+                <p>Analyzes the correlation between Bitcoin performance and ISM Manufacturing Index, revealing economic cycle dependencies.</p>
+                <span class="badge">BTC</span>
+            </a>
+        </div>
+
+        <footer>
+            <p>All indicators are updated automatically on a regular schedule.</p>
+            <p class="last-updated">Data sources: FRED, Polygon, Yahoo Finance, Treasury Fiscal Data</p>
+        </footer>
+    </div>
+</body>
+</html>
