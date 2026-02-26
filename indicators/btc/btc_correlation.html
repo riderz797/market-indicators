@@ -220,14 +220,25 @@ async function fetchFRED(seriesId) {
   const d = new Date(); d.setDate(d.getDate() - 220);
   const start = d.toISOString().slice(0, 10);
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&observation_start=${start}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`FRED ${seriesId}: ${resp.status}`);
-  const data = await resp.json();
-  const dates = [], values = [];
-  for (const obs of data.observations) {
-    if (obs.value !== '.') { dates.push(obs.date); values.push(parseFloat(obs.value)); }
+  const attempts = [
+    url,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+  for (const attempt of attempts) {
+    try {
+      const resp = await fetch(attempt);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (!data.observations) continue;
+      const dates = [], values = [];
+      for (const obs of data.observations) {
+        if (obs.value !== '.') { dates.push(obs.date); values.push(parseFloat(obs.value)); }
+      }
+      if (dates.length > 0) return { dates, values };
+    } catch (e) { continue; }
   }
-  return { dates, values };
+  throw new Error(`FRED ${seriesId} failed`);
 }
 
 async function fetchCoinGeckoBTC(days) {
@@ -326,7 +337,7 @@ async function updateData() {
       fetchYahoo('HG=F',     '6mo'),
       fetchYahoo('GC=F',     '6mo'),
       fetchYahoo('DX-Y.NYB', '6mo'),
-      fetchFRED('DGS10'),
+      fetchYahoo('^TNX',     '6mo'),
       fetchFRED('BAMLH0A0HYM2'),
       fetchYahoo('^VIX',     '6mo'),
       fetchYahoo('^MOVE',    '6mo'),
