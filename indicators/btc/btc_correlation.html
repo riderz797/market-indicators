@@ -214,15 +214,16 @@ async function fetchFRED(seriesId) {
   throw new Error(`FRED ${seriesId} failed`);
 }
 
-async function fetchCoinGeckoBTC(days) {
-  const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`;
+async function fetchBinanceBTC() {
+  // Binance public API — no proxy needed, Monday-aligned weekly candles back to Aug 2017
+  const url = 'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=1000';
   const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`CoinGecko: ${resp.status}`);
+  if (!resp.ok) throw new Error(`Binance: ${resp.status}`);
   const data = await resp.json();
   const dates = [], values = [];
-  for (const [ts, price] of data.prices) {
-    dates.push(new Date(ts).toISOString().slice(0, 10));
-    values.push(price);
+  for (const k of data) {
+    dates.push(new Date(k[0]).toISOString().slice(0, 10));
+    values.push(parseFloat(k[4]));
   }
   return { dates, values };
 }
@@ -303,7 +304,7 @@ async function updateData() {
     setStatus('Fetching data from 11 sources...', 'info');
 
     const results = await Promise.allSettled([
-      fetchYahoo('BTC-USD',   'max'),
+      fetchBinanceBTC(),
       fetchYahoo('^IXIC',    '5y'),
       fetchYahoo('^DJI',     '5y'),
       fetchYahoo('CL=F',     '5y'),
