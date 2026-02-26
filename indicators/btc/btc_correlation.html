@@ -196,8 +196,8 @@
 
 <script>
 const FRED_API_KEY = '824b29c5afa52f3fc7c6e7dc4925aebb';
-const ROLL_WINDOW  = 30;
-const DISPLAY_DAYS = 90;
+const ROLL_WINDOW  = 60;
+const DISPLAY_DAYS = 180;
 const ASSET_ORDER  = ['NASDAQ','Dow','Oil (WTI)','Copper','Gold','DXY','10Y Yield','HY Spreads','VIX','MOVE'];
 const ACCENT       = '#F5C542';
 const NEG_COLOR    = '#EF5350';
@@ -217,7 +217,7 @@ function setStatus(msg, type) {
 // ── Fetch helpers ──────────────────────────────────────────────────────────
 
 async function fetchFRED(seriesId) {
-  const d = new Date(); d.setDate(d.getDate() - 220);
+  const d = new Date(); d.setDate(d.getDate() - 400);
   const start = d.toISOString().slice(0, 10);
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&observation_start=${start}`;
   const attempts = [
@@ -330,17 +330,17 @@ async function updateData() {
     setStatus('Fetching data from 11 sources...', 'info');
 
     const results = await Promise.allSettled([
-      fetchCoinGeckoBTC(190),
-      fetchYahoo('^IXIC',    '6mo'),
-      fetchYahoo('^DJI',     '6mo'),
-      fetchYahoo('CL=F',     '6mo'),
-      fetchYahoo('HG=F',     '6mo'),
-      fetchYahoo('GC=F',     '6mo'),
-      fetchYahoo('DX-Y.NYB', '6mo'),
-      fetchYahoo('^TNX',     '6mo'),
+      fetchCoinGeckoBTC(300),
+      fetchYahoo('^IXIC',    '1y'),
+      fetchYahoo('^DJI',     '1y'),
+      fetchYahoo('CL=F',     '1y'),
+      fetchYahoo('HG=F',     '1y'),
+      fetchYahoo('GC=F',     '1y'),
+      fetchYahoo('DX-Y.NYB', '1y'),
+      fetchYahoo('^TNX',     '1y'),
       fetchFRED('BAMLH0A0HYM2'),
-      fetchYahoo('^VIX',     '6mo'),
-      fetchYahoo('^MOVE',    '6mo'),
+      fetchYahoo('^VIX',     '1y'),
+      fetchYahoo('^MOVE',    '1y'),
     ]);
 
     const names = ['BTC','NASDAQ','Dow','Oil (WTI)','Copper','Gold',
@@ -381,7 +381,7 @@ async function updateData() {
     const endDate  = new Date(btcDates[btcDates.length - 1])
       .toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
     chart1.layout.title.text =
-      `What's BTC Correlated With?<br><sup>30-day rolling Pearson correlation of daily returns  |  as of ${endDate}</sup>`;
+      `What's BTC Correlated With?<br><sup>60-day rolling Pearson correlation of daily returns  |  as of ${endDate}</sup>`;
     Plotly.react(chart1, traces1, chart1.layout);
 
     // ── Update Chart 2: Snapshot bar chart ──
