@@ -190,7 +190,7 @@ function setStatus(msg, type) {
 // ── Fetch helpers ──────────────────────────────────────────────────────────
 
 async function fetchFRED(seriesId) {
-  const d = new Date(); d.setDate(d.getDate() - 400);
+  const d = new Date(); d.setDate(d.getDate() - 1825);
   const start = d.toISOString().slice(0, 10);
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&observation_start=${start}`;
   const attempts = [
@@ -303,17 +303,17 @@ async function updateData() {
     setStatus('Fetching data from 11 sources...', 'info');
 
     const results = await Promise.allSettled([
-      fetchCoinGeckoBTC(300),
-      fetchYahoo('^IXIC',    '1y'),
-      fetchYahoo('^DJI',     '1y'),
-      fetchYahoo('CL=F',     '1y'),
-      fetchYahoo('HG=F',     '1y'),
-      fetchYahoo('GC=F',     '1y'),
-      fetchYahoo('DX-Y.NYB', '1y'),
-      fetchYahoo('^TNX',     '1y'),
+      fetchYahoo('BTC-USD',   'max'),
+      fetchYahoo('^IXIC',    '5y'),
+      fetchYahoo('^DJI',     '5y'),
+      fetchYahoo('CL=F',     '5y'),
+      fetchYahoo('HG=F',     '5y'),
+      fetchYahoo('GC=F',     '5y'),
+      fetchYahoo('DX-Y.NYB', '5y'),
+      fetchYahoo('^TNX',     '5y'),
       fetchFRED('BAMLH0A0HYM2'),
-      fetchYahoo('^VIX',     '1y'),
-      fetchYahoo('^MOVE',    '1y'),
+      fetchYahoo('^VIX',     '5y'),
+      fetchYahoo('^MOVE',    '5y'),
     ]);
 
     const names = ['BTC','NASDAQ','Dow','Oil (WTI)','Copper','Gold',
