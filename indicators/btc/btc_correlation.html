@@ -193,66 +193,80 @@ async function fetchFRED(seriesId) {
   const d = new Date(); d.setDate(d.getDate() - 1825);
   const start = d.toISOString().slice(0, 10);
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&observation_start=${start}`;
+  const ts = Date.now();
   const attempts = [
-    url,
-    `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    { label: 'codetabs',   url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}&_t=${ts}` },
+    { label: 'allorigins', url: `https://api.allorigins.win/raw?_t=${ts}&url=${encodeURIComponent(url)}` },
+    { label: 'direct',     url: url },
   ];
-  for (const attempt of attempts) {
+  for (const { label, url: attempt } of attempts) {
     try {
       const resp = await fetch(attempt);
-      if (!resp.ok) continue;
+      if (!resp.ok) { console.warn(`[FRED ${seriesId}] ${label}: HTTP ${resp.status}`); continue; }
       const data = await resp.json();
-      if (!data.observations) continue;
+      if (!data.observations) { console.warn(`[FRED ${seriesId}] ${label}: no observations`); continue; }
       const dates = [], values = [];
       for (const obs of data.observations) {
         if (obs.value !== '.') { dates.push(obs.date); values.push(parseFloat(obs.value)); }
       }
-      if (dates.length > 0) return { dates, values };
-    } catch (e) { continue; }
+      if (dates.length > 0) { console.log(`[FRED ${seriesId}] OK via ${label} (${dates.length} pts)`); return { dates, values }; }
+    } catch (e) { console.warn(`[FRED ${seriesId}] ${label}: ${e.message}`); continue; }
   }
-  throw new Error(`FRED ${seriesId} failed`);
+  throw new Error(`FRED ${seriesId} failed — all proxies exhausted`);
 }
 
 async function fetchBinanceBTC() {
-  // Binance public API — no proxy needed, Monday-aligned weekly candles back to Aug 2017
-  const url = 'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=1000';
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Binance: ${resp.status}`);
-  const data = await resp.json();
-  const dates = [], values = [];
-  for (const k of data) {
-    dates.push(new Date(k[0]).toISOString().slice(0, 10));
-    values.push(parseFloat(k[4]));
+  const baseUrl = 'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=1000';
+  const ts = Date.now();
+  const attempts = [
+    { label: 'codetabs',   url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(baseUrl)}&_t=${ts}` },
+    { label: 'allorigins', url: `https://api.allorigins.win/raw?_t=${ts}&url=${encodeURIComponent(baseUrl)}` },
+    { label: 'direct',     url: baseUrl },
+  ];
+  for (const { label, url } of attempts) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) { console.warn(`[Binance] ${label}: HTTP ${resp.status}`); continue; }
+      const data = await resp.json();
+      if (!Array.isArray(data) || data.length === 0) { console.warn(`[Binance] ${label}: empty/invalid`); continue; }
+      const dates = [], values = [];
+      for (const k of data) {
+        dates.push(new Date(k[0]).toISOString().slice(0, 10));
+        values.push(parseFloat(k[4]));
+      }
+      if (dates.length > 0) { console.log(`[Binance] OK via ${label} (${dates.length} pts)`); return { dates, values }; }
+    } catch (e) { console.warn(`[Binance] ${label}: ${e.message}`); continue; }
   }
-  return { dates, values };
+  throw new Error('Binance BTC failed — all proxies exhausted');
 }
 
 async function fetchYahoo(ticker, range) {
   const baseUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=1d`;
+  const ts = Date.now();
   const proxies = [
-    `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`,
+    { label: 'codetabs',   url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(baseUrl)}&_t=${ts}` },
+    { label: 'allorigins', url: `https://api.allorigins.win/raw?_t=${ts}&url=${encodeURIComponent(baseUrl)}` },
   ];
-  for (const proxyUrl of proxies) {
+  for (const { label, url: proxyUrl } of proxies) {
     try {
       const resp = await fetch(proxyUrl);
-      if (!resp.ok) continue;
+      if (!resp.ok) { console.warn(`[Yahoo ${ticker}] ${label}: HTTP ${resp.status}`); continue; }
       const json  = await resp.json();
       const result = json.chart.result[0];
-      const ts    = result.timestamp;
+      const timestamps = result.timestamp;
       const closes = result.indicators.quote[0].close;
       const dates = [], values = [];
-      for (let i = 0; i < ts.length; i++) {
+      for (let i = 0; i < timestamps.length; i++) {
         if (closes[i] != null) {
-          dates.push(new Date(ts[i] * 1000).toISOString().slice(0, 10));
+          dates.push(new Date(timestamps[i] * 1000).toISOString().slice(0, 10));
           values.push(closes[i]);
         }
       }
+      console.log(`[Yahoo ${ticker}] OK via ${label} (${dates.length} pts)`);
       return { dates, values };
-    } catch (e) { continue; }
+    } catch (e) { console.warn(`[Yahoo ${ticker}] ${label}: ${e.message}`); continue; }
   }
-  throw new Error(`Yahoo ${ticker} failed`);
+  throw new Error(`Yahoo ${ticker} failed — all proxies exhausted`);
 }
 
 // ── Rolling Pearson correlation ─────────────────────────────────────────────
@@ -301,20 +315,20 @@ function computeRollingCorr(btcDates, btcVals, assetDates, assetVals) {
 async function updateData() {
   setLoading(true);
   try {
-    setStatus('Fetching data from 11 sources...', 'info');
+    setStatus('Fetching data (FRED + Binance + Yahoo)...', 'info');
 
     const results = await Promise.allSettled([
       fetchBinanceBTC(),
-      fetchYahoo('^IXIC',    '5y'),
-      fetchYahoo('^DJI',     '5y'),
-      fetchYahoo('CL=F',     '5y'),
-      fetchYahoo('HG=F',     '5y'),
-      fetchYahoo('GC=F',     '5y'),
-      fetchYahoo('DX-Y.NYB', '5y'),
-      fetchYahoo('^TNX',     '5y'),
-      fetchFRED('BAMLH0A0HYM2'),
-      fetchYahoo('^VIX',     '5y'),
-      fetchYahoo('^MOVE',    '5y'),
+      fetchFRED('NASDAQCOM'),       // NASDAQ — was Yahoo ^IXIC
+      fetchFRED('DJIA'),            // Dow Jones — was Yahoo ^DJI
+      fetchFRED('DCOILWTICO'),      // Oil (WTI) — was Yahoo CL=F
+      fetchYahoo('HG=F',     '5y'), // Copper — no FRED daily
+      fetchYahoo('GC=F',     '5y'), // Gold — no FRED daily
+      fetchFRED('DTWEXBGS'),        // DXY — was Yahoo DX-Y.NYB
+      fetchFRED('DGS10'),           // 10Y Yield — was Yahoo ^TNX
+      fetchFRED('BAMLH0A0HYM2'),    // HY Spreads
+      fetchFRED('VIXCLS'),          // VIX — was Yahoo ^VIX
+      fetchYahoo('^MOVE',    '5y'), // MOVE — no FRED equivalent
     ]);
 
     const names = ['BTC','NASDAQ','Dow','Oil (WTI)','Copper','Gold',

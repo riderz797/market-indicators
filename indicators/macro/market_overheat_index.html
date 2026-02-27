@@ -274,10 +274,9 @@
       const ts = Date.now(); // cache-buster applied only to proxy wrapper URLs
 
       const sources = [
-        { label: 'direct',     url: fredUrl },
-        { label: 'allorigins', url: `https://api.allorigins.win/raw?_t=${ts}&url=${encodeURIComponent(fredUrl)}` },
-        { label: 'corsproxy',  url: `https://corsproxy.io/?${encodeURIComponent(fredUrl)}` },
         { label: 'codetabs',   url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(fredUrl)}&_t=${ts}` },
+        { label: 'allorigins', url: `https://api.allorigins.win/raw?_t=${ts}&url=${encodeURIComponent(fredUrl)}` },
+        { label: 'direct',     url: fredUrl },
       ];
 
       for (const { label, url } of sources) {

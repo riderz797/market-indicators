@@ -225,12 +225,18 @@
     async function fetchFRED(seriesId, limit = 3, observationEnd = null) {
       let url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=${limit}`;
       if (observationEnd) url += `&observation_end=${observationEnd}`;
-      for (const ep of [url, `https://corsproxy.io/?${encodeURIComponent(url)}`, `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`]) {
+      const ts = Date.now();
+      const sources = [
+        { label: 'codetabs',   ep: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}&_t=${ts}` },
+        { label: 'allorigins', ep: `https://api.allorigins.win/raw?_t=${ts}&url=${encodeURIComponent(url)}` },
+        { label: 'direct',     ep: url },
+      ];
+      for (const { label, ep } of sources) {
         try {
           const res = await fetch(ep);
-          if (!res.ok) continue;
+          if (!res.ok) { console.warn(`[FRED ${seriesId}] ${label}: HTTP ${res.status}`); continue; }
           const json = await res.json();
-          if (json.observations) return json.observations;
+          if (json.observations) { console.log(`[FRED ${seriesId}] OK via ${label}`); return json.observations; }
         } catch (_) { continue; }
       }
       return null;
