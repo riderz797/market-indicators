@@ -66,8 +66,24 @@ async function fetchYahoo(ticker, range, interval) {
     return null;
 }
 
+async function fetchCoinGeckoBTC() {
+    try {
+        const resp = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily');
+        if (!resp.ok) { console.warn(`[CoinGecko] HTTP ${resp.status}`); return null; }
+        const data = await resp.json();
+        if (!data.prices || data.prices.length === 0) return null;
+        const dates = [], values = [];
+        for (const [ts, price] of data.prices) {
+            dates.push(new Date(ts).toISOString().slice(0, 10));
+            values.push(price);
+        }
+        console.log(`[CoinGecko BTC] OK (${dates.length} pts, latest $${Math.round(values[values.length-1]).toLocaleString()})`);
+        return { dates, values };
+    } catch (e) { console.warn(`[CoinGecko] ${e.message}`); return null; }
+}
+
 async function fetchBinanceBTC() {
-    const baseUrl = 'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=12';
+    const baseUrl = 'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=90';
     const ts = Date.now();
     const attempts = [
         { label: 'codetabs',   url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(baseUrl)}&_t=${ts}` },
@@ -147,10 +163,10 @@ async function updateData() {
 
         setStatus('Fetching recent data...', 'info');
         const lastM2 = staticM2.dates[staticM2.dates.length - 1];
-        const [liveM2, liveDxy, liveBtc] = await Promise.all([
-            fetchFRED('M2SL', lastM2), fetchYahoo('DX-Y.NYB', '3mo', '1wk'), fetchYahoo('BTC-USD', '3mo', '1wk'),
+        const [liveM2, liveDxy, liveBtcCG] = await Promise.all([
+            fetchFRED('M2SL', lastM2), fetchYahoo('DX-Y.NYB', '3mo', '1wk'), fetchCoinGeckoBTC(),
         ]);
-        let liveBtcFinal = liveBtc || await fetchBinanceBTC();
+        let liveBtcFinal = liveBtcCG || await fetchYahoo('BTC-USD', '3mo', '1d') || await fetchBinanceBTC();
 
         const m2W  = mergeWeekly(staticM2,  liveM2 ? resampleWeekly(liveM2.dates, liveM2.values) : null);
         const dxyW = mergeWeekly(staticDxy, liveDxy ? resampleWeekly(liveDxy.dates, liveDxy.values) : null);
