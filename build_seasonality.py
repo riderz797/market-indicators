@@ -334,9 +334,10 @@ def main():
     <div class="controls-bar">
       <span class="controls-label">Years</span>
       <input type="text" id="year-search" placeholder="Filter: 2020, 1987, 2000-2010 &#8230;">
+      <button class="avg-btn" id="show-all-btn" onclick="toggleShowAllYears()">Show All Years</button>
       <div class="controls-sep"></div>
       <span class="controls-label">Averages</span>
-      <button class="avg-btn active" data-avg="all" onclick="toggleAvg('all', this)">All Years</button>
+      <button class="avg-btn active" data-avg="all" onclick="toggleAvg('all', this)">All Time Avg</button>
       <button class="avg-btn" data-avg="yr1" onclick="toggleAvg('yr1', this)">1 Post-Election</button>
       <button class="avg-btn" data-avg="yr2" onclick="toggleAvg('yr2', this)">2 Midterm</button>
       <button class="avg-btn" data-avg="yr3" onclick="toggleAvg('yr3', this)">3 Pre-Election</button>
@@ -375,6 +376,7 @@ def main():
           <li>Y-axis is the percent change from the first trading day</li>
           <li>The current year is shown as a bold white line</li>
           <li>Dashed lines are the 5 most similar historical years</li>
+          <li>Averages are era-weighted: Pre-Accord &#8217;42&#8211;&#8217;51 (10%), Gold Standard &#8217;52&#8211;&#8217;70 (25%), Early Fiat &#8217;71&#8211;&#8217;08 (100%), QE Era &#8217;09+ (150%)</li>
           <li>Use the search box to isolate specific years or ranges</li>
         </ul>
       </div>
@@ -424,6 +426,7 @@ def main():
     let avgToggles = { all: true, yr1: false, yr2: false, yr3: false, yr4: false };
     let topMatches = [];
     let showMatches = false;
+    let showAllYears = false;
 
     const MATCH_COLORS = ['#EF5350', '#42A5F5', '#66BB6A', '#FFA726', '#AB47BC'];
     const ELEC_COLORS = ['#4FC3F7', '#81C784', '#CE93D8', '#FF8A65'];
@@ -475,16 +478,33 @@ def main():
       return `Day ${dayIdx + 1}`;
     }
 
+    // Era-based weighting for structural regime shifts
+    // Pre-Accord (1942-1951): 10% — pegged rates, wartime distortions
+    // Gold Standard (1952-1970): 25% — real monetary constraints
+    // Early Fiat (1971-2008): 100% — baseline fiat era
+    // QE / Modern (2009+): 150% — most relevant regime, Fed put
+    function eraWeight(year) {
+      const y = parseInt(year);
+      if (y <= 1951) return 0.10;
+      if (y <= 1970) return 0.25;
+      if (y <= 2008) return 1.00;
+      return 1.50;
+    }
+
     function computeAverage(yearKeys) {
       const maxLen = Math.max(...yearKeys.map(y => (yearPct[y] || []).length));
       const avg = [];
       for (let d = 0; d < maxLen; d++) {
-        let sum = 0, cnt = 0;
+        let wSum = 0, wTotal = 0;
         for (const y of yearKeys) {
           const arr = yearPct[y];
-          if (arr && d < arr.length) { sum += arr[d]; cnt++; }
+          if (arr && d < arr.length) {
+            const w = eraWeight(y);
+            wSum += arr[d] * w;
+            wTotal += w;
+          }
         }
-        avg.push(cnt > 0 ? sum / cnt : null);
+        avg.push(wTotal > 0 ? wSum / wTotal : null);
       }
       return avg;
     }
@@ -507,9 +527,36 @@ def main():
       return (dx === 0 || dy === 0) ? 0 : num / (dx * dy);
     }
 
+    // Daily returns from cumulative percent-change array
+    function toDailyReturns(pct) {
+      const dr = [0];
+      for (let i = 1; i < pct.length; i++) {
+        dr.push(pct[i] - pct[i - 1]);
+      }
+      return dr;
+    }
+
+    // Normalized Euclidean distance -> similarity score (0 to 1)
+    function euclideanSimilarity(x, y) {
+      const n = Math.min(x.length, y.length);
+      if (n < 2) return 0;
+      let sumSq = 0;
+      for (let i = 0; i < n; i++) {
+        const diff = x[i] - y[i];
+        sumSq += diff * diff;
+      }
+      const rmse = Math.sqrt(sumSq / n);
+      return 1 / (1 + rmse / 5);
+    }
+
     // ================================================================
-    // PATTERN RECOGNITION
+    // PATTERN RECOGNITION — COMPOSITE SCORING
     // ================================================================
+    // Three metrics combined:
+    //   1. Pearson on daily returns (40%) — captures day-to-day behavior match
+    //   2. Euclidean path similarity  (35%) — captures actual path proximity
+    //   3. Pearson on cumulative path (25%) — captures overall trend direction
+
     function runPatternRecognition() {
       const curPct = yearPct[String(CURRENT_YEAR)];
       if (!curPct || curPct.length < 10) {
@@ -517,15 +564,29 @@ def main():
         return;
       }
       const curLen = curPct.length;
-      const corrs = [];
+      const curDaily = toDailyReturns(curPct);
+      const candidates = [];
+
       for (const [yr, pct] of Object.entries(yearPct)) {
         if (parseInt(yr) === CURRENT_YEAR) continue;
         if (pct.length < curLen) continue;
-        const r = pearson(curPct, pct.slice(0, curLen));
-        corrs.push({ year: yr, r, fullPath: pct });
+
+        const histSlice = pct.slice(0, curLen);
+        const histDaily = toDailyReturns(histSlice);
+
+        const rDaily = pearson(curDaily, histDaily);
+        const eSim = euclideanSimilarity(curPct, histSlice);
+        const rCum = pearson(curPct, histSlice);
+
+        const rDailyNorm = (rDaily + 1) / 2;
+        const rCumNorm = (rCum + 1) / 2;
+        const composite = 0.40 * rDailyNorm + 0.35 * eSim + 0.25 * rCumNorm;
+
+        candidates.push({ year: yr, composite, rDaily, eSim, rCum, fullPath: pct });
       }
-      corrs.sort((a, b) => b.r - a.r);
-      topMatches = corrs.slice(0, 5);
+
+      candidates.sort((a, b) => b.composite - a.composite);
+      topMatches = candidates.slice(0, 5);
     }
 
     function updatePatternCallout() {
@@ -540,16 +601,18 @@ def main():
       el.classList.add('visible');
 
       const days = (yearPct[String(CURRENT_YEAR)] || []).length;
-      metaEl.textContent = `${CURRENT_YEAR} most closely resembles these years (based on ${days} trading days, Pearson correlation on year-to-date return path)`;
+      metaEl.textContent = `${CURRENT_YEAR} most closely resembles these years (based on ${days} trading days). Composite score blends daily-return correlation (40%), path proximity (35%), and cumulative-return correlation (25%).`;
 
       let html = '';
       for (let i = 0; i < topMatches.length; i++) {
         const m = topMatches[i];
         const cycle = electionLabel(parseInt(m.year));
+        const pct = Math.round(m.composite * 100);
         html += `<div class="match-item">
           <span class="match-dot" style="background:${MATCH_COLORS[i]}"></span>
           <span class="match-year">${m.year}</span>
-          <span class="match-corr">r = ${m.r.toFixed(3)}</span>
+          <span class="match-corr">${pct}%</span>
+          <span style="color:#888;font-size:10px;" title="Daily r=${m.rDaily.toFixed(2)} | Path=${(m.eSim*100).toFixed(0)}% | Trend r=${m.rCum.toFixed(2)}">D:${m.rDaily.toFixed(2)} P:${(m.eSim*100).toFixed(0)}% T:${m.rCum.toFixed(2)}</span>
           <span class="match-cycle">${cycle}</span>
         </div>`;
       }
@@ -595,6 +658,21 @@ def main():
     function toggleAvg(key, btn) {
       avgToggles[key] = !avgToggles[key];
       btn.classList.toggle('active', avgToggles[key]);
+      rebuildChart();
+    }
+
+    function toggleShowAllYears() {
+      showAllYears = !showAllYears;
+      const btn = document.getElementById('show-all-btn');
+      btn.classList.toggle('active', showAllYears);
+      btn.textContent = showAllYears ? 'Hide All Years' : 'Show All Years';
+      if (showAllYears) {
+        visibleYears = new Set(Object.keys(yearPct));
+        document.getElementById('year-search').value = '';
+      } else {
+        visibleYears = new Set();
+        if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
+      }
       rebuildChart();
     }
 
@@ -713,7 +791,7 @@ def main():
             x: pct.map((_, j) => j + 1),
             y: pct,
             customdata: hoverDates,
-            name: `${m.year} (r=${m.r.toFixed(2)})`,
+            name: `${m.year} (${Math.round(m.composite*100)}%)`,
             line: { color: MATCH_COLORS[i], width: 2, dash: 'dash' },
             opacity: 0.85,
             hovertemplate: '<b>%{customdata}</b> | <b>' + m.year + '</b><br>Day %{x} | %{y:.1f}%<extra></extra>',
@@ -747,9 +825,9 @@ def main():
           type: 'scattergl', mode: 'lines',
           x: avg.map((_, i) => i + 1), y: avg,
           customdata: hoverDates,
-          name: 'All-Years Avg',
+          name: 'All Time Avg',
           line: { color: '#F5C542', width: 3 },
-          hovertemplate: '<b>%{customdata}</b> | <b>All-Years Avg</b><br>Day %{x} | %{y:.1f}%<extra></extra>',
+          hovertemplate: '<b>%{customdata}</b> | <b>All Time Avg</b><br>Day %{x} | %{y:.1f}%<extra></extra>',
         });
       }
 
@@ -805,46 +883,72 @@ def main():
     }
 
     // ================================================================
-    // LIVE FETCH (CURRENT YEAR)
+    // YAHOO FINANCE FETCH (shared helper)
     // ================================================================
-    async function fetchCurrentYear() {
-      const baseUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=ytd&interval=1d';
+    async function fetchYahooSP500(period1, period2) {
+      const baseUrl = `https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?period1=${period1}&period2=${period2}&interval=1d`;
       const proxies = [
         `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`,
       ];
-
       for (const proxyUrl of proxies) {
         try {
           const resp = await fetch(proxyUrl);
           if (!resp.ok) continue;
           const json = await resp.json();
-          const result = json.chart.result[0];
-          const timestamps = result.timestamp;
-          const closes = result.indicators.quote[0].close;
-
-          const currentDates = [];
-          const currentCloses = [];
-          for (let i = 0; i < timestamps.length; i++) {
-            if (closes[i] == null) continue;
-            const d = new Date(timestamps[i] * 1000);
-            if (d.getFullYear() === CURRENT_YEAR) {
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const dd = String(d.getDate()).padStart(2, '0');
-              currentDates.push(`${CURRENT_YEAR}-${mm}-${dd}`);
-              currentCloses.push(closes[i]);
-            }
-          }
-
-          if (currentCloses.length > 0) {
-            yearDates[String(CURRENT_YEAR)] = currentDates;
-            yearPct[String(CURRENT_YEAR)] = toPctChange(currentCloses);
-            visibleYears.add(String(CURRENT_YEAR));
-            return currentCloses.length;
-          }
+          return json.chart.result[0];
         } catch (e) { continue; }
       }
-      return 0;
+      return null;
+    }
+
+    function parseYahooByYear(result) {
+      const timestamps = result.timestamp;
+      const closes = result.indicators.quote[0].close;
+      const byYear = {};
+      for (let i = 0; i < timestamps.length; i++) {
+        if (closes[i] == null) continue;
+        const d = new Date(timestamps[i] * 1000);
+        const yr = String(d.getFullYear());
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        if (!byYear[yr]) byYear[yr] = { dates: [], closes: [] };
+        byYear[yr].dates.push(`${yr}-${mm}-${dd}`);
+        byYear[yr].closes.push(closes[i]);
+      }
+      return byYear;
+    }
+
+    // ================================================================
+    // AUTO-EXTENSION: fetch missing years between baked data and now
+    // ================================================================
+    async function fetchMissingYears() {
+      const missingYears = [];
+      for (let y = BAKED_THROUGH + 1; y <= CURRENT_YEAR; y++) {
+        if (!yearPct[String(y)]) missingYears.push(y);
+      }
+      if (missingYears.length === 0) return 0;
+
+      const startDate = new Date(missingYears[0], 0, 1);
+      const period1 = Math.floor(startDate.getTime() / 1000);
+      const period2 = Math.floor(Date.now() / 1000);
+
+      const result = await fetchYahooSP500(period1, period2);
+      if (!result) return 0;
+
+      const byYear = parseYahooByYear(result);
+      let filled = 0;
+      for (const [yr, data] of Object.entries(byYear)) {
+        if (data.closes.length > 0) {
+          yearDates[yr] = data.dates;
+          yearPct[yr] = toPctChange(data.closes);
+          filled++;
+        }
+      }
+      if (yearPct[String(CURRENT_YEAR)]) {
+        visibleYears.add(String(CURRENT_YEAR));
+      }
+      return filled;
     }
 
     // ================================================================
@@ -867,13 +971,14 @@ def main():
 
     async function updateData() {
       setLoading(true);
-      setStatus('Fetching current year data\u2026', 'info');
+      setStatus('Fetching live data\u2026', 'info');
       try {
-        const days = await fetchCurrentYear();
-        if (days > 0) {
+        const filled = await fetchMissingYears();
+        if (filled > 0) {
           runPatternRecognition();
           rebuildChart();
-          setStatus(`Updated: ${days} trading days in ${CURRENT_YEAR}`, 'success');
+          const days = (yearPct[String(CURRENT_YEAR)] || []).length;
+          setStatus(`Updated: ${filled} year(s) fetched, ${CURRENT_YEAR} has ${days} trading days`, 'success');
         } else {
           setStatus('No new data available', 'info');
         }
@@ -906,15 +1011,21 @@ def main():
       // Render chart with baked data immediately
       rebuildChart();
 
-      // Then fetch current year live
+      // Auto-extend: fetch any missing years (between baked data and now) + current year
       document.getElementById('status-bar').textContent = 'Fetching live data\u2026';
-      const days = await fetchCurrentYear();
-      if (days > 0) {
-        runPatternRecognition();
-        rebuildChart();
-        document.getElementById('status-bar').textContent = `${CURRENT_YEAR}: ${days} trading days (live)`;
-      } else {
-        document.getElementById('status-bar').textContent = 'Live fetch unavailable \u2014 baked data only';
+      try {
+        const filled = await fetchMissingYears();
+        if (filled > 0) {
+          runPatternRecognition();
+          rebuildChart();
+          const days = (yearPct[String(CURRENT_YEAR)] || []).length;
+          document.getElementById('status-bar').textContent = `${CURRENT_YEAR}: ${days} trading days (live)`;
+        } else {
+          document.getElementById('status-bar').textContent = 'Live fetch unavailable \u2014 baked data only';
+        }
+      } catch (e) {
+        console.warn('Auto-extension failed:', e);
+        document.getElementById('status-bar').textContent = 'Live fetch failed \u2014 baked data only';
       }
     })();
   </script>

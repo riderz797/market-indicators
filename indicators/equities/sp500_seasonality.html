@@ -366,6 +366,7 @@
           <li>Y-axis is the percent change from the first trading day</li>
           <li>The current year is shown as a bold white line</li>
           <li>Dashed lines are the 5 most similar historical years</li>
+          <li>Averages are era-weighted: Pre-Accord &#8217;42&#8211;&#8217;51 (10%), Gold Standard &#8217;52&#8211;&#8217;70 (25%), Early Fiat &#8217;71&#8211;&#8217;08 (100%), QE Era &#8217;09+ (150%)</li>
           <li>Use the search box to isolate specific years or ranges</li>
         </ul>
       </div>
@@ -503,6 +504,7 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
     let avgToggles = { all: true, yr1: false, yr2: false, yr3: false, yr4: false };
     let topMatches = [];
     let showMatches = false;
+    let showAllYears = false;
 
     const MATCH_COLORS = ['#EF5350', '#42A5F5', '#66BB6A', '#FFA726', '#AB47BC'];
     const ELEC_COLORS = ['#4FC3F7', '#81C784', '#CE93D8', '#FF8A65'];
@@ -554,16 +556,33 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
       return `Day ${dayIdx + 1}`;
     }
 
+    // Era-based weighting for structural regime shifts
+    // Pre-Accord (1942-1951): 10% — pegged rates, wartime distortions
+    // Gold Standard (1952-1970): 25% — real monetary constraints
+    // Early Fiat (1971-2008): 100% — baseline fiat era
+    // QE / Modern (2009+): 150% — most relevant regime, Fed put
+    function eraWeight(year) {
+      const y = parseInt(year);
+      if (y <= 1951) return 0.10;
+      if (y <= 1970) return 0.25;
+      if (y <= 2008) return 1.00;
+      return 1.50;
+    }
+
     function computeAverage(yearKeys) {
       const maxLen = Math.max(...yearKeys.map(y => (yearPct[y] || []).length));
       const avg = [];
       for (let d = 0; d < maxLen; d++) {
-        let sum = 0, cnt = 0;
+        let wSum = 0, wTotal = 0;
         for (const y of yearKeys) {
           const arr = yearPct[y];
-          if (arr && d < arr.length) { sum += arr[d]; cnt++; }
+          if (arr && d < arr.length) {
+            const w = eraWeight(y);
+            wSum += arr[d] * w;
+            wTotal += w;
+          }
         }
-        avg.push(cnt > 0 ? sum / cnt : null);
+        avg.push(wTotal > 0 ? wSum / wTotal : null);
       }
       return avg;
     }
@@ -595,8 +614,7 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
       return dr;
     }
 
-    // Normalized Euclidean distance → similarity score (0 to 1)
-    // Lower distance = higher similarity
+    // Normalized Euclidean distance -> similarity score (0 to 1)
     function euclideanSimilarity(x, y) {
       const n = Math.min(x.length, y.length);
       if (n < 2) return 0;
@@ -606,8 +624,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
         sumSq += diff * diff;
       }
       const rmse = Math.sqrt(sumSq / n);
-      // Convert to 0-1 similarity: use sigmoid-like decay
-      // At rmse=0 → 1.0, at rmse=5% → ~0.5, at rmse=15% → ~0.14
       return 1 / (1 + rmse / 5);
     }
 
@@ -618,8 +634,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
     //   1. Pearson on daily returns (40%) — captures day-to-day behavior match
     //   2. Euclidean path similarity  (35%) — captures actual path proximity
     //   3. Pearson on cumulative path (25%) — captures overall trend direction
-    //
-    // This blends shape, proximity, and trend into one score.
 
     function runPatternRecognition() {
       const curPct = yearPct[String(CURRENT_YEAR)];
@@ -638,30 +652,15 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
         const histSlice = pct.slice(0, curLen);
         const histDaily = toDailyReturns(histSlice);
 
-        // Metric 1: Pearson on daily returns (behavior similarity)
         const rDaily = pearson(curDaily, histDaily);
-
-        // Metric 2: Euclidean path similarity (proximity)
         const eSim = euclideanSimilarity(curPct, histSlice);
-
-        // Metric 3: Pearson on cumulative returns (trend direction)
         const rCum = pearson(curPct, histSlice);
 
-        // Composite: weighted blend (all components are 0-1 or -1 to 1 range)
-        // Normalize Pearson values from [-1,1] to [0,1] for fair weighting
         const rDailyNorm = (rDaily + 1) / 2;
         const rCumNorm = (rCum + 1) / 2;
-
         const composite = 0.40 * rDailyNorm + 0.35 * eSim + 0.25 * rCumNorm;
 
-        candidates.push({
-          year: yr,
-          composite,
-          rDaily,
-          eSim,
-          rCum,
-          fullPath: pct,
-        });
+        candidates.push({ year: yr, composite, rDaily, eSim, rCum, fullPath: pct });
       }
 
       candidates.sort((a, b) => b.composite - a.composite);
@@ -740,7 +739,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
       rebuildChart();
     }
 
-    let showAllYears = false;
     function toggleShowAllYears() {
       showAllYears = !showAllYears;
       const btn = document.getElementById('show-all-btn');
@@ -871,7 +869,7 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
             x: pct.map((_, j) => j + 1),
             y: pct,
             customdata: hoverDates,
-            name: `${m.year} (${Math.round(m.composite * 100)}%)`,
+            name: `${m.year} (${Math.round(m.composite*100)}%)`,
             line: { color: MATCH_COLORS[i], width: 2, dash: 'dash' },
             opacity: 0.85,
             hovertemplate: '<b>%{customdata}</b> | <b>' + m.year + '</b><br>Day %{x} | %{y:.1f}%<extra></extra>',
@@ -966,7 +964,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
     // YAHOO FINANCE FETCH (shared helper)
     // ================================================================
     async function fetchYahooSP500(period1, period2) {
-      // period1/period2 are Unix timestamps
       const baseUrl = `https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?period1=${period1}&period2=${period2}&interval=1d`;
       const proxies = [
         `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`,
@@ -983,7 +980,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
       return null;
     }
 
-    // Parse Yahoo result into { year: { dates:[], closes:[] } } grouped by calendar year
     function parseYahooByYear(result) {
       const timestamps = result.timestamp;
       const closes = result.indicators.quote[0].close;
@@ -1005,14 +1001,12 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
     // AUTO-EXTENSION: fetch missing years between baked data and now
     // ================================================================
     async function fetchMissingYears() {
-      // Determine which years are missing
       const missingYears = [];
       for (let y = BAKED_THROUGH + 1; y <= CURRENT_YEAR; y++) {
         if (!yearPct[String(y)]) missingYears.push(y);
       }
       if (missingYears.length === 0) return 0;
 
-      // Fetch from Jan 1 of first missing year through today
       const startDate = new Date(missingYears[0], 0, 1);
       const period1 = Math.floor(startDate.getTime() / 1000);
       const period2 = Math.floor(Date.now() / 1000);
@@ -1029,7 +1023,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
           filled++;
         }
       }
-      // Make sure current year is in visible set
       if (yearPct[String(CURRENT_YEAR)]) {
         visibleYears.add(String(CURRENT_YEAR));
       }
