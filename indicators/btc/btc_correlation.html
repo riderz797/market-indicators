@@ -205,15 +205,26 @@ function setStatus(msg, type) {
 async function fetchFRED(seriesId) {
   const d = new Date(); d.setDate(d.getDate() - 220);
   const start = d.toISOString().slice(0, 10);
-  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&observation_start=${start}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`FRED ${seriesId}: ${resp.status}`);
-  const data = await resp.json();
-  const dates = [], values = [];
-  for (const obs of data.observations) {
-    if (obs.value !== '.') { dates.push(obs.date); values.push(parseFloat(obs.value)); }
+  const baseUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&observation_start=${start}`;
+  const proxies = [
+    { url: `https://api.allorigins.win/get?url=${encodeURIComponent(baseUrl)}`, unwrap: true },
+    { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`, unwrap: false },
+    { url: `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`, unwrap: false },
+  ];
+  for (const proxy of proxies) {
+    try {
+      const resp = await fetch(proxy.url);
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      const data = proxy.unwrap ? JSON.parse(json.contents) : json;
+      const dates = [], values = [];
+      for (const obs of data.observations) {
+        if (obs.value !== '.') { dates.push(obs.date); values.push(parseFloat(obs.value)); }
+      }
+      return { dates, values };
+    } catch (e) { continue; }
   }
-  return { dates, values };
+  throw new Error(`FRED ${seriesId} failed`);
 }
 
 async function fetchCoinGeckoBTC(days) {
