@@ -1026,32 +1026,14 @@ def main():
     // ================================================================
     // AUTO-EXTENSION: fetch missing years between baked data and now
     // ================================================================
-    // localStorage cache helpers
-    const CACHE_KEY = 'btc_seasonality_cache';
-    function loadCache() {
-      try {
-        const raw = localStorage.getItem(CACHE_KEY);
-        if (!raw) return null;
-        const cache = JSON.parse(raw);
-        // Cache is valid for 12 hours
-        if (Date.now() - cache.ts > 12 * 60 * 60 * 1000) return null;
-        return cache.data;
-      } catch (e) { return null; }
-    }
-    function saveCache(byYearData) {
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: byYearData }));
-      } catch (e) { /* quota exceeded, ignore */ }
-    }
-
-    async function fetchMissingYears(force) {
-      const targetYears = [];
+    async function fetchMissingYears() {
+      const missingYears = [];
       for (let y = BAKED_THROUGH + 1; y <= CURRENT_YEAR; y++) {
-        if (force || !yearPct[String(y)]) targetYears.push(y);
+        if (!yearPct[String(y)]) missingYears.push(y);
       }
-      if (targetYears.length === 0) return 0;
+      if (missingYears.length === 0) return 0;
 
-      const startDate = new Date(targetYears[0], 0, 1);
+      const startDate = new Date(missingYears[0], 0, 1);
       const period1 = Math.floor(startDate.getTime() / 1000);
       const period2 = Math.floor(Date.now() / 1000);
 
@@ -1066,16 +1048,13 @@ def main():
 
       const byYear = parseYahooByYear(result);
       let filled = 0;
-      const cacheData = {};
       for (const [yr, data] of Object.entries(byYear)) {
         if (data.closes.length > 0) {
           yearDates[yr] = data.dates;
           yearPct[yr] = toPctChange(data.closes);
-          cacheData[yr] = { dates: data.dates, closes: data.closes };
           filled++;
         }
       }
-      if (filled > 0) saveCache(cacheData);
       if (yearPct[String(CURRENT_YEAR)]) {
         visibleYears.add(String(CURRENT_YEAR));
       }
@@ -1130,20 +1109,8 @@ def main():
         yearDates[yr] = data.d;
       }
 
-      // Load cached live data immediately (so current year shows on first paint)
-      const cached = loadCache();
-      if (cached) {
-        for (const [yr, data] of Object.entries(cached)) {
-          if (!yearPct[yr] && data.closes.length > 0) {
-            yearDates[yr] = data.dates;
-            yearPct[yr] = toPctChange(data.closes);
-          }
-        }
-      }
-
-      // Default: no background years, but always include current year if available
+      // Default: no background years
       visibleYears = new Set();
-      if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
 
       // Auto-enable current halving cycle average
       const curCycle = halvingCycle(CURRENT_YEAR);
@@ -1151,32 +1118,24 @@ def main():
       avgToggles[cycleKey] = true;
       document.getElementById(`cyc-btn-${curCycle + 1}`).classList.add('active');
 
-      // Render chart with baked + cached data immediately
-      if (cached) runPatternRecognition();
+      // Render chart with baked data immediately
       rebuildChart();
 
-      // Fetch fresh live data (force-refresh even if cache exists)
-      const hadCache = !!cached && !!yearPct[String(CURRENT_YEAR)];
-      document.getElementById('status-bar').textContent = hadCache
-        ? `${CURRENT_YEAR}: ${(yearPct[String(CURRENT_YEAR)] || []).length} days (cached) \u2014 refreshing\u2026`
-        : 'Fetching live data\u2026';
+      // Auto-extend: fetch missing years + current year
+      document.getElementById('status-bar').textContent = 'Fetching live data\u2026';
       try {
-        const filled = await fetchMissingYears(true);
+        const filled = await fetchMissingYears();
         if (filled > 0) {
           runPatternRecognition();
           rebuildChart();
           const days = (yearPct[String(CURRENT_YEAR)] || []).length;
           document.getElementById('status-bar').textContent = `${CURRENT_YEAR}: ${days} days (live)`;
-        } else if (hadCache) {
-          document.getElementById('status-bar').textContent = `${CURRENT_YEAR}: ${(yearPct[String(CURRENT_YEAR)] || []).length} days (cached)`;
         } else {
           document.getElementById('status-bar').textContent = 'Live fetch unavailable \u2014 baked data only';
         }
       } catch (e) {
         console.warn('Auto-extension failed:', e);
-        document.getElementById('status-bar').textContent = hadCache
-          ? `${CURRENT_YEAR}: cached data (live fetch failed)`
-          : 'Live fetch failed \u2014 baked data only';
+        document.getElementById('status-bar').textContent = 'Live fetch failed \u2014 baked data only';
       }
     })();
   </script>
