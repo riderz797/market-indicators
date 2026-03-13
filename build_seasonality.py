@@ -861,6 +861,7 @@ def main():
       const proxies = [
         `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`,
+        baseUrl,
       ];
       for (const proxyUrl of proxies) {
         try {
@@ -904,7 +905,13 @@ def main():
       const period1 = Math.floor(startDate.getTime() / 1000);
       const period2 = Math.floor(Date.now() / 1000);
 
-      const result = await fetchYahooSP500(period1, period2);
+      // Try up to 3 attempts with 2s delay between retries
+      let result = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        result = await fetchYahooSP500(period1, period2);
+        if (result) break;
+        if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+      }
       if (!result) return 0;
 
       const byYear = parseYahooByYear(result);

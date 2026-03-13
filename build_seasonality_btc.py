@@ -950,6 +950,7 @@ def main():
       const proxies = [
         `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`,
+        baseUrl,
       ];
       for (const proxyUrl of proxies) {
         try {
