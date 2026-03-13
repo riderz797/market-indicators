@@ -140,44 +140,34 @@
   </script>
 
 <style>
-#update-btn-container {
+#data-status {
   position: fixed; bottom: 20px; right: 20px; z-index: 10000;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-#update-btn {
-  background: #F5C542; color: #000; border: none; padding: 12px 20px;
-  border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5); transition: background 0.2s;
   display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid #444;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #AAAAAA;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
-#update-btn:hover { background: #e6b43c; }
-#update-btn:disabled { background: #555; cursor: not-allowed; color: #999; }
-#update-btn .spinner {
-  display: none; width: 16px; height: 16px;
-  border: 2px solid rgba(0,0,0,0.2); border-top-color: #000;
-  border-radius: 50%; animation: spin 0.8s linear infinite;
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #555;
+  flex-shrink: 0;
 }
-#update-btn.loading .spinner { display: block; }
-#update-btn.loading .btn-text { display: none; }
-#update-status {
-  margin-top: 8px; font-size: 12px; padding: 6px 12px; border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: none; max-width: 290px;
-  background: rgba(30,30,30,0.97); color: #FFFFFF;
-}
-#update-status.visible { display: block; }
-#update-status.error   { border-left: 3px solid #EF5350; }
-#update-status.success { border-left: 3px solid #F5C542; }
-#update-status.info    { border-left: 3px solid #AAAAAA; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.status-dot.live { background: #81C784; }
+.status-dot.fetching { background: #F5C542; animation: pulse 1.2s ease-in-out infinite; }
+.status-dot.error { background: #EF5350; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 </style>
 
-<div id="update-btn-container">
-  <button id="update-btn" onclick="updateData()">
-    <span class="spinner"></span>
-    <span class="btn-text">&#x21bb; Update Data</span>
-    <span class="loading-text" style="display:none">Updating...</span>
-  </button>
-  <div id="update-status"></div>
+<div id="data-status">
+  <span class="status-dot" id="status-dot"></span>
+  <span id="data-status-text">Loading&#8230;</span>
 </div>
 
 <script>
@@ -188,16 +178,15 @@ const ASSET_ORDER  = ['NASDAQ','Dow','Oil (WTI)','Copper','Gold','DXY','10Y Yiel
 const ACCENT       = '#F5C542';
 const NEG_COLOR    = '#EF5350';
 
-function setLoading(on) {
-  const btn = document.getElementById('update-btn');
-  btn.querySelector('.loading-text').style.display = on ? 'inline' : 'none';
-  btn.querySelector('.btn-text').style.display     = on ? 'none'   : 'inline';
-  on ? btn.classList.add('loading') : btn.classList.remove('loading');
-  btn.disabled = on;
+function setDataStatus(text, state) {
+  document.getElementById('data-status-text').textContent = text;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot' + (state ? ' ' + state : '');
 }
-function setStatus(msg, type) {
-  const el = document.getElementById('update-status');
-  el.textContent = msg; el.className = 'visible ' + type;
+function nextMonday() {
+  const d = new Date();
+  d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // ── Fetch helpers ──────────────────────────────────────────────────────────
@@ -300,9 +289,8 @@ function computeRollingCorr(btcDates, btcVals, assetDates, assetVals) {
 // ── Main update ────────────────────────────────────────────────────────────
 
 async function updateData() {
-  setLoading(true);
   try {
-    setStatus('Fetching data from 11 sources...', 'info');
+    setDataStatus('Fetching live data\u2026', 'fetching');
 
     const results = await Promise.allSettled([
       fetchCoinGeckoBTC(190),
@@ -328,7 +316,7 @@ async function updateData() {
     }
     if (!rawData['BTC']) throw new Error('BTC data unavailable');
 
-    setStatus('Computing rolling correlations...', 'info');
+    setDataStatus('Computing correlations\u2026', 'fetching');
 
     const corrData = {};
     for (const name of ASSET_ORDER) {
@@ -379,16 +367,13 @@ async function updateData() {
     chart2.data[0].text           = barTx;
     Plotly.react(chart2, chart2.data, chart2.layout);
 
-    const msg = errors.length > 0
-      ? `Updated (missing: ${errors.join(', ')}): ${new Date().toLocaleString()}`
-      : `Updated: ${new Date().toLocaleString()}`;
-    setStatus(msg, errors.length > 0 ? 'info' : 'success');
+    setDataStatus('Live data \u2014 ' + new Date().toLocaleDateString('en-US', {month: 'short', day: 'numeric'}), 'live');
   } catch (err) {
-    setStatus('Error: ' + err.message, 'error');
+    setDataStatus('Next update: Mon ' + nextMonday(), 'error');
     console.error(err);
   } finally {
-    setLoading(false);
   }
 }
+updateData();
 </script></body>
 </html>

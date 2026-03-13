@@ -241,60 +241,34 @@
       margin-right: 8px;
     }
 
-    /* Update button */
-    .update-wrap {
+    /* Data status badge */
+    .data-status {
       position: fixed;
       bottom: 20px;
       right: 20px;
       z-index: 100;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 8px;
-    }
-    #update-btn {
-      display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 20px;
-      background: #3A3A3A;
-      color: #FFFFFF;
-      border: 1px solid #555;
+      padding: 8px 14px;
+      background: rgba(30, 30, 30, 0.95);
+      border: 1px solid #444;
       border-radius: 8px;
-      font-family: inherit;
-      font-size: 12px;
-      cursor: pointer;
-      letter-spacing: 0.5px;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    #update-btn:hover { border-color: #F5C542; background: #444; }
-    #update-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .spinner {
-      display: none;
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    #update-btn.loading .spinner { display: inline-block; }
-    #update-btn.loading .btn-text { display: none; }
-    #update-btn.loading .loading-text { display: inline; }
-    .loading-text { display: none; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #update-status {
       font-size: 11px;
-      padding: 6px 12px;
-      border-radius: 6px;
-      display: none;
-      max-width: 280px;
-      text-align: right;
+      color: #AAAAAA;
+      letter-spacing: 0.3px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
-    #update-status.visible { display: block; }
-    #update-status.info { background: #1E1E1E; color: #C0C0C0; border: 1px solid #444; }
-    #update-status.success { background: #1a2e1a; color: #81C784; border: 1px solid #2e5a2e; }
-    #update-status.error { background: #2e1a1a; color: #EF5350; border: 1px solid #5a2e2e; }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #555;
+      flex-shrink: 0;
+    }
+    .status-dot.live { background: #81C784; }
+    .status-dot.fetching { background: #F5C542; animation: pulse 1.2s ease-in-out infinite; }
+    .status-dot.error { background: #EF5350; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
     /* Footer */
     .footer-note {
@@ -388,13 +362,10 @@
   </div>
 
   <!-- Update button -->
-  <div class="update-wrap">
-    <div id="update-status"></div>
-    <button id="update-btn" onclick="updateData()">
-      <span class="spinner"></span>
-      <span class="btn-text">Update Data</span>
-      <span class="loading-text">Updating&#8230;</span>
-    </button>
+  <!-- Data status badge -->
+  <div class="data-status">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="data-status-text">Loading&#8230;</span>
   </div>
 
   <script>
@@ -1032,39 +1003,18 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
     // ================================================================
     // UPDATE BUTTON
     // ================================================================
-    function setStatus(msg, type) {
-      const el = document.getElementById('update-status');
-      el.textContent = msg;
-      el.className = 'visible ' + type;
-      if (type === 'success' || type === 'info') {
-        setTimeout(() => { el.className = ''; }, 5000);
-      }
+    // ================================================================
+    // DATA STATUS BADGE
+    // ================================================================
+    function setDataStatus(text, state) {
+      document.getElementById('data-status-text').textContent = text;
+      const dot = document.getElementById('status-dot');
+      dot.className = 'status-dot' + (state ? ' ' + state : '');
     }
-
-    function setLoading(on) {
-      const btn = document.getElementById('update-btn');
-      if (on) btn.classList.add('loading'); else btn.classList.remove('loading');
-      btn.disabled = on;
-    }
-
-    async function updateData() {
-      setLoading(true);
-      setStatus('Fetching live data\u2026', 'info');
-      try {
-        const filled = await fetchMissingYears();
-        if (filled > 0) {
-          runPatternRecognition();
-          rebuildChart();
-          const days = (yearPct[String(CURRENT_YEAR)] || []).length;
-          setStatus(`Updated: ${filled} year(s) fetched, ${CURRENT_YEAR} has ${days} trading days`, 'success');
-        } else {
-          setStatus('No new data available', 'info');
-        }
-      } catch (e) {
-        console.warn('Update failed:', e);
-        setStatus('Update failed \u2014 using baked data', 'error');
-      }
-      setLoading(false);
+    function nextMonday() {
+      const d = new Date();
+      d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
     // ================================================================
@@ -1090,6 +1040,7 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
       rebuildChart();
 
       // Auto-extend: fetch any missing years (between baked data and now) + current year
+      setDataStatus('Fetching live data\u2026', 'fetching');
       document.getElementById('status-bar').textContent = 'Fetching live data\u2026';
       try {
         const filled = await fetchMissingYears();
@@ -1098,12 +1049,15 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
           rebuildChart();
           const days = (yearPct[String(CURRENT_YEAR)] || []).length;
           document.getElementById('status-bar').textContent = `${CURRENT_YEAR}: ${days} trading days (live)`;
+          setDataStatus(`Live data \u2014 ${days} days`, 'live');
         } else {
-          document.getElementById('status-bar').textContent = 'Live fetch unavailable \u2014 baked data only';
+          document.getElementById('status-bar').textContent = 'Baked data only';
+          setDataStatus(`Next update: Mon ${nextMonday()}`, '');
         }
       } catch (e) {
         console.warn('Auto-extension failed:', e);
-        document.getElementById('status-bar').textContent = 'Live fetch failed \u2014 baked data only';
+        document.getElementById('status-bar').textContent = 'Live fetch failed';
+        setDataStatus(`Next update: Mon ${nextMonday()}`, 'error');
       }
     })();
   </script>
