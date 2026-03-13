@@ -995,20 +995,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
           return json.chart.result[0];
         } catch (e) { continue; }
       }
-      // Fallback: CoinGecko
-      try {
-        const cgUrl = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${period1}&to=${period2}`;
-        const resp = await fetch(cgUrl);
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json.prices && json.prices.length > 0) {
-            // Convert CoinGecko format to Yahoo-like format
-            const timestamps = json.prices.map(p => Math.floor(p[0] / 1000));
-            const closes = json.prices.map(p => p[1]);
-            return { timestamp: timestamps, indicators: { quote: [{ close: closes }] } };
-          }
-        }
-      } catch (e) { /* continue */ }
       return null;
     }
 
