@@ -170,11 +170,7 @@
       background: #242424;
       border: 1px solid #444;
       border-radius: 6px;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
     }
-    .match-item:hover { border-color: #888; }
-    .match-item.active { border-color: #F5C542; background: #2A2A1E; }
     .match-dot {
       width: 10px;
       height: 10px;
@@ -317,7 +313,7 @@
       <h3>PATTERN RECOGNITION</h3>
       <div class="meta" id="pattern-meta"></div>
       <div class="matches-row" id="pattern-matches"></div>
-      <button class="avg-btn" id="show-matches-btn" style="margin-top:12px;" onclick="toggleMatchesOnChart()">Show All on Chart</button>
+      <button class="avg-btn" id="show-matches-btn" style="margin-top:12px;" onclick="toggleMatchesOnChart()">Show on Chart</button>
     </div>
 
     <!-- Chart -->
@@ -478,7 +474,7 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
     let visibleYears = new Set();
     let avgToggles = { all: true, yr1: false, yr2: false, yr3: false, yr4: false };
     let topMatches = [];
-    let matchToggles = new Set();   // indices of individually toggled matches
+    let showMatches = false;
     let showAllYears = false;
 
     const MATCH_COLORS = ['#EF5350', '#42A5F5', '#66BB6A', '#FFA726', '#AB47BC'];
@@ -640,7 +636,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
 
       candidates.sort((a, b) => b.composite - a.composite);
       topMatches = candidates.slice(0, 5);
-      matchToggles.clear();
     }
 
     function updatePatternCallout() {
@@ -662,8 +657,7 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
         const m = topMatches[i];
         const cycle = electionLabel(parseInt(m.year));
         const pct = Math.round(m.composite * 100);
-        const isActive = matchToggles.has(i);
-        html += `<div class="match-item${isActive ? ' active' : ''}" onclick="toggleMatch(${i})">
+        html += `<div class="match-item">
           <span class="match-dot" style="background:${MATCH_COLORS[i]}"></span>
           <span class="match-year">${m.year}</span>
           <span class="match-corr">${pct}%</span>
@@ -682,12 +676,8 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
         const raw = e.target.value.trim();
-        showAllYears = false;
-        document.getElementById('show-all-btn').classList.remove('active');
-        document.getElementById('show-all-btn').textContent = 'Show All Years';
-
         if (!raw) {
-          // Default: no background years (just current year + averages + cycle years)
+          // Default: no background years (just current year + averages)
           visibleYears = new Set();
           if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
         } else {
@@ -707,10 +697,6 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
           // Always include current year
           if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
         }
-        // Preserve years added by cycle buttons
-        for (const yrs of Object.values(cycleAddedYears)) {
-          for (const y of yrs) visibleYears.add(y);
-        }
         rebuildChart();
       }, 300);
     });
@@ -718,36 +704,9 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
     // ================================================================
     // AVERAGE TOGGLES
     // ================================================================
-    // Track which years were added by cycle buttons so we can remove them
-    let cycleAddedYears = {};  // key -> Set of year strings
-
     function toggleAvg(key, btn) {
       avgToggles[key] = !avgToggles[key];
       btn.classList.toggle('active', avgToggles[key]);
-
-      // For election cycle buttons (yr1-yr4), also show/hide individual years
-      const cycleIndex = ['yr1', 'yr2', 'yr3', 'yr4'].indexOf(key);
-      if (cycleIndex >= 0) {
-        if (avgToggles[key]) {
-          // Add individual years of this cycle
-          const yearsForCycle = new Set();
-          for (const y of Object.keys(yearPct)) {
-            if (parseInt(y) === CURRENT_YEAR) continue;
-            if (electionCycle(parseInt(y)) === cycleIndex) {
-              visibleYears.add(y);
-              yearsForCycle.add(y);
-            }
-          }
-          cycleAddedYears[key] = yearsForCycle;
-        } else {
-          // Remove years that were added by this cycle toggle
-          const toRemove = cycleAddedYears[key] || new Set();
-          for (const y of toRemove) {
-            visibleYears.delete(y);
-          }
-          delete cycleAddedYears[key];
-        }
-      }
       rebuildChart();
     }
 
@@ -762,40 +721,16 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
       } else {
         visibleYears = new Set();
         if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
-        // Preserve years added by cycle buttons
-        for (const yrs of Object.values(cycleAddedYears)) {
-          for (const y of yrs) visibleYears.add(y);
-        }
       }
-      rebuildChart();
-    }
-
-    function toggleMatch(index) {
-      if (matchToggles.has(index)) {
-        matchToggles.delete(index);
-      } else {
-        matchToggles.add(index);
-      }
-      updateMatchButton();
-      updatePatternCallout();
       rebuildChart();
     }
 
     function toggleMatchesOnChart() {
-      if (matchToggles.size > 0) {
-        matchToggles.clear();
-      } else {
-        for (let i = 0; i < topMatches.length; i++) matchToggles.add(i);
-      }
-      updateMatchButton();
-      updatePatternCallout();
-      rebuildChart();
-    }
-
-    function updateMatchButton() {
+      showMatches = !showMatches;
       const btn = document.getElementById('show-matches-btn');
-      btn.classList.toggle('active', matchToggles.size > 0);
-      btn.textContent = matchToggles.size > 0 ? 'Hide All from Chart' : 'Show All on Chart';
+      btn.classList.toggle('active', showMatches);
+      btn.textContent = showMatches ? 'Hide from Chart' : 'Show on Chart';
+      rebuildChart();
     }
 
     // ================================================================
@@ -870,14 +805,7 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
     function rebuildChart() {
       const traces = [];
       const sortedYears = [...visibleYears].sort();
-      const matchYearSet = new Set();
-      for (let i = 0; i < topMatches.length; i++) {
-        if (matchToggles.has(i)) matchYearSet.add(topMatches[i].year);
-      }
-
-      // Searched years get higher visibility than "show all" mode
-      const bgOpacity = showAllYears ? 0.25 : 0.65;
-      const bgWidth   = showAllYears ? 1 : 2;
+      const matchYearSet = new Set(showMatches ? topMatches.map(m => m.year) : []);
 
       // A. Background year lines
       for (const yr of sortedYears) {
@@ -893,17 +821,16 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
           y: pct,
           customdata: hoverDates,
           name: yr,
-          line: { color: yearColor(parseInt(yr)), width: bgWidth },
-          opacity: bgOpacity,
+          line: { color: yearColor(parseInt(yr)), width: 1 },
+          opacity: 0.25,
           hovertemplate: '<b>%{customdata}</b> | <b>' + yr + '</b><br>Day %{x} | %{y:.1f}%<extra></extra>',
-          showlegend: !showAllYears,
+          showlegend: false,
         });
       }
 
-      // B. Top match analog years (dashed) — only individually toggled matches
-      if (matchToggles.size > 0) {
+      // B. Top match analog years (dashed) — only when toggled on
+      if (showMatches) {
         for (let i = 0; i < topMatches.length; i++) {
-          if (!matchToggles.has(i)) continue;
           const m = topMatches[i];
           const pct = yearPct[m.year];
           if (!pct) continue;
