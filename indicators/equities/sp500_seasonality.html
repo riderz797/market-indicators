@@ -808,6 +808,11 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
       const matchYearSet = new Set(showMatches ? topMatches.map(m => m.year) : []);
 
       // A. Background year lines
+      // When specific years are searched, draw them prominently
+      const isSearched = !showAllYears && sortedYears.length > 0;
+      const bgOpacity = isSearched ? 0.7 : 0.25;
+      const bgWidth   = isSearched ? 2 : 1;
+
       for (const yr of sortedYears) {
         const pct = yearPct[yr];
         if (!pct) continue;
@@ -821,10 +826,10 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
           y: pct,
           customdata: hoverDates,
           name: yr,
-          line: { color: yearColor(parseInt(yr)), width: 1 },
-          opacity: 0.25,
+          line: { color: yearColor(parseInt(yr)), width: bgWidth },
+          opacity: bgOpacity,
           hovertemplate: '<b>%{customdata}</b> | <b>' + yr + '</b><br>Day %{x} | %{y:.1f}%<extra></extra>',
-          showlegend: false,
+          showlegend: isSearched,
         });
       }
 
