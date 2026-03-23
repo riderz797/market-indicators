@@ -59,7 +59,17 @@ if %ERRORLEVEL% NEQ 0 (
     copy /Y "%BTC_DIR%\btc_correlation.html" "%WEBSITE%\indicators\btc\" >> "%LOG%" 2>&1
 )
 
-REM --- Step 5: Commit and push to GitHub ---
+REM --- Step 5: Run rebuild_all.py (MSTR, liquidity, mean reversion, FCI bake) ---
+echo Running rebuild_all.py... >> "%LOG%"
+cd /d "%WEBSITE%"
+"%PYTHON%" rebuild_all.py >> "%LOG%" 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] rebuild_all.py failed >> "%LOG%"
+) else (
+    echo [OK] rebuild_all.py completed >> "%LOG%"
+)
+
+REM --- Step 6: Commit and push to GitHub ---
 echo Pushing to GitHub... >> "%LOG%"
 cd /d "%WEBSITE%"
 %GIT% add indicators/
