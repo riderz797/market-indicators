@@ -5,10 +5,9 @@ computes monthly index values, and injects them into
 indicators/macro/market_overheat_index.html between the @@BAKED_DATA@@ markers.
 
 Run:  python fetch_usbc.py
-Requires: requests  (pip install requests)
+Requires: requests, yfinance  (pip install requests yfinance)
 
-NOTE: S&P 500 is fetched from Stooq (free, no key, history to 1928).
-      FRED's SP500 series is license-restricted to ~10 years via the free API.
+NOTE: S&P 500 is fetched from Yahoo Finance via yfinance (free, full history).
       UNRATE, CPIAUCSL, FEDFUNDS, M2SL are fetched from FRED as usual.
 """
 
@@ -16,40 +15,26 @@ import requests
 import json
 import os
 import re
-import io
-import csv
 from datetime import datetime
+import yfinance as yf
 
 # ── CONFIG ─────────────────────────────────────────────────────────────────────
 FRED_API_KEY = "824b29c5afa52f3fc7c6e7dc4925aebb"
 HTML_PATH    = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "indicators", "macro", "market_overheat_index.html")
 
-# ── FETCH S&P 500 FROM STOOQ ───────────────────────────────────────────────────
-def fetch_sp500_stooq(obs_start="1957-01-01"):
+# ── FETCH S&P 500 FROM YAHOO FINANCE ──────────────────────────────────────────
+def fetch_sp500_yfinance(obs_start="1957-01-01"):
     """
-    Stooq provides S&P 500 monthly closes free, no API key, back to 1928.
-    Returns dict {YYYY-MM: float}.
+    Fetches S&P 500 monthly closes via yfinance. Returns dict {YYYY-MM: float}.
     """
-    url     = "https://stooq.com/q/d/l/?s=%5Espx&i=m"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers, timeout=30)
-    r.raise_for_status()
-
+    ticker = yf.Ticker("^GSPC")
+    hist   = ticker.history(start=obs_start, interval="1mo")
     result = {}
-    reader = csv.DictReader(io.StringIO(r.text))
-    for row in reader:
-        date_str = row.get("Date", "")
-        close    = row.get("Close", "")
-        if not date_str or not close or close.lower() in ("null", "n/d", ""):
-            continue
-        if date_str[:10] < obs_start:
-            continue
-        ym = date_str[:7]
-        try:
-            result[ym] = float(close)
-        except ValueError:
-            pass
+    for ts, row in hist.iterrows():
+        ym = ts.strftime("%Y-%m")
+        if not row.empty and row["Close"] > 0:
+            result[ym] = float(row["Close"])
     return result
 
 
@@ -94,13 +79,13 @@ def shift_ym(ym, months_back):
 
 # ── FETCH DATA ─────────────────────────────────────────────────────────────────
 print("Fetching data...")
-sp500    = fetch_sp500_stooq("1957-01-01")
+sp500    = fetch_sp500_yfinance("1957-01-01")
 unrate   = fetch_fred("UNRATE",   "1959-01-01", "m")
 cpi      = fetch_fred("CPIAUCSL", "1958-01-01", "m")   # extra year for YoY
 fedfunds = fetch_fred("FEDFUNDS", "1959-01-01", "m")
 m2       = fetch_fred("M2SL",     "1959-01-01", "m")
 
-print(f"  SP500 (Stooq): {len(sp500)} months")
+print(f"  SP500 (Yahoo): {len(sp500)} months")
 print(f"  UNRATE       : {len(unrate)} months")
 print(f"  CPIAUCSL     : {len(cpi)} months")
 print(f"  FEDFUNDS     : {len(fedfunds)} months")

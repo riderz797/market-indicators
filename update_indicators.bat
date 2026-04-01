@@ -59,7 +59,17 @@ if %ERRORLEVEL% NEQ 0 (
     copy /Y "%BTC_DIR%\btc_correlation.html" "%WEBSITE%\indicators\btc\" >> "%LOG%" 2>&1
 )
 
-REM --- Step 5: Run rebuild_all.py (MSTR, liquidity, mean reversion, FCI bake) ---
+REM --- Step 5a: Run US Business Cycle Indicator ---
+echo Running US Business Cycle Indicator... >> "%LOG%"
+cd /d "%WEBSITE%"
+"%PYTHON%" fetch_usbc.py >> "%LOG%" 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] fetch_usbc.py failed >> "%LOG%"
+) else (
+    echo [OK] US Business Cycle Indicator completed >> "%LOG%"
+)
+
+REM --- Step 5b: Run rebuild_all.py (MSTR, liquidity, mean reversion, FCI bake) ---
 echo Running rebuild_all.py... >> "%LOG%"
 cd /d "%WEBSITE%"
 "%PYTHON%" rebuild_all.py >> "%LOG%" 2>&1

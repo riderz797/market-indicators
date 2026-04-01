@@ -48,14 +48,14 @@
     const STORAGE_KEY = "acumen_macro_analysis_v1";
 
     const DEFAULT_ANALYSIS = {
-      thesis: "The clock and the engine are diverging.",
-      body: "Benner's cycle clock places us at a predicted peak (100% progress from 2023 trough to 2026 B-peak). However, the mechanical indicators are split:",
-      confirmingHeader: "CONFIRMING PEAK",
-      confirmingBullets: "Yield curve steepening during cuts — historically precedes recessions\nSLOOS shows banks tightening — real economy impact in 2–4 quarters\nReal yields elevated at 1.80% — still pressuring leveraged positions\nForeign Treasury demand declining — structural flow shift\nCentral bank gold buying at records — reserve regime stress",
-      contradictingHeader: "CONTRADICTING PEAK",
-      contradictingBullets: "Credit spreads at 286bps — near historic tights, no stress\nFed cutting gradually — liquidity still easing\nDollar weakening — reduces global tightening pressure\nCredit cycle only ~2-3 years old (young vs. 5-7yr historical)\nNo acute credit event visible yet",
-      readParagraph: "The setup rhymes with 1972 and 2016 — Benner B-peak years where markets were elevated and structural risks were building, but the credit cycle hadn't reached terminal excess. Both produced significant corrections (not crashes) followed by resumed expansion before the eventual credit cycle peak. **Watch the HY spreads.** If they break above 400bps with velocity, the peak confirmation strengthens dramatically.",
-      dataInputs: "CREDIT: HY OAS: 286bps (Feb 19) — ICE BofA via FRED. Near post-financial-crisis lows, compressing.\nCREDIT: SLOOS: Banks tightened C&I standards for all firm sizes (Jan 2026 survey, released Feb 3) — Federal Reserve.\nRATE: 2s10s: +60bps (10Y: 4.08%, 2Y: 3.48%) — Widest since Jan 2022. Steepening during rate cuts. — FRED T10Y2Y.\nRATE: 10Y TIPS: 1.80% real yield (Feb 20) — FRED DFII10. 30Y TIPS at 2.47%, second highest in 16 years.\nRATE: Fed Funds: 3.50-3.75% (175bps of cuts since Sep 2024). On hold at Jan 2026 meeting. — Federal Reserve.\nFLOW: Foreign Demand: China reduced holdings ~$210B since 2022. BRICS+ building alternative payment systems. — Treasury TIC.\nFLOW: Central Bank Gold: Record 1,078 tonnes in 2024 — World Gold Council. Concentrated in BRICS+ nations.\nFLOW: DXY: 97.5 (Feb 23). Down 8.5% year-over-year. 4-year low of 95.5 on Jan 30. — FRED DTWEXBGS.",
+      thesis: "The Benner peak year is here — and the trade architecture fracturing beneath it is the new variable.",
+      body: "We are now in Q2 2026, the predicted Benner B-peak year. The mechanical picture has shifted since February: credit spreads have widened off historic tights as tariff uncertainty repriced risk, the Fed moved from gradual cuts to a full hold, and foreign Treasury demand is deteriorating under active trade war pressure. The clock and the fundamentals are beginning to align.",
+      confirmingHeader: "CONFIRMING CAUTION / CYCLE TOP",
+      confirmingBullets: "Benner clock at 100%+ into 2026 peak year — structural timing warning active\nHY credit spreads widening from 286bps Feb lows — first crack in credit complacency\nForeign Treasury demand deteriorating under U.S.-China tariff escalation — structural flow shift accelerating\nCentral bank gold buying sustaining record pace — reserve regime stress signal\nYield curve steepening during Fed pause — recession precursor pattern intact",
+      contradictingHeader: "CONTRADICTING CYCLE TOP",
+      contradictingBullets: "Credit spreads still sub-500bps — no acute stress event, widening shallow\nFed on hold, not hiking — no active monetary tightening trigger\nDollar weakness reduces global tightening pressure and supports risk assets\nSLOOS tightening modest, not severe — credit availability has not collapsed\nNo visible leverage unwind or credit event — cycle extension remains possible",
+      readParagraph: "The April 2026 setup most closely rhymes with mid-1972 — a Benner B-peak year where structural fractures were brewing but credit spreads remained contained. In 1972, the Bretton Woods fallout and commodity shock were building invisibly while equities held elevated. The analog broke when inflation forced a Fed pivot from accommodation to aggression. The current wildcard is the tariff regime: unlike 1972, the demand shock here is self-imposed, and if it feeds into inflation while growth slows, the Fed's pause becomes a trap rather than a bridge. **Watch HY spreads above 500bps with velocity, and watch the Treasury auction tail.** Foreign selling of U.S. Treasuries as a trade retaliation mechanism — not just passive diversification — would be the qualitative break that confirms the cycle top.",
+      dataInputs: "CREDIT: HY OAS: Widening from 286bps (Feb 19) as tariff uncertainty repriced risk — ICE BofA via FRED BAMLH0A0HYM2. Check live data for current reading.\nCREDIT: SLOOS: Banks tightening C&I standards modestly — Jan 2026 survey (released Feb 3). Q1 2026 survey due ~May 2026 — Federal Reserve.\nRATE: 2s10s: ~70-100bps range — continued steepening during Fed pause — FRED T10Y2Y.\nRATE: 10Y TIPS: ~1.70-2.00% real yield — elevated, off Feb highs as flight-to-quality compressed — FRED DFII10.\nRATE: Fed Funds: 3.50-3.75% — on hold since Jan 2026 meeting. No cuts or hikes signaled near-term — Federal Reserve.\nFLOW: Foreign Demand: Active reduction accelerating — U.S.-China trade war increases risk of Treasury selling as trade lever — Treasury TIC.\nFLOW: Central Bank Gold: Record pace sustained, estimated >900t in 2025 — World Gold Council. Gold making new nominal highs reinforces signal.\nFLOW: DXY: Continued structural decline, down ~10%+ year-over-year — reserve diversification and trade deficit dynamics — FRED DTWEXBGS.",
     };
 
     function loadAnalysis() {
@@ -448,8 +448,8 @@ FLOW: [...]`;
     ═══════════════════════════════════════════════════════════════════ */
     function MacroCycleDashboard() {
       const [indicatorValues, setIndicatorValues] = useState({
-        hy_spreads:-2, sloos:1, yield_curve:2, real_yields:1, fed_direction:-1,
-        foreign_demand:1, gold_buying:2, dollar_index:-1,
+        hy_spreads:-2, sloos:1, yield_curve:2, real_yields:1, fed_direction:0,
+        foreign_demand:2, gold_buying:2, dollar_index:-1,
       });
       const [regimeValues,       setRegimeValues]       = useState({ bond_regime:"bear", reserve_regime:"stressed", moral_hazard:"escalating" });
       const [expandedIndicator,  setExpandedIndicator]  = useState(null);
