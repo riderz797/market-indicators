@@ -1,14 +1,13 @@
 """
 fetch_usbc.py
-Fetches the five data series needed for the US Business Cycle Indicator,
-computes monthly index values, and injects them into
-indicators/macro/market_overheat_index.html between the @@BAKED_DATA@@ markers.
+Incrementally updates the US Business Cycle Indicator.
+
+Reads the existing baked data from market_overheat_index.html, finds the
+last computed month, fetches only the data needed to extend forward, and
+appends new months. Historical data is preserved as-is.
 
 Run:  python fetch_usbc.py
 Requires: requests, yfinance  (pip install requests yfinance)
-
-NOTE: S&P 500 is fetched from Yahoo Finance via yfinance (free, full history).
-      UNRATE, CPIAUCSL, FEDFUNDS, M2SL are fetched from FRED as usual.
 """
 
 import requests
@@ -23,11 +22,19 @@ FRED_API_KEY = "824b29c5afa52f3fc7c6e7dc4925aebb"
 HTML_PATH    = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "indicators", "macro", "market_overheat_index.html")
 
+# ── READ EXISTING BAKED DATA FROM HTML ────────────────────────────────────────
+def read_baked_data(html):
+    """Extract existing USBC_DATES and USBC_VALUES arrays from the HTML."""
+    dates_m  = re.search(r'const USBC_DATES\s*=\s*(\[[\s\S]*?\]);', html)
+    values_m = re.search(r'const USBC_VALUES\s*=\s*(\[[\s\S]*?\]);', html)
+    if not dates_m or not values_m:
+        return [], []
+    return json.loads(dates_m.group(1)), json.loads(values_m.group(1))
+
+
 # ── FETCH S&P 500 FROM YAHOO FINANCE ──────────────────────────────────────────
-def fetch_sp500_yfinance(obs_start="1957-01-01"):
-    """
-    Fetches S&P 500 monthly closes via yfinance. Returns dict {YYYY-MM: float}.
-    """
+def fetch_sp500_yfinance(obs_start):
+    """Returns dict {YYYY-MM: float} from Yahoo Finance."""
     ticker = yf.Ticker("^GSPC")
     hist   = ticker.history(start=obs_start, interval="1mo")
     result = {}
@@ -39,7 +46,7 @@ def fetch_sp500_yfinance(obs_start="1957-01-01"):
 
 
 # ── FETCH FROM FRED ────────────────────────────────────────────────────────────
-def fetch_fred(series_id, obs_start="1958-01-01", frequency="m"):
+def fetch_fred(series_id, obs_start, frequency="m"):
     """Returns dict {YYYY-MM: float} from FRED."""
     url    = "https://api.stlouisfed.org/fred/series/observations"
     params = {
@@ -70,37 +77,61 @@ def fetch_fred(series_id, obs_start="1958-01-01", frequency="m"):
 
 # ── DATE MATH ──────────────────────────────────────────────────────────────────
 def shift_ym(ym, months_back):
-    y, m   = int(ym[:4]), int(ym[5:7])
-    total  = y * 12 + (m - 1) - months_back
-    ny     = total // 12
-    nm     = (total % 12) + 1
-    return f"{ny}-{nm:02d}"
+    y, m  = int(ym[:4]), int(ym[5:7])
+    total = y * 12 + (m - 1) - months_back
+    return f"{total // 12}-{(total % 12) + 1:02d}"
 
 
-# ── FETCH DATA ─────────────────────────────────────────────────────────────────
-print("Fetching data...")
-sp500    = fetch_sp500_yfinance("1957-01-01")
-unrate   = fetch_fred("UNRATE",   "1959-01-01", "m")
-cpi      = fetch_fred("CPIAUCSL", "1958-01-01", "m")   # extra year for YoY
-fedfunds = fetch_fred("FEDFUNDS", "1959-01-01", "m")
-m2       = fetch_fred("M2SL",     "1959-01-01", "m")
+# ── MAIN ───────────────────────────────────────────────────────────────────────
+with open(HTML_PATH, "r", encoding="utf-8") as f:
+    html = f.read()
 
-print(f"  SP500 (Yahoo): {len(sp500)} months")
-print(f"  UNRATE       : {len(unrate)} months")
-print(f"  CPIAUCSL     : {len(cpi)} months")
-print(f"  FEDFUNDS     : {len(fedfunds)} months")
-print(f"  M2SL         : {len(m2)} months")
+existing_dates, existing_values = read_baked_data(html)
 
-# ── COMPUTE INDEX ──────────────────────────────────────────────────────────────
-print("Computing index...")
-dates  = []
-values = []
+if existing_dates:
+    last_date_str = existing_dates[-1]          # e.g. "2026-01-01"
+    last_ym       = last_date_str[:7]           # e.g. "2026-01"
+    print(f"Existing baked data: {len(existing_dates)} points, last = {last_ym}")
+else:
+    last_ym = "1958-12"
+    print("No existing baked data found — computing from scratch.")
+
+# Fetch window: 14 months back from last_ym covers the YoY CPI lookback
+fetch_start_cpi = shift_ym(last_ym, 13)   # 13 months back for safe YoY overlap
+fetch_start_sp  = shift_ym(last_ym, 1)    # 1 month back to catch any revision
+
+print(f"Fetching new data from {fetch_start_sp} onward...")
+sp500    = fetch_sp500_yfinance(fetch_start_sp + "-01")
+unrate   = fetch_fred("UNRATE",   fetch_start_sp + "-01", "m")
+cpi      = fetch_fred("CPIAUCSL", fetch_start_cpi + "-01", "m")
+fedfunds = fetch_fred("FEDFUNDS", fetch_start_sp + "-01", "m")
+m2       = fetch_fred("M2SL",     fetch_start_sp + "-01", "m")
+
+print(f"  SP500  : {len(sp500)} months")
+print(f"  UNRATE : {len(unrate)} months")
+print(f"  CPI    : {len(cpi)} months")
+print(f"  FEDFUNDS: {len(fedfunds)} months")
+print(f"  M2SL   : {len(m2)} months")
+
+# We need the last 12 months of CPI from the existing baked period for YoY.
+# Re-fetch just that window from FRED (small request).
+cpi_history_start = shift_ym(last_ym, 13)
+cpi_full = fetch_fred("CPIAUCSL", cpi_history_start + "-01", "m")
+cpi_full.update(cpi)   # merge, new data wins
+
+# ── COMPUTE NEW MONTHS ONLY ────────────────────────────────────────────────────
+print("Computing new months...")
+new_dates  = []
+new_values = []
 
 for ym in sorted(sp500.keys()):
+    if ym <= last_ym:
+        continue   # skip anything already baked
+
     sp       = sp500.get(ym)
     un       = unrate.get(ym)
-    cpi_curr = cpi.get(ym)
-    cpi_prev = cpi.get(shift_ym(ym, 12))
+    cpi_curr = cpi_full.get(ym)
+    cpi_prev = cpi_full.get(shift_ym(ym, 12))
     fed      = fedfunds.get(ym)
     m2_val   = m2.get(ym)
 
@@ -112,25 +143,27 @@ for ym in sorted(sp500.keys()):
     yoy_cpi = (cpi_curr / cpi_prev - 1) * 100
     val     = (sp / (un ** 2)) * (yoy_cpi * fed) / m2_val
 
-    dates.append(ym + "-01")
-    values.append(round(val, 6))
+    new_dates.append(ym + "-01")
+    new_values.append(round(val, 6))
 
-print(f"  {len(dates)} monthly data points  ({dates[0]} to {dates[-1]})")
+if new_dates:
+    print(f"  {len(new_dates)} new point(s): {new_dates[0]} to {new_dates[-1]}")
+else:
+    print("  No new months available yet — data is already current.")
 
-# ── INJECT INTO HTML ───────────────────────────────────────────────────────────
-today        = datetime.now().strftime("%Y-%m-%d")
-baked_block  = (
-    f"    const USBC_DATES  = {json.dumps(dates)};\n"
-    f"    const USBC_VALUES = {json.dumps(values)};\n"
+# ── MERGE AND INJECT ───────────────────────────────────────────────────────────
+merged_dates  = existing_dates  + new_dates
+merged_values = existing_values + new_values
+
+today       = datetime.now().strftime("%Y-%m-%d")
+baked_block = (
+    f"    const USBC_DATES  = {json.dumps(merged_dates)};\n"
+    f"    const USBC_VALUES = {json.dumps(merged_values)};\n"
     f"    const USBC_BAKED  = true; // injected by fetch_usbc.py on {today}"
 )
 
-with open(HTML_PATH, "r", encoding="utf-8") as f:
-    html = f.read()
-
-pattern     = r"(// @@BAKED_DATA_START@@)[\s\S]*?(// @@BAKED_DATA_END@@)"
-replacement = r"\g<1>\n" + baked_block + "\n    \\2"
-new_html, n = re.subn(pattern, replacement, html)
+pattern  = r"(// @@BAKED_DATA_START@@)[\s\S]*?(// @@BAKED_DATA_END@@)"
+new_html, n = re.subn(pattern, r"\g<1>\n" + baked_block + "\n    \\2", html)
 
 if n == 0:
     print("ERROR: Could not find @@BAKED_DATA_START@@ / @@BAKED_DATA_END@@ markers.")
@@ -139,5 +172,5 @@ if n == 0:
 with open(HTML_PATH, "w", encoding="utf-8") as f:
     f.write(new_html)
 
-print(f"Injected into {HTML_PATH}")
-print("Done. Open market_overheat_index.html to preview.")
+print(f"Injected {len(merged_dates)} total points ({merged_dates[0]} – {merged_dates[-1]}) into {HTML_PATH}")
+print("Done.")
