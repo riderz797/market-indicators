@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTC Supply &amp; Demand Model — Acumen</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #121212; }
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; color: #AAAAAA; text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; letter-spacing: 0.5px;
+      position: fixed; top: 12px; left: 16px; z-index: 100;
+      border: 1px solid #333; border-radius: 6px; background: #1E1E1E;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .back-link:hover { color: #F5C542; border-color: #F5C542; }
+    input[type=range] { accent-color: #F5C542; }
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-link">&#8592; Dashboard</a>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useCallback } = React;
+
+    // ── Rudd & Porter CES Model + Synthetic Supply Extension ──
+    // Core: P = A' * Q^(1/ε) where Q = effective liquid supply
+    // Extension: Q_effective = Q_onchain + Q_synthetic (paper BTC)
+
+    const HALVING_4_DATE = new Date("2024-04-20");
+    const Q0_ISSUED = 19687500;
+    const P0 = 64858;
+    const SATOSHI = 1000000;
+    const LOST = 4000000;
+    const HODL = 3500000;
+    const Q0_LIQUID = Q0_ISSUED - SATOSHI - LOST - HODL; // 11,187,500
+    const DAILY_ISSUANCE_E4 = 450;
+    const DAILY_ISSUANCE_E5 = 225;
+    const DAILY_ISSUANCE_E6 = 112.5;
+    const HALVING_5_DAY = 1461;
+    const HALVING_6_DAY = 2922;
+    const MODEL_DAYS = 4383;
+
+    // Actual BTC monthly close prices (last day of month, USD)
+    const ACTUAL_MONTHLY_CLOSES = [
+      { date: "2024-04-30", price: 60652 },
+      { date: "2024-05-31", price: 67520 },
+      { date: "2024-06-30", price: 62745 },
+      { date: "2024-07-31", price: 64620 },
+      { date: "2024-08-31", price: 59015 },
+      { date: "2024-09-30", price: 63330 },
+      { date: "2024-10-31", price: 70330 },
+      { date: "2024-11-30", price: 96405 },
+      { date: "2024-12-31", price: 93354 },
+      { date: "2025-01-31", price: 102400 },
+      { date: "2025-02-28", price: 84350 },
+      { date: "2025-03-31", price: 82548 },
+      { date: "2025-04-30", price: 95145 },
+      { date: "2025-05-31", price: 107840 },
+      { date: "2025-06-30", price: 108250 },
+      { date: "2025-07-31", price: 123000 },
+      { date: "2025-08-31", price: 124090 },
+      { date: "2025-09-30", price: 108100 },
+      { date: "2025-10-31", price: 84000 },
+      { date: "2025-11-30", price: 87500 },
+      { date: "2025-12-31", price: 89750 },
+      { date: "2026-01-31", price: 77000 },
+      { date: "2026-02-28", price: 60000 },
+      { date: "2026-03-31", price: 66800 },
+    ].map(d => {
+      const dt = new Date(d.date);
+      const halving = new Date("2024-04-20");
+      const daysSinceHalving = (dt - halving) / (1000 * 60 * 60 * 24);
+      return { year: 2024 + daysSinceHalving / 365, price: d.price, date: d.date };
+    });
+
+    function getDailyIssuance(day) {
+      if (day < HALVING_5_DAY) return DAILY_ISSUANCE_E4;
+      if (day < HALVING_6_DAY) return DAILY_ISSUANCE_E5;
+      return DAILY_ISSUANCE_E6;
+    }
+
+    function computeEpsilon(A) {
+      return Math.log(Q0_LIQUID) / Math.log(P0 / A);
+    }
+
+    function logisticGamma(t, rdaily, Tstar) {
+      const midpoint = Tstar * 365 / 2;
+      return 1 / (1 + Math.exp(-rdaily * (t - midpoint)));
+    }
+
+    function computeRdaily(Lmin, Tstar) {
+      const Thalf = Tstar * 365 / 2;
+      return Math.log((1 - Lmin) / Lmin) / Thalf;
+    }
+
+    function fmt(n) {
+      if (n >= 1e12) return "$" + (n / 1e12).toFixed(1) + "T";
+      if (n >= 1e9) return "$" + (n / 1e9).toFixed(1) + "B";
+      if (n >= 1e6) return "$" + (n / 1e6).toFixed(1) + "M";
+      if (n >= 1e3) return "$" + (n / 1e3).toFixed(0) + "K";
+      return "$" + n.toFixed(0);
+    }
+
+    function fmtBtc(n) {
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+      if (n >= 1e3) return (n / 1e3).toFixed(0) + "K";
+      return n.toFixed(0);
+    }
+
+    function syntheticSupply(day, price, synGrowthRate, synCeiling, redeemDay, redeemPct) {
+      const baseDay = 345;
+      const baseSyn = 900000;
+      if (day <= 0) return 0;
+      let syn;
+      if (day <= baseDay) {
+        syn = baseSyn * (day / baseDay);
+      } else {
+        const priceFactor = Math.sqrt(price / P0);
+        const timeFactor = 1 + synGrowthRate * ((day - baseDay) / 365);
+        syn = baseSyn * priceFactor * timeFactor;
+      }
+      syn = Math.min(syn, synCeiling);
+      if (redeemDay > 0 && day >= redeemDay) {
+        const daysSinceRedeem = day - redeemDay;
+        const decayFactor = Math.exp(-daysSinceRedeem / 180);
+        syn = syn * (1 - redeemPct) + syn * redeemPct * decayFactor;
+        if (daysSinceRedeem > 365) {
+          const rebuild = Math.min(0.3, (daysSinceRedeem - 365) / 3650);
+          syn = syn * (1 + rebuild);
+        }
+      }
+      return Math.max(0, syn);
+    }
+
+    function treasuryBid(day, intensity) {
+      if (intensity === 0) return 0;
+      let mstrRate;
+      if (day < 200) { mstrRate = 400; }
+      else if (day < 700) { mstrRate = 900; }
+      else if (day < 1100) { mstrRate = 700; }
+      else if (day < 1461) {
+        const t = (day - 1100) / (1461 - 1100);
+        mstrRate = 700 - 400 * t;
+      } else { mstrRate = 200; }
+
+      let asstRate;
+      if (day < 520) { asstRate = 0; }
+      else if (day < 700) {
+        const t = (day - 520) / (700 - 520);
+        asstRate = 63 * t;
+      } else if (day < 1461) {
+        asstRate = 80 + 40 * Math.min(1, (day - 700) / 761);
+      } else { asstRate = 100; }
+
+      return (mstrRate + asstRate) * intensity;
+    }
+
+    function runModel(params) {
+      const {
+        A, D, Lmin, Tstar, dailyWithdraw, treasuryBidIntensity,
+        includeSynthetic, synGrowthRate, synCeiling, redeemDay, redeemPct
+      } = params;
+
+      const epsilon = computeEpsilon(A);
+      const rdaily = computeRdaily(Lmin, Tstar);
+      const gamma0 = logisticGamma(0, rdaily, Tstar);
+
+      const step = 30;
+      const points = [];
+      const supplyPoints = [];
+
+      let cumulativeIssuance = 0;
+      let cumulativeReserve = 0;
+      let cumulativeTreasury = 0;
+      let prevPrice = P0;
+
+      for (let day = 0; day <= MODEL_DAYS; day += step) {
+        for (let d = (day === 0 ? 0 : day - step + 1); d <= day; d++) {
+          cumulativeIssuance += getDailyIssuance(d);
+          cumulativeReserve += dailyWithdraw;
+          cumulativeTreasury += treasuryBid(d, treasuryBidIntensity);
+        }
+
+        const qlOnchain = Q0_LIQUID + cumulativeIssuance - cumulativeReserve - cumulativeTreasury;
+
+        let qSynthetic = 0;
+        if (includeSynthetic) {
+          qSynthetic = syntheticSupply(day, prevPrice, synGrowthRate, synCeiling, redeemDay, redeemPct);
+        }
+
+        const qEffective = Math.max(1000, qlOnchain + qSynthetic);
+
+        const gamma = logisticGamma(day, rdaily, Tstar);
+        const Aprime = 1 + (D - 1) * Math.max(0, (gamma - gamma0) / (1 - gamma0));
+        const Afinal = A * Aprime;
+
+        const price = Afinal * Math.pow(qEffective, 1 / epsilon);
+        prevPrice = price;
+
+        const year = 2024 + day / 365;
+        points.push({ day, year, price, Aprime: Afinal });
+        supplyPoints.push({
+          day, year,
+          onchain: qlOnchain,
+          synthetic: qSynthetic,
+          effective: qEffective,
+          treasuryDaily: treasuryBid(day, treasuryBidIntensity),
+          treasuryCumulative: cumulativeTreasury
+        });
+      }
+
+      const finalPrice = points[points.length - 1].price;
+      const cagr = Math.pow(finalPrice / P0, 1 / 12) - 1;
+
+      return { points, supplyPoints, finalPrice, cagr, epsilon };
+    }
+
+    // ── Chart Component ──
+    function Chart({ data1, data2, label1, label2, yFormat, title, color1, color2, fillKey, dots, dotsLabel, xMin: xMinProp, xMax: xMaxProp }) {
+      const xMin = xMinProp ?? 2024;
+      const xMax = xMaxProp ?? 2036;
+      const xRange = xMax - xMin;
+
+      const filterRange = (arr) => arr.filter(d => d.x >= xMin && d.x <= xMax);
+      const vis1 = filterRange(data1);
+      const vis2 = data2 ? filterRange(data2) : null;
+      const visDots = dots ? filterRange(dots) : null;
+
+      const allPrices = [...vis1.map(d => d.y), ...(vis2 ? vis2.map(d => d.y) : []), ...(visDots ? visDots.map(d => d.y) : [])];
+      if (allPrices.length === 0) return null;
+      const maxY = Math.max(...allPrices);
+      const minY = Math.min(0, Math.min(...allPrices));
+
+      const W = 680;
+      const H = 280;
+      const PAD = { top: 30, right: 20, bottom: 40, left: 80 };
+      const cw = W - PAD.left - PAD.right;
+      const ch = H - PAD.top - PAD.bottom;
+
+      const xScale = (x) => PAD.left + ((x - xMin) / xRange) * cw;
+      const yScale = (y) => PAD.top + ch - ((y - minY) / (maxY - minY)) * ch;
+
+      const makePath = (data) => data.map((d, i) => `${i === 0 ? "M" : "L"}${xScale(d.x)},${yScale(d.y)}`).join(" ");
+
+      const makeArea = (data) => {
+        const line = data.map((d, i) => `${i === 0 ? "M" : "L"}${xScale(d.x)},${yScale(d.y)}`).join(" ");
+        const bottom = `L${xScale(data[data.length - 1].x)},${yScale(0)} L${xScale(data[0].x)},${yScale(0)} Z`;
+        return line + " " + bottom;
+      };
+
+      let xLabels;
+      if (xRange <= 1.5) {
+        xLabels = [];
+        for (let y = Math.ceil(xMin * 4) / 4; y <= xMax; y += 0.25) {
+          const yr = Math.floor(y);
+          const q = Math.round((y - yr) * 4);
+          const months = ["Jan", "Apr", "Jul", "Oct"];
+          xLabels.push({ val: y, label: months[q] + " " + yr });
+        }
+      } else if (xRange <= 6) {
+        xLabels = [];
+        for (let y = Math.ceil(xMin); y <= xMax; y++) xLabels.push({ val: y, label: String(y) });
+      } else {
+        xLabels = [];
+        for (let y = Math.ceil(xMin / 2) * 2; y <= xMax; y += 2) xLabels.push({ val: y, label: String(y) });
+      }
+
+      const yTicks = 5;
+      const yTickVals = Array.from({ length: yTicks + 1 }, (_, i) => minY + (maxY - minY) * (i / yTicks));
+
+      return (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#F5C542", marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>{title}</div>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: W, background: "#1A1A1A", borderRadius: 8, border: "1px solid #2A2A2A" }}>
+            {yTickVals.map((v, i) => (
+              <g key={i}>
+                <line x1={PAD.left} x2={W - PAD.right} y1={yScale(v)} y2={yScale(v)} stroke="#2A2A2A" strokeWidth={0.5} />
+                <text x={PAD.left - 8} y={yScale(v) + 4} textAnchor="end" fontSize={10} fill="#888" fontFamily="'JetBrains Mono', monospace">{yFormat(v)}</text>
+              </g>
+            ))}
+            {xLabels.map((xl, i) => (
+              <text key={i} x={xScale(xl.val)} y={H - 8} textAnchor="middle" fontSize={10} fill="#888" fontFamily="'JetBrains Mono', monospace">{xl.label}</text>
+            ))}
+            {fillKey && vis1.length > 1 && <path d={makeArea(vis1)} fill={color1} opacity={0.1} />}
+            {vis1.length > 1 && <path d={makePath(vis1)} fill="none" stroke={color1} strokeWidth={2.5} />}
+            {vis2 && vis2.length > 1 && <path d={makePath(vis2)} fill="none" stroke={color2} strokeWidth={2.5} strokeDasharray="6,4" />}
+            <line x1={PAD.left + 10} x2={PAD.left + 35} y1={14} y2={14} stroke={color1} strokeWidth={2.5} />
+            <text x={PAD.left + 40} y={18} fontSize={10} fill="#AAAAAA" fontFamily="'JetBrains Mono', monospace">{label1}</text>
+            {data2 && <>
+              <line x1={PAD.left + 200} x2={PAD.left + 225} y1={14} y2={14} stroke={color2} strokeWidth={2.5} strokeDasharray="6,4" />
+              <text x={PAD.left + 230} y={18} fontSize={10} fill="#AAAAAA" fontFamily="'JetBrains Mono', monospace">{label2}</text>
+            </>}
+            {visDots && visDots.map((d, i) => {
+              const cx = xScale(d.x);
+              const cy = yScale(d.y);
+              if (cx < PAD.left || cx > W - PAD.right || cy < PAD.top || cy > PAD.top + ch) return null;
+              return <circle key={i} cx={cx} cy={cy} r={3.5} fill="#121212" stroke="#E74C3C" strokeWidth={2} />;
+            })}
+            {visDots && <>
+              <circle cx={PAD.left + (data2 ? 390 : 200)} cy={14} r={3.5} fill="#121212" stroke="#E74C3C" strokeWidth={2} />
+              <text x={PAD.left + (data2 ? 398 : 208)} y={18} fontSize={10} fill="#AAAAAA" fontFamily="'JetBrains Mono', monospace">{dotsLabel || "Actual"}</text>
+            </>}
+          </svg>
+        </div>
+      );
+    }
+
+    // ── Slider Component ──
+    function Slider({ label, value, min, max, step, onChange, format }) {
+      return (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: "#AAAAAA", fontFamily: "'JetBrains Mono', monospace" }}>{label}</span>
+            <span style={{ fontSize: 11, color: "#F5C542", fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{format ? format(value) : value}</span>
+          </div>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={e => onChange(Number(e.target.value))}
+            style={{ width: "100%", accentColor: "#F5C542" }}
+          />
+        </div>
+      );
+    }
+
+    // ── Main App ──
+    function App() {
+      const [A, setA] = useState(75000000);
+      const [D, setD] = useState(20);
+      const [Lmin, setLmin] = useState(0.04);
+      const [Tstar, setTstar] = useState(10);
+      const [dailyWithdraw, setDailyWithdraw] = useState(1000);
+      const [treasuryBidIntensity, setTreasuryBidIntensity] = useState(1.0);
+      const [includeSynthetic, setIncludeSynthetic] = useState(true);
+      const [synGrowthRate, setSynGrowthRate] = useState(0.15);
+      const [synCeiling, setSynCeiling] = useState(3000000);
+      const [redeemDay, setRedeemDay] = useState(0);
+      const [redeemPct, setRedeemPct] = useState(0.6);
+      const [activeTab, setActiveTab] = useState("price");
+      const [timeRange, setTimeRange] = useState("all");
+
+      const results = useMemo(() => {
+        const withSyn = runModel({ A, D, Lmin, Tstar, dailyWithdraw, treasuryBidIntensity, includeSynthetic: true, synGrowthRate, synCeiling, redeemDay, redeemPct });
+        const withoutSyn = runModel({ A, D, Lmin, Tstar, dailyWithdraw, treasuryBidIntensity, includeSynthetic: false, synGrowthRate, synCeiling, redeemDay, redeemPct });
+        return { withSyn, withoutSyn };
+      }, [A, D, Lmin, Tstar, dailyWithdraw, treasuryBidIntensity, synGrowthRate, synCeiling, redeemDay, redeemPct]);
+
+      const actualPriceDots = ACTUAL_MONTHLY_CLOSES.map(d => ({ x: d.year, y: d.price }));
+      const priceData1 = results.withoutSyn.points.map(p => ({ x: p.year, y: p.price }));
+      const priceData2 = results.withSyn.points.map(p => ({ x: p.year, y: p.price }));
+      const supplyOnchain = results.withSyn.supplyPoints.map(p => ({ x: p.year, y: p.onchain }));
+      const supplySynthetic = results.withSyn.supplyPoints.map(p => ({ x: p.year, y: p.synthetic }));
+      const supplyEffective = results.withSyn.supplyPoints.map(p => ({ x: p.year, y: p.effective }));
+
+      const cardStyle = {
+        background: "#1E1E1E",
+        borderRadius: 10,
+        padding: 20,
+        border: "1px solid #2A2A2A",
+        marginBottom: 16,
+      };
+
+      const tab = (name, id) => (
+        <button
+          key={id}
+          onClick={() => setActiveTab(id)}
+          style={{
+            padding: "8px 16px",
+            fontSize: 11,
+            fontFamily: "'JetBrains Mono', monospace",
+            background: activeTab === id ? "#F5C542" : "transparent",
+            color: activeTab === id ? "#121212" : "#AAAAAA",
+            border: "1px solid " + (activeTab === id ? "#F5C542" : "#333"),
+            borderRadius: 4,
+            cursor: "pointer",
+            fontWeight: activeTab === id ? 700 : 400,
+          }}
+        >{name}</button>
+      );
+
+      const epsilon = results.withoutSyn.epsilon;
+
+      return (
+        <div style={{ background: "#121212", minHeight: "100vh", padding: "60px 16px 20px", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+          <div style={{ maxWidth: 860, margin: "0 auto" }}>
+
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 10, letterSpacing: 3, color: "#555", fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>ACUMEN RESEARCH</div>
+              <h1 style={{ fontSize: 24, color: "#F5C542", margin: 0, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.5px" }}>
+                Bitcoin Supply &amp; Demand Model
+              </h1>
+              <div style={{ fontSize: 12, color: "#AAAAAA", marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+                Rudd &amp; Porter CES Framework + Synthetic Supply Extension
+              </div>
+            </div>
+
+            {/* Key metrics */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+              {[
+                { label: "On-Chain Only (2036)", val: fmt(results.withoutSyn.finalPrice), sub: `CAGR ${(results.withoutSyn.cagr * 100).toFixed(1)}%` },
+                { label: "With Synthetic (2036)", val: fmt(results.withSyn.finalPrice), sub: `CAGR ${(results.withSyn.cagr * 100).toFixed(1)}%` },
+                { label: "Price Suppression", val: ((1 - results.withSyn.finalPrice / results.withoutSyn.finalPrice) * 100).toFixed(1) + "%", sub: `ε = ${epsilon.toFixed(3)}` },
+              ].map((m, i) => (
+                <div key={i} style={{ ...cardStyle, textAlign: "center", padding: 14, marginBottom: 0 }}>
+                  <div style={{ fontSize: 10, color: "#555", fontFamily: "'JetBrains Mono', monospace", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{m.label}</div>
+                  <div style={{ fontSize: 20, color: "#F5C542", fontWeight: 700 }}>{m.val}</div>
+                  <div style={{ fontSize: 10, color: "#AAAAAA", fontFamily: "'JetBrains Mono', monospace" }}>{m.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16 }}>
+
+              {/* Controls */}
+              <div>
+                <div style={cardStyle}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#F5C542", marginBottom: 12, borderBottom: "1px solid #333", paddingBottom: 6, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+                    DEMAND PARAMETERS
+                  </div>
+                  <Slider label="Demand Shift A" value={A} min={50000000} max={500000000} step={25000000}
+                    onChange={setA} format={v => (v / 1e6).toFixed(0) + "M"} />
+                  <Slider label="Demand Multiplier D" value={D} min={1} max={40} step={1}
+                    onChange={setD} format={v => v + "X"} />
+                  <Slider label="Logistic Min (L_Min)" value={Lmin} min={0.01} max={0.10} step={0.01}
+                    onChange={setLmin} format={v => v.toFixed(2)} />
+                  <Slider label="Time Horizon T* (yrs)" value={Tstar} min={4} max={14} step={2}
+                    onChange={setTstar} format={v => v + " yrs"} />
+                </div>
+
+                <div style={cardStyle}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#F5C542", marginBottom: 12, borderBottom: "1px solid #333", paddingBottom: 6, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+                    SUPPLY PARAMETERS
+                  </div>
+                  <Slider label="Daily Reserve Withdraw" value={dailyWithdraw} min={0} max={4000} step={250}
+                    onChange={setDailyWithdraw} format={v => v.toLocaleString() + " BTC"} />
+                  <div style={{ fontSize: 10, color: "#F5C542", marginTop: 14, marginBottom: 6, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+                    MSTR + ASST TREASURY BID
+                  </div>
+                  <div style={{ fontSize: 10, color: "#555", marginBottom: 8, lineHeight: 1.5 }}>
+                    Strategy: ~762K BTC held, 42/42 plan ($84B thru 2027). Strive: ~13.3K BTC, $1B shelf. Combined peak ~960 BTC/day.
+                  </div>
+                  <Slider label="Treasury Bid Intensity" value={treasuryBidIntensity} min={0} max={2.0} step={0.1}
+                    onChange={setTreasuryBidIntensity} format={v => v === 0 ? "Off" : (v * 100).toFixed(0) + "% of base"} />
+                </div>
+
+                <div style={cardStyle}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#F5C542", marginBottom: 12, borderBottom: "1px solid #333", paddingBottom: 6, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+                    SYNTHETIC SUPPLY (WOO)
+                  </div>
+                  <div style={{ fontSize: 10, color: "#555", marginBottom: 10, lineHeight: 1.5 }}>
+                    Paper BTC claims from ETF rehypothecation, exchange IOUs, and unbacked derivatives. Woo estimates ~0.9M currently.
+                  </div>
+                  <Slider label="Syn. Growth Rate (/yr)" value={synGrowthRate} min={0} max={0.5} step={0.05}
+                    onChange={setSynGrowthRate} format={v => (v * 100).toFixed(0) + "%"} />
+                  <Slider label="Synthetic Ceiling" value={synCeiling} min={500000} max={5000000} step={250000}
+                    onChange={setSynCeiling} format={v => fmtBtc(v) + " BTC"} />
+                  <Slider label="Redemption Shock (day)" value={redeemDay} min={0} max={3650} step={365}
+                    onChange={setRedeemDay} format={v => v === 0 ? "None" : "Day " + v + " (~" + (2024 + v / 365).toFixed(0) + ")"} />
+                  {redeemDay > 0 && (
+                    <Slider label="Redemption Severity" value={redeemPct} min={0.1} max={0.9} step={0.1}
+                      onChange={setRedeemPct} format={v => (v * 100).toFixed(0) + "% collapse"} />
+                  )}
+                </div>
+              </div>
+
+              {/* Charts */}
+              <div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                  {tab("Price Forecast", "price")}
+                  {tab("Supply Breakdown", "supply")}
+                  {tab("Model Notes", "notes")}
+                </div>
+
+                {activeTab === "price" && (
+                  <div style={cardStyle}>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                      {[
+                        { id: "1y", label: "1Y" },
+                        { id: "3y", label: "3Y" },
+                        { id: "5y", label: "5Y" },
+                        { id: "all", label: "All" },
+                      ].map(r => (
+                        <button
+                          key={r.id}
+                          onClick={() => setTimeRange(r.id)}
+                          style={{
+                            padding: "4px 12px",
+                            fontSize: 11,
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontWeight: timeRange === r.id ? 700 : 400,
+                            background: timeRange === r.id ? "#F5C542" : "transparent",
+                            color: timeRange === r.id ? "#121212" : "#AAAAAA",
+                            border: "1px solid " + (timeRange === r.id ? "#F5C542" : "#333"),
+                            borderRadius: 3,
+                            cursor: "pointer",
+                          }}
+                        >{r.label}</button>
+                      ))}
+                    </div>
+                    <Chart
+                      data1={priceData1}
+                      data2={priceData2}
+                      label1="On-Chain Supply Only"
+                      label2="With Synthetic Supply"
+                      color1="#F5C542"
+                      color2="#4ECDC4"
+                      yFormat={fmt}
+                      title="BTC Price Trajectory — CES Model (Apr 2024 – Apr 2036)"
+                      fillKey
+                      dots={actualPriceDots}
+                      dotsLabel="Actual Monthly Close"
+                      xMin={2024}
+                      xMax={timeRange === "1y" ? 2025 : timeRange === "3y" ? 2027 : timeRange === "5y" ? 2029 : 2036}
+                    />
+                    <div style={{ fontSize: 10, color: "#555", fontFamily: "'JetBrains Mono', monospace", marginTop: 8, lineHeight: 1.5 }}>
+                      Synthetic supply inflates effective liquid supply → suppresses price by dampening the scarcity premium.
+                      {redeemDay > 0 && " Redemption event visible as price convergence/spike near day " + redeemDay + "."}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "supply" && (
+                  <div style={cardStyle}>
+                    <Chart
+                      data1={supplyOnchain}
+                      data2={supplyEffective}
+                      label1="On-Chain Liquid"
+                      label2="Effective (+ Synthetic)"
+                      color1="#F5C542"
+                      color2="#4ECDC4"
+                      yFormat={v => fmtBtc(v)}
+                      title="Liquid Supply Decomposition"
+                    />
+                    <Chart
+                      data1={results.withSyn.supplyPoints.map(p => ({ x: p.year, y: p.treasuryDaily }))}
+                      label1="MSTR + ASST Daily Bid (BTC)"
+                      color1="#2ECC71"
+                      yFormat={v => v.toFixed(0)}
+                      title="Treasury Company Daily Acquisition Rate"
+                    />
+                    <Chart
+                      data1={results.withSyn.supplyPoints.map(p => ({ x: p.year, y: p.treasuryCumulative }))}
+                      label1="Cumulative Treasury Acquisitions"
+                      color1="#2ECC71"
+                      yFormat={v => fmtBtc(v)}
+                      title="MSTR + ASST Cumulative BTC Removed from Liquid Supply"
+                      fillKey
+                    />
+                    <Chart
+                      data1={supplySynthetic}
+                      label1="Synthetic Paper BTC"
+                      color1="#E74C3C"
+                      yFormat={v => fmtBtc(v)}
+                      title="Estimated Synthetic BTC Supply Over Time"
+                    />
+                  </div>
+                )}
+
+                {activeTab === "notes" && (
+                  <div style={{ ...cardStyle, fontSize: 13, color: "#FFFFFF", lineHeight: 1.75 }}>
+
+                    <div style={{ fontWeight: 700, color: "#F5C542", marginBottom: 8 }}>Core Model (Rudd &amp; Porter, 2025)</div>
+                    <p style={{ margin: "0 0 8px" }}>
+                      <b>CES demand:</b> P = A′ · Q<sup>1/ε</sup>, where A′ grows via logistic adoption curve. Supply is perfectly inelastic (vertical). Price is the intersection of demand with liquid supply at each timestep.
+                    </p>
+                    <p style={{ margin: "0 0 8px" }}>
+                      <b>Baseline:</b> A = 75M, ε = −2.301, q₀ = 11.19M BTC liquid, calibrated to $64,858 on Apr 20, 2024.
+                    </p>
+
+                    <div style={{ fontWeight: 700, color: "#F5C542", marginBottom: 8, marginTop: 16 }}>Parameter Guide</div>
+
+                    <p style={{ margin: "0 0 10px" }}>
+                      <b>Demand Shift A</b> — Sets the base demand curve level. A and ε are mathematically linked: raising A makes ε less negative (less elastic), meaning price reacts more violently to supply changes. At A=75M (baseline), ε≈−2.30 — Bitcoin behaves as a speculative, elastic asset. At A=500M, ε≈−1.81 — closer to gold, where price-insensitive institutional buyers dominate.
+                    </p>
+
+                    <p style={{ margin: "0 0 10px" }}>
+                      <b>Demand Multiplier D</b> — Total demand growth over the logistic horizon. D=1 means no demand growth. D=20 means demand expands 20X from baseline via the S-curve. Think of D as your conviction on adoption acceleration.
+                    </p>
+
+                    <p style={{ margin: "0 0 10px" }}>
+                      <b>Logistic Min (L_Min)</b> — Where we sit on the adoption S-curve at t=0. Low values (0.01–0.02) mean "we're very early" — slow start, sharp acceleration at the inflection point. High values (0.08–0.10) produce near-linear growth from day one.
+                    </p>
+
+                    <p style={{ margin: "0 0 10px" }}>
+                      <b>Time Horizon T*</b> — When the logistic demand curve reaches saturation. T*=6 means demand hits its full D multiplier by ~2030 (aggressive). T*=14 means ~2038 (gradual). Shorter T* front-loads price appreciation.
+                    </p>
+
+                    <p style={{ margin: "0 0 10px", padding: "8px 12px", background: "#242424", borderLeft: "3px solid #F5C542", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "#AAAAAA" }}>
+                      Calibration tip: Use the 1Y view with actual monthly close dots visible. Find parameter combos where the model roughly tracks the real price path through 2024–2026. That gives a calibrated starting point — then zoom to 3Y/5Y/All to see where the forward projection lands.
+                    </p>
+
+                    <div style={{ fontWeight: 700, color: "#F5C542", marginBottom: 8, marginTop: 16 }}>Treasury Company Bid (MSTR + ASST)</div>
+                    <p style={{ margin: "0 0 8px" }}>
+                      <b>Strategy (MSTR):</b> Held ~214K BTC at halving, ~762K by Mar 2026 (~783 BTC/day realized). 42/42 plan targets $84B in capital raises through 2027. Post-2027, pace modeled to taper to ~200 BTC/day.
+                    </p>
+                    <p style={{ margin: "0 0 8px" }}>
+                      <b>Strive (ASST):</b> Started Sep 2025, ~13.3K BTC by Mar 2026 (~63 BTC/day). $1B shelf registration. Modeled to grow to ~120 BTC/day.
+                    </p>
+                    <p style={{ margin: "0 0 8px" }}>
+                      <b>Model:</b> Combined bid peaks at ~960 BTC/day during 42/42 active phase, tapers to ~300/day post-2028. Intensity slider scales the entire profile.
+                    </p>
+
+                    <div style={{ fontWeight: 700, color: "#F5C542", marginBottom: 8, marginTop: 16 }}>Synthetic Supply Extension (Woo)</div>
+                    <p style={{ margin: "0 0 8px" }}>
+                      Willy Woo identifies ~0.9M "synthetic chairs" — paper BTC claims that exist via exchange IOUs, ETF share creation/redemption mismatches, futures open interest, and rehypothecation of custodied BTC.
+                    </p>
+                    <p style={{ margin: "0 0 8px" }}>
+                      <b>Redemption shock:</b> When paper claims unwind (exchange collapse, audit event, run on ETF), synthetic supply collapses with ~6-month half-life, causing the effective supply to snap to on-chain reality. This triggers violent upward price repricing.
+                    </p>
+
+                    <div style={{ fontWeight: 700, color: "#F5C542", marginBottom: 8, marginTop: 16 }}>Key Insight</div>
+                    <p style={{ margin: 0 }}>
+                      Synthetic supply acts as a <b>price dampener</b> during accumulation phases — paper chairs appear more numerous than they are, suppressing the scarcity premium. But this is borrowed time. When the music stops and claims are settled on-chain, the true supply shock emerges with greater violence than the base model predicts.
+                    </p>
+
+                    {/* Paper citation block */}
+                    <div style={{ marginTop: 24, padding: "12px 16px", background: "#242424", borderRadius: 8, border: "1px solid #2A2A2A" }}>
+                      <div style={{ fontSize: 10, color: "#555", fontFamily: "'JetBrains Mono', monospace", marginBottom: 6, letterSpacing: 1 }}>SOURCE PAPER</div>
+                      <p style={{ margin: 0, fontSize: 12, color: "#AAAAAA", lineHeight: 1.6 }}>
+                        Rudd, M. A., &amp; Porter, D. (2025).{" "}
+                        <a
+                          href="https://doi.org/10.3390/jrfm18020066"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "#F5C542", textDecoration: "none", borderBottom: "1px solid #F5C542" }}
+                        >
+                          A Supply and Demand Framework for Bitcoin Price Forecasting
+                        </a>.{" "}
+                        <em>Journal of Risk and Financial Management</em>, 18(2), 66.{" "}
+                        <span style={{ color: "#555", fontSize: 11 }}>https://doi.org/10.3390/jrfm18020066</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ textAlign: "center", marginTop: 20, fontSize: 10, color: "#444", fontFamily: "'JetBrains Mono', monospace" }}>
+              ACUMEN · Model based on{" "}
+              <a
+                href="https://doi.org/10.3390/jrfm18020066"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#555", textDecoration: "underline" }}
+              >
+                Rudd &amp; Porter (2025), JRFM 18(2), 66
+              </a>
+              {" "}· Synthetic extension informed by @willywoo
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
