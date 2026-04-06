@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -h \"back-link\\\\|href.*index\" \"c:\\\\Users\\\\rider\\\\Desktop\\\\my-website\\\\indicators\"/*/*.html)",
+      "Bash(grep -l \"btc_baked\\\\|sp500_baked\" \"c:\\\\Users\\\\rider\\\\Desktop\\\\my-website\\\\indicators\"/*/*.html)"
+    ]
+  }
+}
