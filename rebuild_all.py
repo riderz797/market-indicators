@@ -396,6 +396,32 @@ def main():
     except Exception as e:
         print(f'  MSTR indicator FAILED: {e}')
 
+    # ── 5. Acumen Global Liquidity Indicator ─────────────────────────────────
+    print('\n=== Acumen Global Liquidity Indicator ===')
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'acumen_liq', os.path.join(BASE, 'acumen_liquidity_indicator.py'))
+        acumen = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(acumen)
+
+        m    = acumen.build_liquidity_index()
+        useq = acumen.build_usequities(m.index)
+        payload = acumen.bake_js(m, useq, write_file=False)
+
+        liq_script = build_script('acumen_liquidity_script.js', payload)
+        replace_script_block(
+            os.path.join(BASE, 'indicators/macro/acumen_liquidity.html'),
+            liq_script)
+        meta = payload['meta']
+        print(f"  Liquidity: last equity {meta['last_equity_date']} · "
+              f"projection to {meta['proj_end_date']} · "
+              f"r={meta['corr_full']}")
+    except Exception as e:
+        import traceback
+        print(f'  Acumen Liquidity FAILED: {e}')
+        traceback.print_exc()
+
     print(f'\nDone! BTC at ${btc_v[-1]:,.0f}')
 
 
