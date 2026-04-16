@@ -422,6 +422,20 @@ def main():
         print(f'  Acumen Liquidity FAILED: {e}')
         traceback.print_exc()
 
+    # ── Capital Flows ──────────────────────────────────────────────────────
+    print('\n── Capital Flows ──')
+    try:
+        import importlib.util, sys
+        cf_path = os.path.join(BASE, 'fetch_capital_flows.py')
+        spec = importlib.util.spec_from_file_location('fetch_capital_flows', cf_path)
+        cf = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cf)
+        cf.main()
+    except Exception as e:
+        import traceback
+        print(f'  Capital Flows FAILED: {e}')
+        traceback.print_exc()
+
     print(f'\nDone! BTC at ${btc_v[-1]:,.0f}')
 
 
