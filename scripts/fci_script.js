@@ -133,22 +133,146 @@ function rollingAvg(values, window) {
     return result;
 }
 
+// Build the weekly series dict from a raw map of id->series (static or merged)
+function buildWeeklyFromMap(rawMap) {
+    const seriesMapping = {
+        'WALCL': 'fed_balance_sheet', 'DGS10': 'us10y', 'DGS2': 'us2y',
+        'SP500': 'spx', 'DJIA': 'dji', 'T10YIE': 'inflation',
+        'RRPONTSYD': 'rrp', 'SOFR': 'sofr', 'IORB': 'iorb',
+        'BAMLH0A0HYM2': 'hy_spread', 'VIXCLS': 'vix',
+        'DTWEXBGS': 'dxy'
+    };
+    const weekly = {};
+    for (const [id, name] of Object.entries(seriesMapping)) {
+        if (!rawMap[id]) continue;
+        weekly[name] = id === 'WALCL'
+            ? { dates: rawMap[id].dates, values: rawMap[id].values.map(v => v / 1000) }
+            : rawMap[id];
+    }
+    if (rawMap.GOLD) weekly.gold = rawMap.GOLD;
+    if (rawMap.BTC)  weekly.btc  = rawMap.BTC;
+    if (rawMap.TGA)  weekly.tga  = rawMap.TGA;
+    return weekly;
+}
+
+// Compute contributions and index values from a weekly series dict
+function computeContributions(weekly) {
+    const masterDates = weekly.dxy ? weekly.dxy.dates : (weekly.us10y ? weekly.us10y.dates : []);
+    const aligned = {};
+    for (const [key, w] of Object.entries(weekly)) aligned[key] = alignToIndex(w.dates, w.values, masterDates);
+
+    const n = masterDates.length;
+    const series = {};
+    if (aligned.dxy)            series.DXY             = aligned.dxy;
+    if (aligned.hy_spread)      series.hy_spread        = aligned.hy_spread;
+    if (aligned.vix)            series.vix              = aligned.vix;
+    if (aligned.fed_balance_sheet) series.fed_balance_sheet = aligned.fed_balance_sheet;
+    if (aligned.tga)            series.TGA              = aligned.tga;
+    if (aligned.us10y && aligned.inflation)
+        series.real_yield = aligned.us10y.map((v, i) => v != null && aligned.inflation[i] != null ? v - aligned.inflation[i] : null);
+    if (aligned.us10y && aligned.us2y)
+        series.yield_curve = aligned.us10y.map((v, i) => v != null && aligned.us2y[i] != null ? v - aligned.us2y[i] : null);
+    if (aligned.sofr && aligned.iorb)
+        series.liquidity_spread = aligned.sofr.map((v, i) => v != null && aligned.iorb[i] != null ? v - aligned.iorb[i] : null);
+    if (aligned.rrp)
+        series.RRP = aligned.rrp.map((v, i) => i > 0 && v != null && aligned.rrp[i-1] != null ? v - aligned.rrp[i-1] : null);
+
+    const ratios = {};
+    if (aligned.btc && aligned.gold) ratios['BTC/Gold'] = aligned.btc.map((v, i) => v && aligned.gold[i] ? v / aligned.gold[i] : null);
+    if (aligned.spx && aligned.gold) ratios['SPX/Gold'] = aligned.spx.map((v, i) => v && aligned.gold[i] ? v / aligned.gold[i] : null);
+    if (aligned.dji && aligned.gold) ratios['DJI/Gold'] = aligned.dji.map((v, i) => v && aligned.gold[i] ? v / aligned.gold[i] : null);
+
+    const zScores = {};
+    for (const [key, vals] of Object.entries(series)) zScores[key] = rollingZScores(vals, 260, 52);
+    const ratioZ = {};
+    for (const [key, vals] of Object.entries(ratios)) ratioZ[key] = rollingZScores(vals, 260, 52);
+
+    zScores.risk_gold = new Array(n).fill(null);
+    for (let i = 0; i < n; i++) {
+        const vals = [];
+        for (const key of ['BTC/Gold', 'SPX/Gold', 'DJI/Gold']) { if (ratioZ[key] && ratioZ[key][i] != null) vals.push(ratioZ[key][i]); }
+        if (vals.length > 0) zScores.risk_gold[i] = vals.reduce((a,b) => a+b, 0) / vals.length;
+    }
+
+    const totalWeight = Object.values(COMPONENT_WEIGHTS).reduce((a,b) => a+b, 0);
+    const indexValues = new Array(n).fill(null);
+    const contributions = {};
+    for (const comp of Object.keys(COMPONENT_WEIGHTS)) contributions[comp] = new Array(n).fill(null);
+
+    for (let i = 0; i < n; i++) {
+        let weightedSum = 0, count = 0;
+        for (const comp of Object.keys(COMPONENT_WEIGHTS)) {
+            if (zScores[comp] && zScores[comp][i] != null) {
+                const signed = zScores[comp][i] * (SIGNS[comp] || 1);
+                const weighted = signed * COMPONENT_WEIGHTS[comp];
+                contributions[comp][i] = (weighted * -1) / totalWeight;
+                weightedSum += weighted; count++;
+            }
+        }
+        if (count > 0) indexValues[i] = (weightedSum / totalWeight) * -1;
+    }
+
+    return { contributions, indexValues, masterDates, n };
+}
+
+// Render the movers panel from contributions (no fetch required)
+function renderMoversPanel(contributions, n) {
+    const latestContribs = {}, fourWkContribs = {};
+    for (const comp of Object.keys(COMPONENT_WEIGHTS)) {
+        latestContribs[comp] = contributions[comp][n - 1] ?? 0;
+        fourWkContribs[comp] = contributions[comp][Math.max(0, n - 5)] ?? 0;
+    }
+    const byVal = Object.keys(latestContribs).sort((a, b) => (latestContribs[b] || 0) - (latestContribs[a] || 0));
+    const easingComps  = byVal.filter(c => (latestContribs[c] || 0) > 0).slice(0, 3);
+    const tightenComps = [...byVal].reverse().filter(c => (latestContribs[c] || 0) < 0).slice(0, 3);
+    const maxAbs = Math.max(...Object.values(latestContribs).map(v => Math.abs(v || 0)), 0.01);
+
+    function buildRow(comp) {
+        const val    = latestContribs[comp] || 0;
+        const delta  = val - (fourWkContribs[comp] || 0);
+        const pct    = Math.min(Math.abs(val) / maxAbs * 100, 100).toFixed(1);
+        const barClr = val > 0 ? '#2E7D32' : '#C62828';
+        const arrow  = delta > 0.003 ? '&#9650;' : delta < -0.003 ? '&#9660;' : '&#8594;';
+        const dClr   = delta > 0.003 ? '#4CAF50' : delta < -0.003 ? '#EF5350' : '#888888';
+        const dStr   = (delta >= 0 ? '+' : '') + delta.toFixed(3);
+        return `<div class="mover-row">
+            <span class="mover-name">${LABELS[comp] || comp}</span>
+            <span class="mover-bar-wrap"><span class="mover-bar" style="width:${pct}%;background:${barClr}"></span></span>
+            <span class="mover-delta" style="color:${dClr}">${arrow} ${dStr}</span>
+        </div>`;
+    }
+
+    const easingEl   = document.getElementById('easing-rows');
+    const tightenEl  = document.getElementById('tightening-rows');
+    if (easingEl)  easingEl.innerHTML  = easingComps.length  ? easingComps.map(buildRow).join('')  : '<div class="mover-empty">None</div>';
+    if (tightenEl) tightenEl.innerHTML = tightenComps.length ? tightenComps.map(buildRow).join('') : '<div class="mover-empty">None</div>';
+}
+
+// On page load: use baked STATIC_DATA — no network call
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const rawMap = {};
+        for (const [key, data] of Object.entries(STATIC_DATA)) {
+            if (key === 'generated') continue;
+            rawMap[key] = { dates: data.dates, values: data.values };
+        }
+        const weekly = buildWeeklyFromMap(rawMap);
+        const { contributions, n } = computeContributions(weekly);
+        renderMoversPanel(contributions, n);
+        console.log('[FCI] Movers loaded from static data (' + STATIC_DATA.generated + ')');
+    } catch (e) {
+        console.warn('[FCI] Static movers init failed:', e);
+    }
+});
+
 async function updateData() {
     setLoading(true);
     try {
-        const staticMap = {};
-        const seriesMapping = {
-            'WALCL': 'fed_balance_sheet', 'DGS10': 'us10y', 'DGS2': 'us2y',
-            'SP500': 'spx', 'DJIA': 'dji', 'T10YIE': 'inflation',
-            'RRPONTSYD': 'rrp', 'SOFR': 'sofr', 'IORB': 'iorb',
-            'BAMLH0A0HYM2': 'hy_spread', 'VIXCLS': 'vix',
-            'GOLD': 'gold', 'DTWEXBGS': 'dxy', 'BTC': 'btc', 'TGA': 'tga'
-        };
+        const rawMap = {};
         for (const [key, data] of Object.entries(STATIC_DATA)) {
             if (key === 'generated') continue;
-            staticMap[key] = { dates: [...data.dates], values: [...data.values] };
+            rawMap[key] = { dates: [...data.dates], values: [...data.values] };
         }
-        console.log('[Static] Loaded ' + Object.keys(staticMap).length + ' series');
 
         setStatus('Fetching recent data...', 'info');
         const recentStart = new Date();
@@ -159,80 +283,24 @@ async function updateData() {
         const fredResults = await Promise.allSettled(fredIds.map(id => fetchFRED(id, startStr)));
         const [btcRes, tgaRes] = await Promise.allSettled([fetchBinanceBTC(), fetchTGA()]);
 
-        const weekly = {};
         fredIds.forEach((id, i) => {
             const live = fredResults[i].status === 'fulfilled' ? fredResults[i].value : null;
-            const liveW = live ? resampleWeekly(live.dates, live.values) : null;
-            const merged = mergeWeekly(staticMap[id] || null, liveW);
-            if (!merged) return;
-            const name = seriesMapping[id];
-            weekly[name] = id === 'WALCL' ? { dates: merged.dates, values: merged.values.map(v => v / 1000) } : merged;
+            if (!live) return;
+            const liveW = resampleWeekly(live.dates, live.values);
+            const merged = mergeWeekly(rawMap[id] || null, liveW);
+            if (merged) rawMap[id] = merged;
         });
 
-        if (staticMap.GOLD) weekly.gold = { dates: [...staticMap.GOLD.dates], values: [...staticMap.GOLD.values] };
-
         const liveBtc = btcRes.status === 'fulfilled' ? btcRes.value : null;
-        const liveBtcW = liveBtc ? resampleWeekly(liveBtc.dates, liveBtc.values) : null;
-        const mergedBtc = mergeWeekly(staticMap.BTC || null, liveBtcW);
-        if (mergedBtc) weekly.btc = mergedBtc;
+        if (liveBtc) rawMap.BTC = mergeWeekly(rawMap.BTC || null, resampleWeekly(liveBtc.dates, liveBtc.values));
 
         const liveTga = tgaRes.status === 'fulfilled' ? tgaRes.value : null;
-        const liveTgaW = liveTga ? resampleWeekly(liveTga.dates, liveTga.values) : null;
-        const mergedTga = mergeWeekly(staticMap.TGA || null, liveTgaW);
-        if (mergedTga) weekly.tga = mergedTga;
+        if (liveTga) rawMap.TGA = mergeWeekly(rawMap.TGA || null, resampleWeekly(liveTga.dates, liveTga.values));
 
         setStatus('Computing z-score index...', 'info');
-        const masterDates = weekly.dxy ? weekly.dxy.dates : (weekly.us10y ? weekly.us10y.dates : []);
-        const aligned = {};
-        for (const [key, w] of Object.entries(weekly)) aligned[key] = alignToIndex(w.dates, w.values, masterDates);
-
-        const n = masterDates.length;
-        const series = {};
-        if (aligned.dxy) series.DXY = aligned.dxy;
-        if (aligned.hy_spread) series.hy_spread = aligned.hy_spread;
-        if (aligned.vix) series.vix = aligned.vix;
-        if (aligned.fed_balance_sheet) series.fed_balance_sheet = aligned.fed_balance_sheet;
-        if (aligned.tga) series.TGA = aligned.tga;
-
-        if (aligned.us10y && aligned.inflation) series.real_yield = aligned.us10y.map((v, i) => v != null && aligned.inflation[i] != null ? v - aligned.inflation[i] : null);
-        if (aligned.us10y && aligned.us2y) series.yield_curve = aligned.us10y.map((v, i) => v != null && aligned.us2y[i] != null ? v - aligned.us2y[i] : null);
-        if (aligned.sofr && aligned.iorb) series.liquidity_spread = aligned.sofr.map((v, i) => v != null && aligned.iorb[i] != null ? v - aligned.iorb[i] : null);
-        if (aligned.rrp) series.RRP = aligned.rrp.map((v, i) => i > 0 && v != null && aligned.rrp[i-1] != null ? v - aligned.rrp[i-1] : null);
-
-        const ratios = {};
-        if (aligned.btc && aligned.gold) ratios['BTC/Gold'] = aligned.btc.map((v, i) => v && aligned.gold[i] ? v / aligned.gold[i] : null);
-        if (aligned.spx && aligned.gold) ratios['SPX/Gold'] = aligned.spx.map((v, i) => v && aligned.gold[i] ? v / aligned.gold[i] : null);
-        if (aligned.dji && aligned.gold) ratios['DJI/Gold'] = aligned.dji.map((v, i) => v && aligned.gold[i] ? v / aligned.gold[i] : null);
-
-        const zScores = {};
-        for (const [key, vals] of Object.entries(series)) zScores[key] = rollingZScores(vals, 260, 52);
-        const ratioZ = {};
-        for (const [key, vals] of Object.entries(ratios)) ratioZ[key] = rollingZScores(vals, 260, 52);
-
-        zScores.risk_gold = new Array(n).fill(null);
-        for (let i = 0; i < n; i++) {
-            const vals = [];
-            for (const key of ['BTC/Gold', 'SPX/Gold', 'DJI/Gold']) { if (ratioZ[key] && ratioZ[key][i] != null) vals.push(ratioZ[key][i]); }
-            if (vals.length > 0) zScores.risk_gold[i] = vals.reduce((a,b) => a+b, 0) / vals.length;
-        }
-
-        const totalWeight = Object.values(COMPONENT_WEIGHTS).reduce((a,b) => a+b, 0);
-        const indexValues = new Array(n).fill(null);
-        const contributions = {};
-        for (const comp of Object.keys(COMPONENT_WEIGHTS)) contributions[comp] = new Array(n).fill(null);
-
-        for (let i = 0; i < n; i++) {
-            let weightedSum = 0, count = 0;
-            for (const comp of Object.keys(COMPONENT_WEIGHTS)) {
-                if (zScores[comp] && zScores[comp][i] != null) {
-                    const signed = zScores[comp][i] * (SIGNS[comp] || 1);
-                    const weighted = signed * COMPONENT_WEIGHTS[comp];
-                    contributions[comp][i] = (weighted * -1) / totalWeight;
-                    weightedSum += weighted; count++;
-                }
-            }
-            if (count > 0) indexValues[i] = (weightedSum / totalWeight) * -1;
-        }
+        const weekly = buildWeeklyFromMap(rawMap);
+        const { contributions, indexValues, masterDates, n } = computeContributions(weekly);
+        if (n < 2 || indexValues[n-1] == null) throw new Error('Insufficient data returned.');
 
         const periods = { '3M': 13, '1Y': 52, '5Y': 260 };
         const periodTraces = {};
@@ -245,30 +313,19 @@ async function updateData() {
 
         const chartDiv = document.querySelector('.plotly-graph-div');
         const traces = chartDiv.data;
-        const periodNames = ['3M', '1Y', '5Y'];
         for (let p = 0; p < 3; p++) {
-            const pd = periodTraces[periodNames[p]], base = p * 3;
+            const pd = periodTraces[['3M','1Y','5Y'][p]], base = p * 3;
             traces[base].x = pd.dates; traces[base].y = pd.pos;
             traces[base + 1].x = pd.dates; traces[base + 1].y = pd.neg;
             traces[base + 2].x = pd.dates; traces[base + 2].y = pd.values;
         }
 
-        const latestContribs = {}, prevContribs = {};
-        for (const comp of Object.keys(COMPONENT_WEIGHTS)) { latestContribs[comp] = contributions[comp][n - 1]; prevContribs[comp] = contributions[comp][n - 2]; }
-        const sortedComps = Object.keys(latestContribs).sort((a, b) => (latestContribs[a] || 0) - (latestContribs[b] || 0));
-        traces[9].cells.values = [
-            sortedComps.map(c => LABELS[c] || c),
-            sortedComps.map(c => latestContribs[c] != null ? (latestContribs[c] >= 0 ? '+' : '') + latestContribs[c].toFixed(3) : 'N/A'),
-            sortedComps.map(c => { const diff = (latestContribs[c] || 0) - (prevContribs[c] || 0); return (diff >= 0 ? '+' : '') + diff.toFixed(3); })
-        ];
-        traces[9].cells.fill.color = [
-            sortedComps.map(c => { const v = latestContribs[c] || 0; return v > 0.02 ? 'rgba(46,125,50,0.3)' : v < -0.02 ? 'rgba(198,40,40,0.3)' : 'rgba(200,200,200,0.3)'; }),
-            sortedComps.map(c => { const v = latestContribs[c] || 0; return v > 0.02 ? 'rgba(46,125,50,0.3)' : v < -0.02 ? 'rgba(198,40,40,0.3)' : 'rgba(200,200,200,0.3)'; }),
-            sortedComps.map(c => { const v = latestContribs[c] || 0; return v > 0.02 ? 'rgba(46,125,50,0.3)' : v < -0.02 ? 'rgba(198,40,40,0.3)' : 'rgba(200,200,200,0.3)'; })
-        ];
+        renderMoversPanel(contributions, n);
 
         const current = indexValues[n - 1], prev = indexValues[n - 2], dateStr = masterDates[n - 1];
         const layout = chartDiv.layout;
+        if (layout.xaxis) layout.xaxis.domain = [0, 1];
+        if (layout.yaxis) layout.yaxis.domain = [0, 1];
         layout.title.text = `Financial Conditions Index<br><sup>As of ${dateStr} | Current: ${current >= 0 ? '+' : ''}${current.toFixed(2)}\u03c3 | WoW: ${(current - prev) >= 0 ? '+' : ''}${(current - prev).toFixed(2)}\u03c3 | Green = Easing, Red = Tightening</sup>`;
         Plotly.react(chartDiv, traces, layout);
 
@@ -277,4 +334,3 @@ async function updateData() {
     } catch (err) { setStatus('Error: ' + err.message, 'error'); console.error(err); }
     finally { setLoading(false); }
 }
-document.addEventListener('DOMContentLoaded', updateData);
