@@ -113,11 +113,7 @@ print(f"  CPI    : {len(cpi)} months")
 print(f"  FEDFUNDS: {len(fedfunds)} months")
 print(f"  M2SL   : {len(m2)} months")
 
-# We need the last 12 months of CPI from the existing baked period for YoY.
-# Re-fetch just that window from FRED (small request).
-cpi_history_start = shift_ym(last_ym, 13)
-cpi_full = fetch_fred("CPIAUCSL", cpi_history_start + "-01", "m")
-cpi_full.update(cpi)   # merge, new data wins
+cpi_full = cpi
 
 # ── COMPUTE NEW MONTHS ONLY ────────────────────────────────────────────────────
 print("Computing new months...")

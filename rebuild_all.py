@@ -423,7 +423,7 @@ def main():
         traceback.print_exc()
 
     # ── Capital Flows ──────────────────────────────────────────────────────
-    print('\n── Capital Flows ──')
+    print('\n-- Capital Flows --')
     try:
         import importlib.util, sys
         cf_path = os.path.join(BASE, 'fetch_capital_flows.py')
