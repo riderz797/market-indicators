@@ -863,8 +863,8 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
           y: pct,
           customdata: hoverDates,
           name: yr,
-          line: { color: yearColor(parseInt(yr)), width: isSearched ? 2 : 1 },
-          opacity: isSearched ? 0.55 : 0.25,
+          line: { color: yearColor(parseInt(yr)), width: isSearched ? 2 : 1.5 },
+          opacity: isSearched ? 0.65 : 0.50,
           hovertemplate: '<b>%{customdata}</b> | <b>' + yr + '</b><br>Day %{x} | %{y:.1f}%<extra></extra>',
           showlegend: isSearched,
         });
@@ -980,6 +980,23 @@ const MONTH_TICK_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
           if (t.x[i] > maxDay) maxDay = t.x[i];
           if (!isBackground && t.y[i] != null && t.y[i] < minY) minY = t.y[i];
           if (!isBackground && t.y[i] != null && t.y[i] > maxY) maxY = t.y[i];
+        }
+      }
+      // When showing all years, expand range to capture most of the data
+      // using a percentile clip so extreme outliers (e.g. 2017 +1300%) don't
+      // flatten everything else.
+      if (showAllYears) {
+        const allY = [];
+        for (const t of traces) {
+          if (!t.y || t._isBand) continue;
+          for (const v of t.y) { if (v != null && isFinite(v)) allY.push(v); }
+        }
+        if (allY.length > 0) {
+          allY.sort((a, b) => a - b);
+          const p3  = allY[Math.floor(allY.length * 0.03)];
+          const p97 = allY[Math.floor(allY.length * 0.97)];
+          if (minY === Infinity)  minY = p3;  else minY = Math.min(minY, p3);
+          if (maxY === -Infinity) maxY = p97; else maxY = Math.max(maxY, p97);
         }
       }
       // Fallback if only background lines are visible (no prominent traces)
