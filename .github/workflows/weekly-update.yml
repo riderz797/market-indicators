@@ -24,10 +24,14 @@ jobs:
         run: pip install requests pandas yfinance
 
       - name: Run US Business Cycle update
+        continue-on-error: true   # FRED outages must not abort downstream steps
         run: python fetch_usbc.py
 
       - name: Run rebuild_all (all other indicators)
         run: python rebuild_all.py
+
+      - name: Run Capital Flows update
+        run: python fetch_capital_flows.py
 
       - name: Commit and push updated indicators
         run: |
