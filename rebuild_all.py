@@ -255,10 +255,17 @@ def main():
         return result
 
     try:
-        # Fetch MOVE Index
-        print('  Yahoo ^MOVE...')
-        move_d, move_v = fetch_yfinance('^MOVE', '2019-01-01')
-        print(f'  MOVE: {len(move_d)} pts to {move_d[-1]}')
+        # Fetch MOVE Index — try FRED first (more reliable), fall back to Yahoo
+        print('  MOVE Index...')
+        try:
+            move_d, move_v = fetch_fred('MOVE', '2019-01-01')
+            print(f'  MOVE (FRED): {len(move_d)} pts to {move_d[-1]}')
+        except Exception as _move_err:
+            print(f'  MOVE (FRED failed: {_move_err}) — trying Yahoo ^MOVE...')
+            move_d, move_v = fetch_yfinance('^MOVE', '2019-01-01')
+            print(f'  MOVE (Yahoo): {len(move_d)} pts' + (f' to {move_d[-1]}' if move_d else ' — EMPTY'))
+        if not move_d:
+            raise RuntimeError('MOVE Index returned no data from FRED or Yahoo Finance')
 
         # HY OAS from FRED
         print('  FRED BAMLH0A0HYM2...')
@@ -379,19 +386,21 @@ def main():
                 bear = (m > 0 and h > 0 and b < 0)  # all unfavorable
                 fconf.append(1 if bull else (-1 if bear else 0))
 
-        print(f'  Output: {len(fd)} weeks  {fd[0]} -> {fd[-1]}')
-
-        mstr_script = build_script('mstr_stress_script.js', {
-            'generated': today,
-            'dates': fd, 'stress_index': fs,
-            'move_z': fmz, 'hy_oas_z': fhz,
-            'nav_premium': fn,
-            'move_raw': fmr, 'hy_oas_raw': fhr,
-            'btc_ps_mom_z': fbps, 'confidence': fconf,
-        })
-        replace_script_block(
-            os.path.join(BASE, 'indicators/btc/mstr_stress_indicator.html'),
-            mstr_script)
+        if not fd:
+            print('  MSTR: no output rows — check MOVE/HY/MSTR/BTC data alignment')
+        else:
+            print(f'  Output: {len(fd)} weeks  {fd[0]} -> {fd[-1]}')
+            mstr_script = build_script('mstr_stress_script.js', {
+                'generated': today,
+                'dates': fd, 'stress_index': fs,
+                'move_z': fmz, 'hy_oas_z': fhz,
+                'nav_premium': fn,
+                'move_raw': fmr, 'hy_oas_raw': fhr,
+                'btc_ps_mom_z': fbps, 'confidence': fconf,
+            })
+            replace_script_block(
+                os.path.join(BASE, 'indicators/btc/mstr_stress_indicator.html'),
+                mstr_script)
 
     except Exception as e:
         print(f'  MSTR indicator FAILED: {e}')

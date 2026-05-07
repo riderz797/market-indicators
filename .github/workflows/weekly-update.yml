@@ -21,7 +21,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests pandas yfinance
+        run: pip install requests pandas yfinance matplotlib
 
       - name: Run US Business Cycle update
         continue-on-error: true   # FRED outages must not abort downstream steps

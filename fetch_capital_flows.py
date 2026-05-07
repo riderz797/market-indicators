@@ -165,7 +165,7 @@ def main():
 
     if n == 0:
         print("\nERROR: Could not find baked data markers in HTML.")
-        raise SystemExit(1)
+        raise RuntimeError("Could not find @@BAKED_DATA_START@@ / @@BAKED_DATA_END@@ markers in capital_flows.html")
 
     with open(HTML_PATH, "w", encoding="utf-8") as f:
         f.write(new_html)
