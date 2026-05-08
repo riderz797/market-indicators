@@ -265,7 +265,7 @@
   <!-- BOARD 3 -->
   <div class="panel">
     <div class="panel-title">Board 3 — Asset Allocation Cycle Position</div>
-    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) per asset class.</div>
+    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) across 5 nodes: Cyclical → Commodities → Hard Assets → Defensive → Fixed Income.</div>
     <div class="cycle-wrapper">
       <div class="cycle-svg-container">
         <svg id="cycle-svg" viewBox="0 0 700 320" width="100%" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -285,15 +285,15 @@ const CAPITAL_FLOWS_BAKED = true; // injected by fetch_capital_flows.py on 2026-
 
 // ── ASSET CLASS MAP ──────────────────────────────────────────────────────────
 const ASSET_CLASSES = {
-  "Crypto":     { tickers: ["BTC","MSTR","STRC","ASST","SATA"], color: "#9B59B6", phase: "Speculation / Risk-On" },
-  "Cyclical":   { tickers: ["QQQ","XLY","XLF","IWM","IGV","SPY"], color: "#E67E22", phase: "Expansion / Risk-On" },
-  "Commodities":{ tickers: ["DBC","XLE","GLD","DBA"], color: "#E74C3C", phase: "Mid-to-Late Cycle" },
-  "Defensive":  { tickers: ["XLP","VYM","XLV","MOAT"], color: "#3498DB", phase: "Late Cycle / Slowdown" },
-  "Fixed Income":{ tickers: ["SHV","TLT","IEF"], color: "#2ECC71", phase: "Recession / Risk-Off" },
+  "Cyclical":    { tickers: ["QQQ","XLY","XLF","IWM","IGV","SPY"],          color: "#E67E22", phase: "Expansion / Risk-On" },
+  "Commodities": { tickers: ["DBC","XLE","DBA"],                             color: "#E74C3C", phase: "Late Cycle / Inflationary" },
+  "Hard Assets": { tickers: ["BTC","MSTR","STRC","ASST","SATA","GLD"],       color: "#F0B429", phase: "Debasement / Monetary Stress" },
+  "Defensive":   { tickers: ["XLP","VYM","XLV","MOAT"],                      color: "#3498DB", phase: "Slowdown / Risk-Off Rotation" },
+  "Fixed Income":{ tickers: ["SHV","TLT","IEF"],                             color: "#2ECC71", phase: "Contraction / Flight to Safety" },
 };
 
 // Ordered cycle phases for SVG (left→right along the wave)
-const CYCLE_ORDER = ["Crypto","Cyclical","Commodities","Defensive","Fixed Income"];
+const CYCLE_ORDER = ["Cyclical","Commodities","Hard Assets","Defensive","Fixed Income"];
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function buyOrSell(open, close) { return close > open ? 1 : -1; }
