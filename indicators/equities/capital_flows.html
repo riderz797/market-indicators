@@ -265,7 +265,7 @@
   <!-- BOARD 3 -->
   <div class="panel">
     <div class="panel-title">Board 3 — Asset Allocation Cycle Position</div>
-    <div class="panel-desc">Estimated cycle position based on the last 4 weeks of net capital flow (relative volume × buy/sell direction) per asset class.</div>
+    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) per asset class.</div>
     <div class="cycle-wrapper">
       <div class="cycle-svg-container">
         <svg id="cycle-svg" viewBox="0 0 700 320" width="100%" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -480,7 +480,7 @@ function buildBoard2() {
 
 // ── BOARD 3: CYCLE ───────────────────────────────────────────────────────────
 function computeCycleScores() {
-  const WEEKS_4 = 4;
+  const WEEKS_13 = 13;
   const WEEKS_12M = 52;
   const scores = {};
 
@@ -490,9 +490,9 @@ function computeCycleScores() {
       const d = CAPITAL_FLOWS.data[ticker];
       if (!d || d.volumes.length < 2) return;
       const avg = avgVolume(ticker, WEEKS_12M) || 1;
-      const last4v = d.volumes.slice(-WEEKS_4);
-      const last4o = d.opens.slice(-WEEKS_4);
-      const last4c = d.closes.slice(-WEEKS_4);
+      const last4v = d.volumes.slice(-WEEKS_13);
+      const last4o = d.opens.slice(-WEEKS_13);
+      const last4c = d.closes.slice(-WEEKS_13);
       last4v.forEach((vol, i) => {
         const relVol = vol / avg;
         const side   = buyOrSell(last4o[i], last4c[i]);
@@ -610,7 +610,7 @@ function buildCycleSidebar(scores, activeClass) {
   const activeScore = scores[activeClass];
   document.getElementById("cycle-summary").innerHTML = `
     <strong>Estimated Phase: ${activeCfg.phase}</strong><br>
-    Capital is rotating into <strong>${activeClass}</strong> assets (4-week net flow score: ${activeScore >= 0 ? "+" : ""}${activeScore.toFixed(2)}).
+    Capital is rotating into <strong>${activeClass}</strong> assets (13-week net flow score: ${activeScore >= 0 ? "+" : ""}${activeScore.toFixed(2)}).
     ${activeScore > 0.3 ? "Strong inflow signal." : activeScore > 0 ? "Mild inflow signal." : "Net outflow — positioning may be rotating elsewhere."}
   `;
 }
