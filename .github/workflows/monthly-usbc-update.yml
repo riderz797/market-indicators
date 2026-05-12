@@ -1,0 +1,45 @@
+name: Monthly USBC Update
+
+# Runs on the 15th and 22nd of every month.
+# The 15th catches CPI (published ~13th); the 22nd catches M2SL,
+# which is the last series needed and has a ~6-week publication lag.
+# USBC for month X is typically computable on the ~22nd of month X+1.
+
+on:
+  schedule:
+    - cron: '0 10 15 * *'   # 15th of every month at 10:00 AM UTC
+    - cron: '0 10 22 * *'   # 22nd of every month at 10:00 AM UTC
+  workflow_dispatch:         # Allow manual runs from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  usbc-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests yfinance
+
+      - name: Run US Business Cycle update
+        run: python fetch_usbc.py
+
+      - name: Commit and push if data changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add indicators/macro/market_overheat_index.html
+          if git diff --staged --quiet; then
+            echo "No new USBC data available yet"
+          else
+            git commit -m "Monthly USBC update $(date +'%m/%d/%Y')"
+            git push
+          fi
