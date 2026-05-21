@@ -28,10 +28,20 @@ jobs:
         run: python fetch_usbc.py
 
       - name: Run rebuild_all (all other indicators)
+        continue-on-error: true
         run: python rebuild_all.py
 
       - name: Run Capital Flows update
+        continue-on-error: true
         run: python fetch_capital_flows.py
+
+      - name: Bake S&P 500 seasonality data
+        continue-on-error: true
+        run: python bake_sp500.py > sp500_baked.js.tmp && mv sp500_baked.js.tmp sp500_baked.js || echo "bake_sp500 failed, keeping existing data"
+
+      - name: Bake BTC seasonality data
+        continue-on-error: true
+        run: python bake_btc.py > btc_baked.js.tmp && mv btc_baked.js.tmp btc_baked.js || echo "bake_btc failed, keeping existing data"
 
       - name: Commit and push updated indicators
         run: |

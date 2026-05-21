@@ -111,42 +111,61 @@ def main():
     print(f'  {len(fred_dxy_d)} pts to {fred_dxy_d[-1]}')
 
     print('Yahoo BTC-USD...')
-    btc_d, btc_v = fetch_yfinance('BTC-USD', '2013-01-01')
-    print(f'  {len(btc_d)} pts to {btc_d[-1]} (${btc_v[-1]:,.0f})')
+    try:
+        btc_d, btc_v = fetch_yfinance('BTC-USD', '2013-01-01')
+        print(f'  {len(btc_d)} pts to {btc_d[-1]} (${btc_v[-1]:,.0f})')
+    except Exception as e:
+        print(f'  WARNING: BTC-USD failed ({e}) — BTC indicators will not be updated')
+        btc_d, btc_v = None, None
 
     print('Yahoo DX-Y.NYB...')
-    yahoo_dxy_d, yahoo_dxy_v = fetch_yfinance('DX-Y.NYB', '2000-01-01')
-    print(f'  {len(yahoo_dxy_d)} pts to {yahoo_dxy_d[-1]}')
+    try:
+        yahoo_dxy_d, yahoo_dxy_v = fetch_yfinance('DX-Y.NYB', '2000-01-01')
+        print(f'  {len(yahoo_dxy_d)} pts to {yahoo_dxy_d[-1]}')
+    except Exception as e:
+        print(f'  WARNING: DX-Y.NYB failed ({e}) — using FRED DTWEXBGS')
+        yahoo_dxy_d, yahoo_dxy_v = fred_dxy_d, fred_dxy_v
+
+    # Pre-compute weekly BTC buckets used by multiple sections below
+    if btc_d is not None:
+        btc_fri_d, btc_fri_v = resample_weekly(btc_d, btc_v, 4)
+        btc_mon_d, btc_mon_v = resample_weekly(btc_d, btc_v, 0)
+    else:
+        btc_fri_d = btc_fri_v = btc_mon_d = btc_mon_v = []
 
     # ── 1. BTC Liquidity Backtest (Friday-resampled, Yahoo DXY) ──
     print('\n=== BTC Liquidity Backtest ===')
-    btc_fri_d, btc_fri_v = resample_weekly(btc_d, btc_v, 4)
-    m2_fri_d, m2_fri_v = resample_weekly(m2_d, m2_v, 4)
-    dxy_fri_d, dxy_fri_v = resample_weekly(yahoo_dxy_d, yahoo_dxy_v, 4)
+    if not btc_fri_d:
+        print('  Skipped — BTC data unavailable')
+    else:
+        m2_fri_d, m2_fri_v = resample_weekly(m2_d, m2_v, 4)
+        dxy_fri_d, dxy_fri_v = resample_weekly(yahoo_dxy_d, yahoo_dxy_v, 4)
 
-    liq_script = build_script('btc_liquidity_script.js', {
-        'generated': today,
-        'btc': {'dates': btc_fri_d, 'values': rd(btc_fri_v)},
-        'm2':  {'dates': m2_fri_d,  'values': rd(m2_fri_v, 1)},
-        'dxy': {'dates': dxy_fri_d, 'values': rd(dxy_fri_v, 4)},
-    })
-    replace_script_block(
-        os.path.join(BASE, 'indicators/btc/btc_liquidity_backtest.html'), liq_script)
+        liq_script = build_script('btc_liquidity_script.js', {
+            'generated': today,
+            'btc': {'dates': btc_fri_d, 'values': rd(btc_fri_v)},
+            'm2':  {'dates': m2_fri_d,  'values': rd(m2_fri_v, 1)},
+            'dxy': {'dates': dxy_fri_d, 'values': rd(dxy_fri_v, 4)},
+        })
+        replace_script_block(
+            os.path.join(BASE, 'indicators/btc/btc_liquidity_backtest.html'), liq_script)
 
     # ── 2. BTC Mean Reversion (Monday-resampled, FRED DXY) ──
     print('\n=== BTC Mean Reversion ===')
-    btc_mon_d, btc_mon_v = resample_weekly(btc_d, btc_v, 0)
-    m2_mon_d, m2_mon_v = resample_weekly(m2_d, m2_v, 0)
-    dxy_mon_d, dxy_mon_v = resample_weekly(fred_dxy_d, fred_dxy_v, 0)
+    if not btc_mon_d:
+        print('  Skipped — BTC data unavailable')
+    else:
+        m2_mon_d, m2_mon_v = resample_weekly(m2_d, m2_v, 0)
+        dxy_mon_d, dxy_mon_v = resample_weekly(fred_dxy_d, fred_dxy_v, 0)
 
-    mr_script = build_script('btc_mean_reversion_script.js', {
-        'generated': today,
-        'btc': {'dates': btc_mon_d, 'values': rd(btc_mon_v)},
-        'm2':  {'dates': m2_mon_d,  'values': rd(m2_mon_v, 1)},
-        'dxy': {'dates': dxy_mon_d, 'values': rd(dxy_mon_v, 4)},
-    })
-    replace_script_block(
-        os.path.join(BASE, 'indicators/btc/btc_mean_reversion.html'), mr_script)
+        mr_script = build_script('btc_mean_reversion_script.js', {
+            'generated': today,
+            'btc': {'dates': btc_mon_d, 'values': rd(btc_mon_v)},
+            'm2':  {'dates': m2_mon_d,  'values': rd(m2_mon_v, 1)},
+            'dxy': {'dates': dxy_mon_d, 'values': rd(dxy_mon_v, 4)},
+        })
+        replace_script_block(
+            os.path.join(BASE, 'indicators/btc/btc_mean_reversion.html'), mr_script)
 
     # ── 3. Financial Conditions Index (Friday-resampled, 14 series) ──
     print('\n=== Financial Conditions Index ===')
@@ -168,10 +187,13 @@ def main():
             print(f'  {sid}: FAILED ({e})')
 
     print('  Gold (GC=F)...')
-    gold_d, gold_v = fetch_yfinance('GC=F', '1990-01-01')
-    g_d, g_v = resample_weekly(gold_d, gold_v, 4)
-    fci_static['GOLD'] = {'dates': g_d, 'values': rd(g_v, 2)}
-    print(f'  GOLD: {len(g_d)} weeks')
+    try:
+        gold_d, gold_v = fetch_yfinance('GC=F', '1990-01-01')
+        g_d, g_v = resample_weekly(gold_d, gold_v, 4)
+        fci_static['GOLD'] = {'dates': g_d, 'values': rd(g_v, 2)}
+        print(f'  GOLD: {len(g_d)} weeks')
+    except Exception as e:
+        print(f'  GOLD: FAILED ({e})')
 
     fci_static['BTC'] = {'dates': btc_fri_d, 'values': rd(btc_fri_v)}
 
@@ -227,7 +249,9 @@ def main():
         ('2026-01-05', 673783), ('2026-01-12', 687410), ('2026-01-20', 709715),
         ('2026-01-26', 712647), ('2026-02-02', 713502), ('2026-02-09', 714644),
         ('2026-02-17', 717131), ('2026-02-23', 717722), ('2026-03-02', 720737),
-        ('2026-03-09', 738731), ('2026-03-16', 761068),
+        ('2026-03-09', 738731), ('2026-03-16', 761068), ('2026-03-23', 762099),
+        ('2026-04-06', 766970), ('2026-04-13', 780897), ('2026-04-20', 815061),
+        ('2026-04-27', 818334), ('2026-05-11', 818869), ('2026-05-18', 843738),
     ]
 
     # Shares outstanding — quarterly approximations from SEC filings
@@ -238,10 +262,10 @@ def main():
         ('2022-07-01', 11_390_000), ('2023-01-01', 11_535_000),
         ('2023-04-01', 12_300_000), ('2023-07-01', 13_340_000),
         ('2023-10-01', 14_250_000), ('2024-01-01', 15_100_000),
-        ('2024-04-01', 16_400_000), ('2024-07-01', 19_600_000),
-        ('2024-10-01', 20_000_000), ('2025-01-01', 24_500_000),
-        ('2025-04-01', 30_000_000), ('2025-07-01', 34_000_000),
-        ('2025-10-01', 36_000_000), ('2026-01-01', 39_000_000),
+        ('2024-04-01', 16_400_000), ('2024-07-01', 15_000_000),   # pre-split (10-for-1 split Aug 7 2024)
+        ('2024-10-01', 215_000_000), ('2025-01-01', 250_000_000),  # post-split + ATM issuances
+        ('2025-04-01', 262_000_000), ('2025-07-01', 280_000_000),
+        ('2025-10-01', 287_000_000), ('2026-01-01', 312_000_000), ('2026-04-01', 348_000_000),
     ]
 
     def step_lookup(table, date_str):
@@ -445,7 +469,8 @@ def main():
         print(f'  Capital Flows FAILED: {e}')
         traceback.print_exc()
 
-    print(f'\nDone! BTC at ${btc_v[-1]:,.0f}')
+    btc_tail = f' BTC at ${btc_v[-1]:,.0f}' if btc_v else ''
+    print(f'\nDone!{btc_tail}')
 
 
 if __name__ == '__main__':
