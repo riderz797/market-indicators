@@ -27,7 +27,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests yfinance
+        run: pip install requests
 
       - name: Run US Business Cycle update
         run: python fetch_usbc.py

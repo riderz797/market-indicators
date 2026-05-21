@@ -3,11 +3,11 @@ fetch_usbc.py
 Incrementally updates the US Business Cycle Indicator.
 
 Reads the existing baked data from market_overheat_index.html, finds the
-last computed month, fetches only the data needed to extend forward, and
-appends new months. Historical data is preserved as-is.
+last computed month and any gaps, fetches only the data needed to extend
+forward and fill gaps, then writes the result back.
 
 Run:  python fetch_usbc.py
-Requires: requests, yfinance  (pip install requests yfinance)
+Requires: requests  (pip install requests)
 """
 
 import requests
@@ -15,16 +15,15 @@ import json
 import os
 import re
 from datetime import datetime
-import yfinance as yf
 
 # ── CONFIG ─────────────────────────────────────────────────────────────────────
 FRED_API_KEY = "824b29c5afa52f3fc7c6e7dc4925aebb"
 HTML_PATH    = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "indicators", "macro", "market_overheat_index.html")
 
+
 # ── READ EXISTING BAKED DATA FROM HTML ────────────────────────────────────────
 def read_baked_data(html):
-    """Extract existing USBC_DATES and USBC_VALUES arrays from the HTML."""
     dates_m  = re.search(r'const USBC_DATES\s*=\s*(\[[\s\S]*?\]);', html)
     values_m = re.search(r'const USBC_VALUES\s*=\s*(\[[\s\S]*?\]);', html)
     if not dates_m or not values_m:
@@ -32,22 +31,8 @@ def read_baked_data(html):
     return json.loads(dates_m.group(1)), json.loads(values_m.group(1))
 
 
-# ── FETCH S&P 500 FROM YAHOO FINANCE ──────────────────────────────────────────
-def fetch_sp500_yfinance(obs_start):
-    """Returns dict {YYYY-MM: float} from Yahoo Finance."""
-    ticker = yf.Ticker("^GSPC")
-    hist   = ticker.history(start=obs_start, interval="1mo")
-    result = {}
-    for ts, row in hist.iterrows():
-        ym = ts.strftime("%Y-%m")
-        if not row.empty and row["Close"] > 0:
-            result[ym] = float(row["Close"])
-    return result
-
-
 # ── FETCH FROM FRED ────────────────────────────────────────────────────────────
-def fetch_fred(series_id, obs_start, frequency="m"):
-    """Returns dict {YYYY-MM: float} from FRED."""
+def fetch_fred(series_id, obs_start, frequency="m", aggregation_method=None):
     url    = "https://api.stlouisfed.org/fred/series/observations"
     params = {
         "series_id":         series_id,
@@ -56,9 +41,10 @@ def fetch_fred(series_id, obs_start, frequency="m"):
         "observation_start": obs_start,
         "sort_order":        "asc",
         "limit":             100000,
+        "frequency":         frequency,
     }
-    if frequency:
-        params["frequency"] = frequency
+    if aggregation_method:
+        params["aggregation_method"] = aggregation_method
 
     r = requests.get(url, params=params, timeout=30)
     r.raise_for_status()
@@ -82,52 +68,84 @@ def shift_ym(ym, months_back):
     return f"{total // 12}-{(total % 12) + 1:02d}"
 
 
+def find_gaps(dates):
+    """Return list of YYYY-MM strings missing from a sorted date list."""
+    if not dates:
+        return []
+    gaps = []
+    prev_y, prev_m = None, None
+    for d in sorted(dates):
+        y, m = int(d[:4]), int(d[5:7])
+        if prev_y is not None:
+            ey, em = (prev_y, prev_m + 1) if prev_m < 12 else (prev_y + 1, 1)
+            while (ey, em) != (y, m):
+                gaps.append(f"{ey}-{em:02d}")
+                em += 1
+                if em > 12:
+                    ey += 1
+                    em = 1
+        prev_y, prev_m = y, m
+    return gaps
+
+
 # ── MAIN ───────────────────────────────────────────────────────────────────────
 with open(HTML_PATH, "r", encoding="utf-8") as f:
     html = f.read()
 
 existing_dates, existing_values = read_baked_data(html)
+existing_set = {d[:7] for d in existing_dates}
 
 if existing_dates:
-    last_date_str = existing_dates[-1]          # e.g. "2026-01-01"
-    last_ym       = last_date_str[:7]           # e.g. "2026-01"
+    last_ym = existing_dates[-1][:7]
     print(f"Existing baked data: {len(existing_dates)} points, last = {last_ym}")
 else:
     last_ym = "1958-12"
     print("No existing baked data found — computing from scratch.")
 
-# Fetch window: 14 months back from last_ym covers the YoY CPI lookback
-fetch_start_cpi = shift_ym(last_ym, 13)   # 13 months back for safe YoY overlap
-fetch_start_sp  = shift_ym(last_ym, 1)    # 1 month back to catch any revision
+gaps = find_gaps(existing_dates)
+if gaps:
+    print(f"Gaps detected: {gaps}")
+    earliest_gap = gaps[0]
+else:
+    earliest_gap = None
 
-print(f"Fetching new data from {fetch_start_sp} onward...")
-sp500    = fetch_sp500_yfinance(fetch_start_sp + "-01")
-unrate   = fetch_fred("UNRATE",   fetch_start_sp + "-01", "m")
+# Fetch far enough back to cover both gaps and 1-month revision window
+if earliest_gap and earliest_gap < shift_ym(last_ym, 1):
+    effective_start = earliest_gap
+else:
+    effective_start = shift_ym(last_ym, 1)
+
+fetch_start_cpi = shift_ym(effective_start, 13)  # 13-month lookback for YoY CPI
+
+print(f"Fetching data from {effective_start} onward (CPI from {fetch_start_cpi})...")
+
+# SP500 from FRED (end-of-period monthly close) — replaces yfinance for reliability
+sp500    = fetch_fred("SP500",    effective_start + "-01", "m", "eop")
+unrate   = fetch_fred("UNRATE",   effective_start + "-01", "m")
 cpi      = fetch_fred("CPIAUCSL", fetch_start_cpi + "-01", "m")
-fedfunds = fetch_fred("FEDFUNDS", fetch_start_sp + "-01", "m")
-m2       = fetch_fred("M2SL",     fetch_start_sp + "-01", "m")
+fedfunds = fetch_fred("FEDFUNDS", effective_start + "-01", "m")
+m2       = fetch_fred("M2SL",     effective_start + "-01", "m")
 
-print(f"  SP500  : {len(sp500)} months")
-print(f"  UNRATE : {len(unrate)} months")
-print(f"  CPI    : {len(cpi)} months")
-print(f"  FEDFUNDS: {len(fedfunds)} months")
-print(f"  M2SL   : {len(m2)} months")
+print(f"  SP500    : {len(sp500)} months")
+print(f"  UNRATE   : {len(unrate)} months")
+print(f"  CPI      : {len(cpi)} months")
+print(f"  FEDFUNDS : {len(fedfunds)} months")
+print(f"  M2SL     : {len(m2)} months")
 
-cpi_full = cpi
+# Months to compute: any month in the fetch window not already baked
+all_months = sorted(
+    (set(sp500) | set(unrate) | set(m2) | set(fedfunds)) - existing_set
+)
 
-# ── COMPUTE NEW MONTHS ONLY ────────────────────────────────────────────────────
-print("Computing new months...")
+print("Computing missing/new months...")
 new_dates  = []
 new_values = []
 
-for ym in sorted(sp500.keys()):
-    if ym <= last_ym:
-        continue   # skip anything already baked
-
+for ym in all_months:
     sp       = sp500.get(ym)
     un       = unrate.get(ym)
-    cpi_curr = cpi_full.get(ym)
-    cpi_prev = cpi_full.get(shift_ym(ym, 12))
+    cpi_curr = cpi.get(ym)
+    cpi_prev = cpi.get(shift_ym(ym, 12))
     fed      = fedfunds.get(ym)
     m2_val   = m2.get(ym)
 
@@ -143,13 +161,17 @@ for ym in sorted(sp500.keys()):
     new_values.append(round(val, 6))
 
 if new_dates:
-    print(f"  {len(new_dates)} new point(s): {new_dates[0]} to {new_dates[-1]}")
+    print(f"  {len(new_dates)} new/filled point(s): {new_dates[0]} → {new_dates[-1]}")
 else:
     print("  No new months available yet — data is already current.")
 
-# ── MERGE AND INJECT ───────────────────────────────────────────────────────────
-merged_dates  = existing_dates  + new_dates
-merged_values = existing_values + new_values
+# Merge into sorted combined list
+combined = dict(zip(existing_dates, existing_values))
+for d, v in zip(new_dates, new_values):
+    combined[d] = v
+
+merged_dates  = sorted(combined.keys())
+merged_values = [combined[d] for d in merged_dates]
 
 today       = datetime.now().strftime("%Y-%m-%d")
 baked_block = (
@@ -168,5 +190,6 @@ if n == 0:
 with open(HTML_PATH, "w", encoding="utf-8") as f:
     f.write(new_html)
 
-print(f"Injected {len(merged_dates)} total points ({merged_dates[0]} – {merged_dates[-1]}) into {HTML_PATH}")
+total_range = f"{merged_dates[0]} – {merged_dates[-1]}" if merged_dates else "empty"
+print(f"Injected {len(merged_dates)} total points ({total_range}) into {HTML_PATH}")
 print("Done.")
