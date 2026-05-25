@@ -105,11 +105,32 @@ def main():
     latest_date   = ""
     total_new     = 0
 
+    # Only bake weeks that started at least 2 days ago.  On Monday morning the
+    # current week's bar (labeled with today's date) has barely begun — crypto
+    # shows one holiday day of volume, US equity tickers show nothing.  Excluding
+    # it keeps all 22 tickers in sync and prevents a misleading partial bar.
+    week_cutoff = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+
     for ticker in TICKERS:
         yf_sym    = YF_SYMBOL[ticker]
         new_rows  = fetch_ticker(ticker, yf_sym, fetch_from)
+        new_rows  = [r for r in new_rows if r["date"] <= week_cutoff]
 
         existing_entry = existing_data.get(ticker, {"dates": [], "volumes": [], "opens": [], "closes": []})
+
+        # Purge any previously-baked bars that are past the cutoff (e.g. a
+        # partial Monday bar from an earlier run on a holiday).
+        if existing_entry.get("dates"):
+            combined_existing = list(zip(
+                existing_entry["dates"], existing_entry["volumes"],
+                existing_entry["opens"], existing_entry["closes"]
+            ))
+            combined_existing = [r for r in combined_existing if r[0] <= week_cutoff]
+            existing_entry["dates"]   = [r[0] for r in combined_existing]
+            existing_entry["volumes"] = [r[1] for r in combined_existing]
+            existing_entry["opens"]   = [r[2] for r in combined_existing]
+            existing_entry["closes"]  = [r[3] for r in combined_existing]
+
         existing_dates = set(existing_entry.get("dates", []))
 
         added = 0
@@ -143,8 +164,14 @@ def main():
         else:
             print(f"  {ticker:6s}: already current")
 
-    if not latest_date and existing.get("baked_through"):
-        latest_date = existing["baked_through"]
+    # Derive baked_through from actual data (covers the purge case where
+    # no new rows were added but stale future bars were removed).
+    all_dates = [
+        d
+        for entry in existing_data.values()
+        for d in entry.get("dates", [])
+    ]
+    latest_date = max(all_dates) if all_dates else existing.get("baked_through", "")
 
     today = datetime.now().strftime("%Y-%m-%d")
     payload = {
