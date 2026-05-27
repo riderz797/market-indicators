@@ -284,6 +284,20 @@ async function updateData() {
             }
         }
 
+        // Watermark — keep exactly one ACUMEN annotation at paper center
+        if (!layout.annotations) layout.annotations = [];
+        layout.annotations = layout.annotations.filter(a => a._acumen !== true);
+        layout.annotations.push({
+            _acumen: true,
+            text: 'ACUMEN',
+            xref: 'paper', yref: 'paper',
+            x: 0.5, y: 0.5,
+            xanchor: 'center', yanchor: 'middle',
+            showarrow: false,
+            font: { size: 72, color: 'rgba(0,0,0,0.07)', family: 'Arial Black, Arial, sans-serif' },
+            textangle: 0
+        });
+
         Plotly.react(chartDiv, traces, layout);
 
         const live = [liveM2 && 'M2', liveDxy && 'DXY', liveBtcFinal && 'BTC'].filter(Boolean);
