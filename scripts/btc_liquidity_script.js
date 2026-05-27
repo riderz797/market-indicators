@@ -221,7 +221,7 @@ async function updateData() {
         }
 
         const layout = chartDiv.layout;
-        layout.title.text = `Bitcoin vs Global Liquidity Index<br><sup>Liquidity leads BTC by ~${DISPLAY_LAG} weeks | r = ${bestCorr.toFixed(3)} | Model projects $${Math.round(projectedBTC).toLocaleString()} BTC</sup>`;
+        layout.title.text = `Bitcoin vs DXY Weighted Money Supply<br><sup>Liquidity leads BTC by ~${DISPLAY_LAG} weeks | r = ${bestCorr.toFixed(3)} | Model projects $${Math.round(projectedBTC).toLocaleString()} BTC</sup>`;
 
         const today = btcW.dates[btcW.dates.length - 1];
         const projEnd = liqDates[liqDates.length - 1];
@@ -284,18 +284,18 @@ async function updateData() {
             }
         }
 
-        // Watermark — keep exactly one ACUMEN annotation at paper center
-        if (!layout.annotations) layout.annotations = [];
-        layout.annotations = layout.annotations.filter(a => a._acumen !== true);
-        layout.annotations.push({
+        // Watermark — hexagonal Acumen logo centered on chart
+        if (!layout.images) layout.images = [];
+        layout.images = layout.images.filter(img => img._acumen !== true);
+        layout.images.push({
             _acumen: true,
-            text: 'ACUMEN',
+            source: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAgMTIwIj48cG9seWdvbiBwb2ludHM9IjExMiw2MCA4NiwxNSAzNCwxNSA4LDYwIDM0LDEwNSA4NiwxMDUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzk5OTk5OSIgc3Ryb2tlLXdpZHRoPSI2IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHRleHQgeD0iNjAiIHk9Ijg0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI2MiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzk5OTk5OSI+QTwvdGV4dD48L3N2Zz4=',
             xref: 'paper', yref: 'paper',
-            x: 0.5, y: 0.5,
+            x: 0.5, y: 0.55,
             xanchor: 'center', yanchor: 'middle',
-            showarrow: false,
-            font: { size: 72, color: 'rgba(0,0,0,0.07)', family: 'Arial Black, Arial, sans-serif' },
-            textangle: 0
+            sizex: 0.12, sizey: 0.12,
+            opacity: 0.18,
+            layer: 'below'
         });
 
         Plotly.react(chartDiv, traces, layout);
