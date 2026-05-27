@@ -284,21 +284,41 @@ async function updateData() {
             }
         }
 
-        // Watermark — hexagonal Acumen logo centered on chart
-        if (!layout.images) layout.images = [];
-        layout.images = layout.images.filter(img => img._acumen !== true);
-        layout.images.push({
-            _acumen: true,
-            source: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAgMTIwIj48cG9seWdvbiBwb2ludHM9IjExMiw2MCA4NiwxNSAzNCwxNSA4LDYwIDM0LDEwNSA4NiwxMDUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzk5OTk5OSIgc3Ryb2tlLXdpZHRoPSI2IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHRleHQgeD0iNjAiIHk9Ijg0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwgQmxhY2ssQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSI2MiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzk5OTk5OSI+QTwvdGV4dD48L3N2Zz4=',
-            xref: 'paper', yref: 'paper',
-            x: 0.5, y: 0.55,
-            xanchor: 'center', yanchor: 'middle',
-            sizex: 0.12, sizey: 0.12,
-            opacity: 0.18,
-            layer: 'below'
-        });
-
         Plotly.react(chartDiv, traces, layout);
+
+        // Watermark — HTML overlay so it always renders regardless of Plotly version
+        (function addAcumenWatermark() {
+            const existing = chartDiv.querySelector('.acumen-wm');
+            if (existing) existing.remove();
+
+            // Use Plotly's computed margins to center exactly on the plot area
+            const fl = chartDiv._fullLayout;
+            const ml = (fl && fl.margin) ? fl.margin.l : 80;
+            const mt = (fl && fl.margin) ? fl.margin.t : 80;
+            const mr = (fl && fl.margin) ? fl.margin.r : 80;
+            const mb = (fl && fl.margin) ? fl.margin.b : 60;
+            const cw = (fl && fl.width)  ? fl.width  : chartDiv.offsetWidth;
+            const ch = (fl && fl.height) ? fl.height : chartDiv.offsetHeight;
+
+            const cx = ml + (cw - ml - mr) / 2;
+            const cy = mt + (ch - mt - mb) / 2;
+            const sz = Math.min(cw - ml - mr, ch - mt - mb) * 0.18; // 18% of plot area
+
+            const wm = document.createElement('div');
+            wm.className = 'acumen-wm';
+            wm.style.cssText = `position:absolute;left:${cx}px;top:${cy}px;` +
+                `transform:translate(-50%,-50%);pointer-events:none;z-index:2;opacity:0.13;`;
+            wm.innerHTML =
+                `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}" viewBox="0 0 120 120">` +
+                `<polygon points="112,60 86,15 34,15 8,60 34,105 86,105" ` +
+                    `fill="none" stroke="#444" stroke-width="6.5" stroke-linejoin="round"/>` +
+                `<text x="60" y="84" text-anchor="middle" ` +
+                    `font-family="Arial Black,Arial,sans-serif" font-size="62" font-weight="900" fill="#444">A</text>` +
+                `</svg>`;
+
+            chartDiv.style.position = 'relative';
+            chartDiv.appendChild(wm);
+        })();
 
         const live = [liveM2 && 'M2', liveDxy && 'DXY', liveBtcFinal && 'BTC'].filter(Boolean);
         setStatus(live.length > 0 ? `Updated ${new Date().toLocaleString()} | r=${bestCorr.toFixed(3)} | Live: ${live.join(', ')}` : `Static data | r=${bestCorr.toFixed(3)}`, 'success');
