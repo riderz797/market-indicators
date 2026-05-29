@@ -161,7 +161,7 @@ for ym in all_months:
     new_values.append(round(val, 6))
 
 if new_dates:
-    print(f"  {len(new_dates)} new/filled point(s): {new_dates[0]} → {new_dates[-1]}")
+    print(f"  {len(new_dates)} new/filled point(s): {new_dates[0]} -> {new_dates[-1]}")
 else:
     print("  No new months available yet — data is already current.")
 
