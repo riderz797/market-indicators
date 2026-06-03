@@ -12,7 +12,6 @@ Writes: indicators/btc/bnhi_baked.js
 
 Data sources (all free, no API keys required):
     - blockchain.info charts API  — mining revenue, hashrate, on-chain activity
-    - bitnodes.io snapshots API   — reachable full-node count
     - mempool.space mining API    — pool concentration (top-2 share)
 
 Normalization:
@@ -23,16 +22,20 @@ Normalization:
     destroyed) are flipped so that 100 always means "healthier."
 
 Composite:
-    BNHI = weighted sum of 11 normalized 0–100 sub-scores.
+    BNHI = weighted sum of 10 normalized 0–100 sub-scores.
     See WEIGHTS below. Bands: 0–25 critical, 25–50 weak,
     50–75 healthy, 75–100 robust.
+
+    Any metric whose source is unavailable on a given day is *dropped*
+    and the remaining weights are renormalized — a missing metric never
+    silently injects a neutral 50 that would distort the composite.
 """
 
 import json
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -54,8 +57,7 @@ WEIGHTS = {
     "miner_revenue":   0.10,   # total miner revenue in USD
     "hashrate":        0.10,   # 30d average hashrate
     # Decentralization — 25%
-    "pool_conc":       0.15,   # top-2 pool share (INVERTED)
-    "node_count":      0.10,   # reachable full nodes
+    "pool_conc":       0.25,   # top-2 pool share (INVERTED)
     # Miner Sustainability — 15%
     "hashprice":       0.10,   # revenue per TH/s/day
     "miner_stress":    0.05,   # 30d hashprice momentum (higher = less stress)
@@ -72,7 +74,7 @@ INVERTED = {"pool_conc", "lth_supply"}
 
 CATEGORY_METRICS = {
     "Security Budget":      ["fee_share", "miner_revenue", "hashrate"],
-    "Decentralization":     ["pool_conc", "node_count"],
+    "Decentralization":     ["pool_conc"],
     "Miner Sustainability": ["hashprice", "miner_stress"],
     "Real Usage":           ["active_entities", "settle_vol", "velocity"],
     "Holder Structure":     ["lth_supply"],
@@ -83,7 +85,6 @@ METRIC_LABELS = {
     "miner_revenue":   "Total Miner Revenue (USD)",
     "hashrate":        "Hashrate",
     "pool_conc":       "Pool Concentration (top-2, inv.)",
-    "node_count":      "Reachable Node Count",
     "hashprice":       "Hashprice (rev/TH/s/day)",
     "miner_stress":    "Miner Stress Signal (inv.)",
     "active_entities": "Active Addresses (proxy)",
@@ -148,33 +149,6 @@ def blockchain_chart(name):
 def fetch_btc_price():
     """BTC/USD daily close from blockchain.info market-price chart."""
     return blockchain_chart("market-price")
-
-
-def fetch_node_count():
-    """
-    bitnodes.io /api/v1/snapshots/ — paginated list of network snapshots.
-    Returns daily-resampled total_nodes series.
-    """
-    results = {}
-    url = "https://bitnodes.io/api/v1/snapshots/"
-    params = {"limit": 100, "page": 1}
-    for _ in range(60):   # cap: 60 pages × 100 = 6 000 records ≈ 16 years daily
-        r = get(url, params=params, timeout=30)
-        data = r.json()
-        for snap in data.get("results", []):
-            ts = pd.Timestamp(snap["timestamp"], unit="s").normalize()
-            n = snap.get("total_nodes") or 0
-            if n > 0:
-                results[ts] = float(n)
-        if not data.get("next"):
-            break
-        params["page"] += 1
-
-    if not results:
-        return pd.Series(dtype=float, name="node_count")
-    s = pd.Series(results, name="node_count").sort_index()
-    # Multiple snapshots per day → keep max (most complete count)
-    return s.groupby(s.index).max()
 
 
 def fetch_pool_concentration():
@@ -281,14 +255,6 @@ def main():
     print("  blockchain.info: market-price (BTC/USD) ...", file=sys.stderr)
     btc_price   = fetch_btc_price()
 
-    print("  bitnodes.io: node count ...", file=sys.stderr)
-    try:
-        nodes = fetch_node_count()
-        print(f"    {len(nodes)} snapshots", file=sys.stderr)
-    except Exception as exc:
-        print(f"  WARNING: bitnodes.io failed ({exc}) — using empty series", file=sys.stderr)
-        nodes = pd.Series(dtype=float, name="node_count")
-
     print("  mempool.space: pool concentration ...", file=sys.stderr)
     try:
         pool_conc = fetch_pool_concentration()
@@ -315,7 +281,6 @@ def main():
         "miner_revenue":    align(miners_rev),
         "hashrate":         align(hashrate),
         "pool_conc":        align(pool_conc),
-        "node_count":       align(nodes),
         "hashprice":        align(hashprice),
         "active_entities":  align(active_addr),
         "settle_vol":       align(settle_vol),
@@ -342,30 +307,44 @@ def main():
         pct = rolling_percentile(smoothed[m])
         normalized[m] = 100.0 - pct if m in INVERTED else pct
 
-    # 6. BNHI composite (weights already sum to 1.0)
-    bnhi = pd.Series(0.0, index=idx)
-    for m, w in WEIGHTS.items():
-        bnhi += normalized[m].fillna(50.0) * w
+    # 6. BNHI composite + category sub-scores.
+    #    For each date, take the weighted average of the metrics that
+    #    actually have data, renormalizing by the weight of the metrics
+    #    present.  A metric whose source is missing (all-NaN) or still in
+    #    its percentile warm-up drops out instead of silently injecting a
+    #    neutral 50 that would distort the score toward the midpoint.
+    def weighted_score(mlist):
+        num = pd.Series(0.0, index=idx)
+        den = pd.Series(0.0, index=idx)
+        for m in mlist:
+            w = WEIGHTS[m]
+            avail = normalized[m].notna()
+            num = num.add(normalized[m].where(avail, 0.0) * w, fill_value=0.0)
+            den = den.add(avail.astype(float) * w, fill_value=0.0)
+        return num / den.where(den > 0)
+
+    bnhi = weighted_score(metrics)
 
     # 7. Category sub-scores
-    cat_scores: dict[str, pd.Series] = {}
-    for cat, mlist in CATEGORY_METRICS.items():
-        cat_w = sum(WEIGHTS[m] for m in mlist)
-        cat_s = sum(normalized[m].fillna(50.0) * WEIGHTS[m] for m in mlist)
-        cat_scores[cat] = cat_s / cat_w
+    cat_scores: dict[str, pd.Series] = {
+        cat: weighted_score(mlist) for cat, mlist in CATEGORY_METRICS.items()
+    }
 
     # 8. Build current-reading summary
+    def safe_round(x, dec=1):
+        return round(float(x), dec) if pd.notna(x) else None
+
     last_bnhi = float(bnhi.iloc[-1])
     current = {
         "date":       idx[-1].strftime("%Y-%m-%d"),
         "bnhi":       round(last_bnhi, 1),
         "band":       band(last_bnhi),
         "categories": {
-            cat: round(float(s.iloc[-1]), 1)
+            cat: safe_round(s.iloc[-1])
             for cat, s in cat_scores.items()
         },
         "metrics": {
-            m: round(float(normalized[m].iloc[-1]), 1)
+            m: safe_round(normalized[m].iloc[-1])
             for m in metrics
         },
     }
@@ -374,7 +353,7 @@ def main():
     date_strs = [d.strftime("%Y-%m-%d") for d in idx]
 
     out: dict = {
-        "generated":   datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated":   datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "baked_through": date_strs[-1],
         "dates":       date_strs,
         "bnhi":        to_list(bnhi),
@@ -393,7 +372,7 @@ def main():
 
     js = (
         "// Auto-generated by build_bnhi.py — "
-        + datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         + "\nconst BNHI_DATA = "
         + json.dumps(out, separators=(",", ":"))
         + ";\n"
