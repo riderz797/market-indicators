@@ -68,12 +68,33 @@ JS_OUTPUT_PATH = 'indicators/macro/acumen_liquidity_baked.js'
 # DATA FETCHERS
 # ============================================================================
 
+FRED_API_KEY = '824b29c5afa52f3fc7c6e7dc4925aebb'
+
+
 def fred(series_id):
-    """Fetch a FRED series via the public CSV endpoint (no API key needed)."""
-    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
-    r = requests.get(url, timeout=30)
-    df = pd.read_csv(StringIO(r.text))
-    df.columns = ['date', series_id]
+    """Fetch a FRED series.
+
+    Primary path is the JSON API on api.stlouisfed.org; the legacy CSV
+    endpoint on fred.stlouisfed.org is kept as a fallback because that host
+    is intermittently unreachable from some networks (hangs / read timeout).
+    """
+    api_url = (f"https://api.stlouisfed.org/fred/series/observations"
+               f"?series_id={series_id}&api_key={FRED_API_KEY}"
+               f"&file_type=json&sort_order=asc")
+    try:
+        r = requests.get(api_url, timeout=30)
+        r.raise_for_status()
+        obs = r.json().get('observations', [])
+        if not obs:
+            raise ValueError(f'no observations returned for {series_id}')
+        df = pd.DataFrame([(o['date'], o['value']) for o in obs],
+                          columns=['date', series_id])
+    except Exception:
+        # Fallback: legacy public CSV endpoint (no API key needed)
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+        r = requests.get(url, timeout=30)
+        df = pd.read_csv(StringIO(r.text))
+        df.columns = ['date', series_id]
     df['date'] = pd.to_datetime(df['date'])
     df[series_id] = pd.to_numeric(df[series_id], errors='coerce')
     return df.dropna().set_index('date')
