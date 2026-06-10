@@ -21,11 +21,15 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests pandas yfinance matplotlib
+        run: pip install requests pandas yfinance matplotlib xlrd
 
       - name: Run US Business Cycle update
         continue-on-error: true   # FRED outages must not abort downstream steps
         run: python fetch_usbc.py
+
+      - name: Run Fiscal Dominance Debt Spiral update
+        continue-on-error: true
+        run: python fetch_fdds.py
 
       - name: Run rebuild_all (all other indicators)
         continue-on-error: true
