@@ -119,6 +119,17 @@
             line-height: 1.9;
         }
 
+        .dev-link {
+            display: inline-block;
+            margin-top: 10px;
+            color: #2E2E2E;
+            text-decoration: none;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+            transition: color 0.2s;
+        }
+        .dev-link:hover { color: #F5C542; }
+
         @media (max-width: 768px) {
             header h1 { font-size: 1.3em; }
             .indicators-grid { grid-template-columns: 1fr; }
@@ -209,15 +220,6 @@
                 <p>Year-over-year overlay of Bitcoin daily returns from 2014 to present. Dual cycle analysis with halving and election cycle averages, year filtering, and pattern recognition identifying which historical years most closely match the current path.</p>
             </a>
 
-            <!-- BTC Mean Reversion -->
-            <a href="indicators/btc/btc_mean_reversion.html" class="indicator-card">
-                <div class="card-top">
-                    <h2>BTC Mean Reversion</h2>
-                    <span class="badge">BTC</span>
-                </div>
-                <p>Bitcoin deviation from its global M2-implied fair value. Sigma bands around the liquidity-adjusted trend identify statistically overbought or oversold conditions.</p>
-            </a>
-
             <!-- BTC Liquidity Index -->
             <a href="indicators/btc/btc_liquidity_backtest.html" class="indicator-card">
                 <div class="card-top">
@@ -225,15 +227,6 @@
                     <span class="badge">BTC</span>
                 </div>
                 <p>Bitcoin price overlaid against global liquidity (M2 × 100/DXY) with a dynamic lead-lag regression. Finds the optimal lag (up to 30 weeks), plots the model price, and projects future BTC based on where liquidity is heading.</p>
-            </a>
-
-            <!-- BTC Correlation -->
-            <a href="indicators/btc/btc_correlation.html" class="indicator-card">
-                <div class="card-top">
-                    <h2>What's BTC Correlated With?</h2>
-                    <span class="badge">BTC</span>
-                </div>
-                <p>Rolling 60-day correlations between Bitcoin and 11 assets across equities, commodities, macro rates, and volatility. Filter by category to isolate regime shifts in real time.</p>
             </a>
 
             <!-- BTC Network Health Index -->
@@ -245,29 +238,12 @@
                 <p>Composite 0–100 score across 11 on-chain metrics: security budget, mining decentralization, miner sustainability, real usage, and holder structure. Each metric is percentile-ranked against its own 4-year rolling history so the index measures health relative to baseline, not absolute growth.</p>
             </a>
 
-            <!-- MSTR Credit-Vol Regime -->
-            <a href="indicators/btc/mstr_stress_indicator.html" class="indicator-card">
-                <div class="card-top">
-                    <h2>MSTR Credit-Vol Regime</h2>
-                    <span class="badge">BTC</span>
-                </div>
-                <p>Composite stress signal (70% MOVE, 30% High Yield OAS) overlaid against MSTR's NAV premium. Tracks divergences where credit-vol conditions ease before the market reprices Strategy's BTC premium.</p>
-            </a>
-
-            <!-- BTC Supply & Demand Model -->
-            <a href="indicators/btc/btc_supply_demand_model.html" class="indicator-card">
-                <div class="card-top">
-                    <h2>BTC Supply &amp; Demand Model</h2>
-                    <span class="badge">BTC</span>
-                </div>
-                <p>Interactive Rudd &amp; Porter (2025) CES framework for Bitcoin price forecasting. Model demand growth via logistic adoption curves, treasury company accumulation (MSTR/ASST), synthetic supply from paper BTC, and redemption shocks. Calibrated to actual monthly closes.</p>
-            </a>
-
         </div>
 
         <footer>
             <p>Acumen Research — All indicators updated weekly</p>
             <p>Data sources: FRED, CoinGecko, Yahoo Finance, Treasury Fiscal Data</p>
+            <a href="dev.html" class="dev-link">in development</a>
         </footer>
     </div>
 </body>

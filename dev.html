@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>In Development — Acumen</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #121212;
+            min-height: 100vh;
+            padding: 40px 24px 60px;
+            color: #FFFFFF;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        header {
+            padding: 20px 0 36px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid #242424;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 1.55em;
+            font-weight: 600;
+            color: #FFFFFF;
+            letter-spacing: 0.2px;
+        }
+
+        header p {
+            font-size: 0.9em;
+            color: #AAAAAA;
+            margin-top: 5px;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            color: #CCCCCC;
+            text-decoration: none;
+            font-size: 0.85em;
+            border: 1px solid #2A2A2A;
+            border-radius: 6px;
+            background: #1E1E1E;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .back-link:hover { color: #F5C542; border-color: #F5C542; }
+
+        .indicators-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .indicator-card {
+            background: #1E1E1E;
+            border-radius: 12px;
+            padding: 28px;
+            border: 1px solid #2A2A2A;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .indicator-card:hover {
+            border-color: #F5C542;
+            box-shadow: 0 8px 32px rgba(245,197,66,0.12);
+            transform: translateY(-3px);
+        }
+
+        .card-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .indicator-card h2 {
+            font-size: 1.05em;
+            font-weight: 600;
+            color: #FFFFFF;
+            line-height: 1.3;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            background: transparent;
+            color: #F5C542;
+            border: 1px solid rgba(245,197,66,0.45);
+            border-radius: 4px;
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .indicator-card p {
+            color: #AAAAAA;
+            font-size: 0.88em;
+            line-height: 1.65;
+        }
+
+        footer {
+            text-align: center;
+            color: #555555;
+            font-size: 0.82em;
+            padding: 24px 0 8px;
+            border-top: 1px solid #242424;
+            line-height: 1.9;
+        }
+
+        @media (max-width: 768px) {
+            header h1 { font-size: 1.3em; }
+            .indicators-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>In Development</h1>
+                <p>Experimental indicators — not yet ready for the main dashboard</p>
+            </div>
+            <a href="index.html" class="back-link">&#8592; Dashboard</a>
+        </header>
+
+        <div class="indicators-grid">
+
+            <!-- BTC Mean Reversion -->
+            <a href="indicators/btc/btc_mean_reversion.html" class="indicator-card">
+                <div class="card-top">
+                    <h2>BTC Mean Reversion</h2>
+                    <span class="badge">BTC</span>
+                </div>
+                <p>Bitcoin deviation from its global M2-implied fair value. Sigma bands around the liquidity-adjusted trend identify statistically overbought or oversold conditions.</p>
+            </a>
+
+            <!-- BTC Correlation -->
+            <a href="indicators/btc/btc_correlation.html" class="indicator-card">
+                <div class="card-top">
+                    <h2>What's BTC Correlated With?</h2>
+                    <span class="badge">BTC</span>
+                </div>
+                <p>Rolling 60-day correlations between Bitcoin and 11 assets across equities, commodities, macro rates, and volatility. Filter by category to isolate regime shifts in real time.</p>
+            </a>
+
+            <!-- MSTR Credit-Vol Regime -->
+            <a href="indicators/btc/mstr_stress_indicator.html" class="indicator-card">
+                <div class="card-top">
+                    <h2>MSTR Credit-Vol Regime</h2>
+                    <span class="badge">BTC</span>
+                </div>
+                <p>Composite stress signal (70% MOVE, 30% High Yield OAS) overlaid against MSTR's NAV premium. Tracks divergences where credit-vol conditions ease before the market reprices Strategy's BTC premium.</p>
+            </a>
+
+            <!-- BTC Supply & Demand Model -->
+            <a href="indicators/btc/btc_supply_demand_model.html" class="indicator-card">
+                <div class="card-top">
+                    <h2>BTC Supply &amp; Demand Model</h2>
+                    <span class="badge">BTC</span>
+                </div>
+                <p>Interactive Rudd &amp; Porter (2025) CES framework for Bitcoin price forecasting. Model demand growth via logistic adoption curves, treasury company accumulation (MSTR/ASST), synthetic supply from paper BTC, and redemption shocks. Calibrated to actual monthly closes.</p>
+            </a>
+
+        </div>
+
+        <footer>
+            <p>Acumen Research — In Development</p>
+            <p>These indicators still update weekly but are under evaluation</p>
+        </footer>
+    </div>
+</body>
+</html>
