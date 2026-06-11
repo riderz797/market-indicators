@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Move in Historical Distribution — Acumen</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #FFFFFF;
+      color: #1A1A1A;
+      font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+      min-height: 100vh;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      color: #CCCCCC;
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      position: fixed;
+      top: 12px;
+      left: 16px;
+      z-index: 100;
+      border: 1px solid #CCCCCC;
+      border-radius: 6px;
+      background: #F6F6F6;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .back-link:hover { color: #C9971C; border-color: #C9971C; }
+
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 60px 24px 48px;
+    }
+
+    .header { margin-bottom: 28px; padding-top: 12px; }
+
+    .header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      background: #F6F6F6;
+      color: #C9971C;
+      border: 1px solid #C9971C;
+      border-radius: 4px;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      font-weight: 700;
+      vertical-align: middle;
+      margin-left: 12px;
+    }
+
+    h1 { font-size: 22px; font-weight: 700; color: #1A1A1A; letter-spacing: 0.3px; }
+
+    .subtitle {
+      font-size: 11px;
+      color: #555555;
+      letter-spacing: 0.3px;
+      margin-top: 6px;
+      line-height: 1.6;
+    }
+
+    #status-bar { font-size: 11px; color: #555555; text-align: right; letter-spacing: 0.5px; }
+    #status-bar.error   { color: #DC2626; }
+    #status-bar.loading { color: #C9971C; }
+
+    /* ─── Boards ─── */
+    .boards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 980px) { .boards { grid-template-columns: 1fr; } }
+
+    .board {
+      position: relative;
+      background: #F6F6F6;
+      border: 1px solid #DDDDDD;
+      border-radius: 8px;
+      padding: 16px 18px 10px;
+      overflow: hidden;
+    }
+    .board.wide { grid-column: 1 / -1; }
+    @media (max-width: 980px) { .board.wide { grid-column: auto; } }
+
+    .board-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .board-name { font-size: 14px; font-weight: 700; color: #1A1A1A; letter-spacing: 0.5px; }
+    .board-sub  { font-size: 9px; color: #888888; letter-spacing: 1px; margin-top: 4px; }
+
+    .board-cur { text-align: right; }
+    .cur-value { font-size: 24px; font-weight: 700; }
+    .cur-value.t-up   { color: #16A34A; }
+    .cur-value.t-down { color: #DC2626; }
+    .cur-value.t-flat { color: #777777; }
+    .cur-date { font-size: 9px; color: #888888; letter-spacing: 1px; margin-top: 2px; }
+
+    .board-stats {
+      font-size: 10.5px;
+      color: #555555;
+      letter-spacing: 0.3px;
+      margin-top: 8px;
+      padding: 6px 10px;
+      background: #FFFFFF;
+      border: 1px solid #E5E5E5;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    .board-stats b { color: #C9971C; }
+
+    .board-plot { width: 100%; height: 230px; margin-top: 4px; }
+    .board.wide .board-plot { height: 280px; }
+
+    .board-foot {
+      font-size: 9px;
+      color: #888888;
+      letter-spacing: 0.5px;
+      padding: 4px 2px 6px;
+    }
+
+    .watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0.05;
+      z-index: 0;
+    }
+
+    /* ─── Meta cards ─── */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 700px) { .meta-grid { grid-template-columns: 1fr; } }
+
+    .meta-card {
+      background: #F6F6F6;
+      border: 1px solid #DDDDDD;
+      border-radius: 8px;
+      padding: 20px 24px;
+    }
+    .meta-card-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: #888888;
+      margin-bottom: 12px;
+    }
+    .meta-card p { font-size: 11px; color: #555555; line-height: 1.7; margin-bottom: 8px; }
+    .meta-card p:last-child { margin-bottom: 0; }
+    .meta-card .k { color: #C9971C; font-weight: 700; }
+
+    .data-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: #555555;
+      padding: 5px 0;
+      border-bottom: 1px solid #DDDDDD;
+    }
+    .data-row:last-child { border-bottom: none; }
+    .data-row .sid { color: #C9971C; min-width: 110px; font-size: 10px; }
+
+    .footer-note {
+      text-align: center;
+      font-size: 9px;
+      color: #888888;
+      letter-spacing: 2px;
+      padding: 12px 0 4px;
+    }
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-link">&#8592; Dashboard</a>
+
+  <div class="page">
+
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <h1>Daily Move in Historical Distribution <span class="badge">MACRO</span></h1>
+          <p class="subtitle">
+            How unusual was today? Each board bins every daily move in the asset's recorded history,
+            overlays the normal distribution with the same mean and standard deviation (dotted),
+            and marks the latest move in gold &mdash; with the odds of a day this big.
+          </p>
+        </div>
+        <div id="status-bar" class="loading">Loading&hellip;</div>
+      </div>
+    </div>
+
+    <!-- ─── BOARDS (built by JS from baked data) ─────────────────────────── -->
+    <div class="boards" id="boards"></div>
+
+    <!-- ─── META CARDS ──────────────────────────────────────────────────── -->
+    <div class="meta-grid">
+
+      <div class="meta-card">
+        <div class="meta-card-label">HOW TO READ IT</div>
+        <p><span class="k">Gray bars</span> &mdash; how often each size of daily move actually happened, across the asset's full history.</p>
+        <p><span class="k">Dotted curve</span> &mdash; what a normal distribution (the bell curve) predicts for the same mean and standard deviation. Where bars escape the curve in the tails, markets are wilder than the bell curve says they should be &mdash; and they always are.</p>
+        <p><span class="k">Gold line</span> &mdash; the latest daily move. The stats chip shows it three ways: standard deviations from the average (z), the percentile among all days on record (low = unusually negative day, high = unusually positive), and how often a move at least this large &mdash; in either direction &mdash; has historically occurred.</p>
+        <p style="font-size:10px;color:#888;">Charts show &plusmn;4.5 standard deviations. Days beyond that are counted in the stats and listed as extremes under each board.</p>
+      </div>
+
+      <div class="meta-card">
+        <div class="meta-card-label">DATA &amp; METHOD</div>
+        <div class="data-row"><span class="sid">S&amp;P 500</span><span>Daily closes since Dec 1927 (Yahoo ^GSPC) &mdash; percent change</span></div>
+        <div class="data-row"><span class="sid">GOLD</span><span>History: LBMA PM fix since Aug 1971, the end of the fixed gold window. Today's move: COMEX futures (GC=F) when fresher than the fix, which publishes a day behind &mdash; percent change</span></div>
+        <div class="data-row"><span class="sid">US 10YR</span><span>10-year Treasury yield since 1962 (CBOE ^TNX) &mdash; change in basis points</span></div>
+        <div class="data-row"><span class="sid">DXY</span><span>US Dollar Index since 1971 (ICE, via Yahoo) &mdash; percent change</span></div>
+        <div class="data-row"><span class="sid">BITCOIN</span><span>Daily closes since Sep 2014 (Yahoo BTC-USD) &mdash; percent change</span></div>
+        <p style="margin-top:12px;font-size:10px;color:#888;">
+          Moves are computed between consecutive available closes (gaps over 7 calendar days are skipped).
+          Data is baked into this page by <span style="color:#C9971C;">fetch_daily_move.py</span>, refreshed daily
+          at 22:30 UTC by GitHub Actions.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="footer-note">ACUMEN &mdash; DAILY MOVE IN HISTORICAL DISTRIBUTION</div>
+
+  </div>
+
+  <script>
+    /* ─── HELPERS ────────────────────────────────────────────────────────── */
+    const $ = id => document.getElementById(id);
+
+    function setStatus(msg, cls) {
+      const el = $('status-bar');
+      el.textContent = msg;
+      el.className = cls || '';
+    }
+
+    function normPdf(x, mean, sd) {
+      const t = (x - mean) / sd;
+      return Math.exp(-0.5 * t * t) / (sd * Math.sqrt(2 * Math.PI));
+    }
+
+    function fmtMove(a, v, signed = true) {
+      const sign = v > 0 ? '+' : (v < 0 ? '−' : '');
+      const abs  = Math.abs(v);
+      if (a.unit === 'bp') return (signed ? sign : '') + abs.toFixed(1) + ' bp';
+      return (signed ? sign : '') + abs.toFixed(2) + '%';
+    }
+
+    function ordinal(p) {
+      const r = (p >= 99 || p <= 1) ? Math.round(p * 10) / 10 : Math.round(p);
+      const i = Math.floor(r), d = Math.abs(r - i) > 1e-9;
+      if (d) return r + 'th';
+      const m10 = i % 10, m100 = i % 100;
+      if (m10 === 1 && m100 !== 11) return i + 'st';
+      if (m10 === 2 && m100 !== 12) return i + 'nd';
+      if (m10 === 3 && m100 !== 13) return i + 'rd';
+      return i + 'th';
+    }
+
+    function fmtOneIn(oneIn) {
+      if (oneIn == null) return 'the largest move on record';
+      if (oneIn < 1.5)  return 'a typical day';
+      const n = oneIn >= 10 ? Math.round(oneIn).toLocaleString('en-US') : oneIn.toFixed(1);
+      return '~1 in ' + n + ' days';
+    }
+
+    const WATERMARK_SVG =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 220 200" width="220" height="200">' +
+      '<polygon points="50,0 150,0 200,87 150,174 50,174 0,87" fill="none" stroke="black" stroke-width="10" stroke-linejoin="round"/>' +
+      '<text x="100" y="128" text-anchor="middle" font-size="84" font-family="\'Segoe UI\', system-ui, sans-serif" font-weight="500" fill="black">A</text></svg>';
+
+    // @@BAKED_DATA_START@@
+    const DMHD_ASSETS   = [{"id": "spx", "name": "S&P 500", "unit": "%", "subLabel": "% change vs prior close", "start": "1928-01-03", "n": 24726, "mean": 0.03086, "sd": 1.18722, "binLo": -5.311647, "binW": 0.118722, "counts": [7, 4, 4, 8, 4, 14, 6, 8, 15, 11, 10, 12, 16, 17, 12, 30, 27, 29, 38, 44, 40, 41, 45, 58, 60, 68, 86, 99, 101, 157, 167, 217, 238, 271, 305, 421, 474, 573, 676, 825, 937, 1099, 1384, 1597, 1768, 1681, 1731, 1357, 1306, 1093, 879, 763, 610, 518, 449, 318, 303, 259, 205, 155, 126, 121, 88, 79, 61, 59, 56, 49, 33, 33, 22, 25, 24, 20, 16, 14, 8, 13, 14, 5, 9, 10, 8, 8, 12, 6, 9, 6, 2, 1], "below": 73, "above": 66, "recMin": {"v": -20.47, "d": "1987-10-19"}, "recMax": {"v": 12.53, "d": "1929-10-30"}, "cur": {"v": 1.75, "d": "2026-06-11"}, "z": 1.45, "pctile": 95.6, "oneIn": 11.1}, {"id": "gold", "name": "Gold", "unit": "%", "subLabel": "% change vs prior close", "start": "1971-08-18", "n": 13760, "mean": 0.04097, "sd": 1.24403, "binLo": -5.557154, "binW": 0.124403, "counts": [3, 5, 4, 2, 6, 1, 8, 2, 7, 5, 6, 5, 10, 10, 7, 14, 10, 13, 20, 22, 20, 19, 31, 31, 47, 48, 53, 76, 62, 79, 87, 96, 160, 168, 198, 221, 296, 309, 386, 484, 593, 647, 788, 919, 1054, 934, 842, 734, 564, 536, 464, 392, 358, 271, 211, 190, 171, 150, 117, 105, 76, 68, 58, 50, 48, 39, 28, 28, 32, 26, 16, 20, 16, 11, 11, 13, 11, 9, 8, 8, 7, 3, 5, 9, 5, 0, 3, 4, 2, 1], "below": 33, "above": 41, "recMin": {"v": -13.24, "d": "1980-01-22"}, "recMax": {"v": 13.32, "d": "1980-01-03"}, "cur": {"v": 3.12, "d": "2026-06-11"}, "z": 2.48, "pctile": 98.5, "oneIn": 35.2}, {"id": "ust10y", "name": "US 10YR Yield", "unit": "bp", "subLabel": "basis-point change vs prior close", "start": "1962-01-03", "n": 16125, "mean": 0.0025, "sd": 6.47398, "binLo": -29.130415, "binW": 0.647398, "counts": [2, 3, 0, 8, 5, 0, 12, 5, 1, 13, 2, 13, 10, 3, 18, 19, 5, 23, 33, 11, 33, 43, 13, 63, 46, 22, 68, 36, 118, 126, 74, 151, 247, 101, 292, 347, 238, 497, 634, 299, 755, 932, 430, 1227, 1767, 338, 1253, 414, 953, 767, 303, 610, 461, 215, 324, 275, 115, 226, 163, 82, 116, 123, 38, 96, 29, 55, 50, 17, 51, 39, 14, 30, 26, 5, 18, 17, 3, 23, 14, 2, 12, 0, 5, 7, 1, 2, 12, 0, 5, 2], "below": 38, "above": 31, "recMin": {"v": -75.0, "d": "1987-10-20"}, "recMax": {"v": 65.0, "d": "1980-02-19"}, "cur": {"v": -7.9, "d": "2026-06-11"}, "z": -1.22, "pctile": 7.7, "oneIn": 6.3}, {"id": "dxy", "name": "DXY (US Dollar Index)", "unit": "%", "subLabel": "% change vs prior close", "start": "1971-01-05", "n": 14077, "mean": -0.00013, "sd": 0.4945, "binLo": -2.225374, "binW": 0.04945, "counts": [3, 0, 2, 3, 2, 6, 2, 2, 8, 8, 1, 8, 11, 8, 12, 18, 8, 18, 13, 18, 35, 44, 50, 64, 43, 76, 69, 92, 98, 121, 135, 139, 204, 182, 264, 268, 323, 361, 369, 452, 503, 631, 630, 738, 806, 1090, 738, 648, 584, 544, 477, 410, 346, 320, 292, 266, 207, 156, 173, 138, 123, 94, 96, 67, 52, 71, 49, 36, 29, 28, 29, 16, 21, 13, 14, 9, 10, 10, 9, 5, 8, 5, 5, 2, 1, 0, 4, 2, 0, 3], "below": 15, "above": 14, "recMin": {"v": -4.82, "d": "1973-02-13"}, "recMax": {"v": 4.35, "d": "1978-11-01"}, "cur": {"v": -0.3, "d": "2026-06-11"}, "z": -0.61, "pctile": 21.8, "oneIn": 2.3}, {"id": "btc", "name": "Bitcoin", "unit": "%", "subLabel": "% change vs prior close", "start": "2014-09-18", "n": 4285, "mean": 0.17649, "sd": 3.4897, "binLo": -15.527159, "binW": 0.34897, "counts": [1, 0, 0, 2, 2, 1, 3, 1, 1, 1, 0, 4, 4, 3, 5, 9, 9, 4, 1, 7, 7, 6, 11, 8, 14, 19, 25, 28, 20, 25, 31, 30, 38, 49, 57, 75, 70, 101, 120, 134, 157, 187, 262, 314, 349, 338, 242, 224, 201, 148, 121, 111, 101, 71, 68, 51, 50, 60, 40, 35, 25, 16, 15, 20, 14, 14, 14, 11, 7, 6, 5, 9, 5, 13, 8, 6, 2, 4, 4, 3, 2, 3, 1, 1, 0, 0, 2, 0, 3, 1], "below": 8, "above": 7, "recMin": {"v": -37.17, "d": "2020-03-12"}, "recMax": {"v": 25.25, "d": "2017-12-07"}, "cur": {"v": 3.09, "d": "2026-06-11"}, "z": 0.83, "pctile": 86.8, "oneIn": 4.1}];
+    const DMHD_BAKED_ON = "2026-06-11"; // injected by fetch_daily_move.py
+    // @@BAKED_DATA_END@@
+
+    /* ─── BOARD RENDER ───────────────────────────────────────────────────── */
+    function buildBoard(a, wide) {
+      const cls  = a.cur.v > 0 ? 't-up' : (a.cur.v < 0 ? 't-down' : 't-flat');
+      const card = document.createElement('div');
+      card.className = 'board' + (wide ? ' wide' : '');
+      card.innerHTML =
+        (wide ? '<div class="watermark">' + WATERMARK_SVG + '</div>' : '') +
+        '<div class="board-head">' +
+          '<div><div class="board-name">' + a.name + '</div>' +
+          '<div class="board-sub">' + a.subLabel.toUpperCase() + ' &middot; SINCE ' + a.start.slice(0, 4) + '</div></div>' +
+          '<div class="board-cur"><div class="cur-value ' + cls + '">' + fmtMove(a, a.cur.v) + '</div>' +
+          '<div class="cur-date">' + a.cur.d + '</div></div>' +
+        '</div>' +
+        '<div class="board-stats">z <b>' + (a.z > 0 ? '+' : '−') + Math.abs(a.z).toFixed(2) + 'σ</b>' +
+          ' &middot; <b>' + ordinal(a.pctile) + '</b> percentile' +
+          ' &middot; a move this big: <b>' + fmtOneIn(a.oneIn) + '</b></div>' +
+        '<div id="plot-' + a.id + '" class="board-plot"></div>' +
+        '<div class="board-foot">' + a.n.toLocaleString('en-US') + ' daily moves &middot; extremes ' +
+          fmtMove(a, a.recMin.v) + ' (' + a.recMin.d + ') / ' + fmtMove(a, a.recMax.v) + ' (' + a.recMax.d + ')' +
+          (a.below + a.above > 0 ? ' &middot; ' + (a.below + a.above) + ' day(s) beyond chart range' : '') +
+        '</div>';
+      $('boards').appendChild(card);
+    }
+
+    function plotBoard(a) {
+      const nb = a.counts.length;
+      const centers = [], hover = [];
+      for (let i = 0; i < nb; i++) {
+        const lo = a.binLo + i * a.binW;
+        centers.push(lo + a.binW / 2);
+        hover.push(fmtMove(a, lo, true) + ' to ' + fmtMove(a, lo + a.binW, true));
+      }
+
+      // normal curve scaled to histogram area (n * binWidth * pdf)
+      const cx = [], cy = [];
+      const x0 = a.binLo, x1 = a.binLo + nb * a.binW;
+      for (let i = 0; i <= 220; i++) {
+        const x = x0 + (x1 - x0) * i / 220;
+        cx.push(x);
+        cy.push(a.n * a.binW * normPdf(x, a.mean, a.sd));
+      }
+
+      // x-range: bins, widened if today's move falls outside
+      let rLo = x0, rHi = x1;
+      if (a.cur.v < rLo) rLo = a.cur.v - 2 * a.binW;
+      if (a.cur.v > rHi) rHi = a.cur.v + 2 * a.binW;
+
+      const suffix = a.unit === 'bp' ? ' bp' : '%';
+
+      Plotly.newPlot('plot-' + a.id, [
+        {
+          type: 'bar', x: centers, y: a.counts,
+          marker: { color: '#B6BBC4' },
+          customdata: hover,
+          hovertemplate: '%{customdata}<br>%{y} days<extra></extra>',
+        },
+        {
+          x: cx, y: cy, mode: 'lines',
+          line: { color: '#555555', width: 1.4, dash: 'dot' },
+          hoverinfo: 'skip',
+        },
+      ], {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { family: 'JetBrains Mono, monospace', color: '#666666' },
+        margin: { l: 46, r: 14, t: 18, b: 30 },
+        bargap: 0.1,
+        showlegend: false,
+        xaxis: {
+          range: [rLo, rHi], ticksuffix: suffix,
+          gridcolor: '#E3E3E3', zerolinecolor: '#E3E3E3', linecolor: '#DDDDDD',
+          tickfont: { family: 'JetBrains Mono, monospace', size: 10, color: '#666666' },
+        },
+        yaxis: {
+          title: { text: 'days', font: { size: 10 } },
+          gridcolor: '#E3E3E3', zerolinecolor: '#E3E3E3', linecolor: '#DDDDDD',
+          tickfont: { family: 'JetBrains Mono, monospace', size: 10, color: '#666666' },
+        },
+        shapes: [{
+          type: 'line', x0: a.cur.v, x1: a.cur.v, y0: 0, y1: 1, yref: 'paper',
+          line: { color: '#C9971C', width: 2 },
+        }],
+        annotations: [{
+          x: a.cur.v, y: 1, yref: 'paper', yanchor: 'top',
+          xanchor: a.cur.v >= a.mean ? 'left' : 'right',
+          xshift: a.cur.v >= a.mean ? 6 : -6,
+          text: 'TODAY ' + fmtMove(a, a.cur.v),
+          showarrow: false,
+          font: { family: 'JetBrains Mono, monospace', size: 9, color: '#C9971C' },
+        }],
+        hoverlabel: { bgcolor: '#FFFFFF', bordercolor: '#CCCCCC', font: { family: 'JetBrains Mono, monospace', size: 11, color: '#1A1A1A' } },
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    /* ─── MAIN ───────────────────────────────────────────────────────────── */
+    function main() {
+      if (!DMHD_ASSETS) throw new Error('No baked data — run fetch_daily_move.py');
+
+      DMHD_ASSETS.forEach((a, i) => buildBoard(a, i === 0));
+      DMHD_ASSETS.forEach(a => plotBoard(a));
+
+      const latest = DMHD_ASSETS.map(a => a.cur.d).sort().pop();
+      setStatus('Data through ' + latest + ' · baked ' + DMHD_BAKED_ON, '');
+    }
+
+    try { main(); }
+    catch (e) { setStatus(e.message, 'error'); console.error(e); }
+  </script>
+</body>
+</html>
