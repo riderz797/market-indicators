@@ -146,7 +146,7 @@
       padding: 2px 7px;
       border-radius: 3px;
     }
-    .side-badge.buy     { background: rgba(184,134,11,0.12); color: #B8860B; border: 1px solid #D4A82C; }
+    .side-badge.buy     { background: rgba(39,174,96,0.12); color: #1E8E4E; border: 1px solid #1E8E4E; }
     .side-badge.sell    { background: rgba(192,57,43,0.10);  color: #C0392B; border: 1px solid #C0392B; }
     .side-badge.neutral { background: rgba(120,120,120,0.10); color: #888888; border: 1px solid #CCCCCC; }
 
@@ -251,14 +251,14 @@
   <!-- BOARD 1 -->
   <div class="panel">
     <div class="panel-title">Board 1 — Weekly Volume (6 Months)</div>
-    <div class="panel-desc">Each bar = one week. Gold = buy side (closed above open). Red = sell side. Dashed line = 52-week average volume.</div>
+    <div class="panel-desc">Each bar = one week. Green = buy side (closed above open). Red = sell side. Dashed line = 52-week average volume.</div>
     <div class="volume-grid" id="volume-grid"></div>
   </div>
 
   <!-- BOARD 2 -->
   <div class="panel">
     <div class="panel-title">Board 2 — Last Week vs 12-Month Average</div>
-    <div class="panel-desc">Bar length = last week's volume as a percent of the 52-week average. Gold bar = buy side. Red bar = sell side. Vertical line at 100%.</div>
+    <div class="panel-desc">Bar length = last week's volume as a percent of the 52-week average. Green bar = buy side. Red bar = sell side. Vertical line at 100%.</div>
     <div id="board2-chart"></div>
   </div>
 
@@ -286,19 +286,19 @@ const CAPITAL_FLOWS_BAKED = true; // injected by fetch_capital_flows.py on 2026-
 // ── ASSET CLASS MAP ──────────────────────────────────────────────────────────
 const ASSET_CLASSES = {
   "Debasement":  { tickers: ["BTC","GLD"],                                   color: "#F0B429", phase: "Debasement / Monetary Stress" },
-  "Cyclical":    { tickers: ["QQQ","XLY","XLF","IWM","IGV","SPY"],          color: "#E67E22", phase: "Expansion / Risk-On" },
-  "Speculation": { tickers: ["MSTR","ASST","STRC","SATA"],                   color: "#7B68EE", phase: "Froth / Peak Liquidity" },
+  "Cyclical":    { tickers: ["XLY","XLF","IWM","SPY"],                       color: "#E67E22", phase: "Expansion / Risk-On" },
+  "Speculation": { tickers: ["MSTR","ASST","QQQ","IGV"],                     color: "#7B68EE", phase: "Froth / Peak Liquidity" },
   "Commodities": { tickers: ["DBC","XLE","DBA"],                             color: "#E74C3C", phase: "Late Cycle / Inflationary" },
   "Defensive":   { tickers: ["XLP","VYM","XLV","MOAT"],                      color: "#3498DB", phase: "Slowdown / Risk-Off Rotation" },
-  "Fixed Income":{ tickers: ["SHV","TLT","IEF"],                             color: "#2ECC71", phase: "Contraction / Flight to Safety" },
+  "Fixed Income":{ tickers: ["SHV","TLT","IEF","STRC","SATA"],               color: "#2ECC71", phase: "Contraction / Flight to Safety" },
 };
 
 // Ordered cycle phases for SVG (left→right along the wave): rebound → risk-on → froth → peak → descent → trough
 const CYCLE_ORDER = ["Debasement","Cyclical","Speculation","Commodities","Defensive","Fixed Income"];
 
 // ── BUY/SELL COLORS ──────────────────────────────────────────────────────────
-const BUY_COLOR  = "#C8960C";   // gold — week closed above open
-const SELL_COLOR = "#C0392B";   // red  — week closed below open
+const BUY_COLOR  = "#27AE60";   // green — week closed above open
+const SELL_COLOR = "#C0392B";   // red   — week closed below open
 
 // Minimum 13-week net-flow score for the cycle to name a dominant phase.
 // Below this (or with every class negative) Board 3 reports "no dominant inflow".
