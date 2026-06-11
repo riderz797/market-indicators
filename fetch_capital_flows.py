@@ -118,51 +118,43 @@ def main():
 
         existing_entry = existing_data.get(ticker, {"dates": [], "volumes": [], "opens": [], "closes": []})
 
-        # Purge any previously-baked bars that are past the cutoff (e.g. a
-        # partial Monday bar from an earlier run on a holiday).
-        if existing_entry.get("dates"):
-            combined_existing = list(zip(
-                existing_entry["dates"], existing_entry["volumes"],
-                existing_entry["opens"], existing_entry["closes"]
-            ))
-            combined_existing = [r for r in combined_existing if r[0] <= week_cutoff]
-            existing_entry["dates"]   = [r[0] for r in combined_existing]
-            existing_entry["volumes"] = [r[1] for r in combined_existing]
-            existing_entry["opens"]   = [r[2] for r in combined_existing]
-            existing_entry["closes"]  = [r[3] for r in combined_existing]
+        # Build a date-keyed map of existing bars, dropping any past the cutoff
+        # (e.g. a partial Monday bar baked by an earlier holiday run).
+        by_date = {}
+        for dt, v, o, c in zip(
+            existing_entry.get("dates", []),
+            existing_entry.get("volumes", []),
+            existing_entry.get("opens", []),
+            existing_entry.get("closes", []),
+        ):
+            if dt <= week_cutoff:
+                by_date[dt] = (v, o, c)
 
-        existing_dates = set(existing_entry.get("dates", []))
+        before = set(by_date)
 
-        added = 0
+        # Overlay freshly fetched bars. Fresh values WIN on overlapping dates so
+        # the 1-week revision overlap actually applies and any stale partial bar
+        # from a mid-week run gets corrected on the next run.
         for row in new_rows:
-            if row["date"] in existing_dates:
-                continue
-            existing_entry["dates"].append(row["date"])
-            existing_entry["volumes"].append(row["volume"])
-            existing_entry["opens"].append(row["open"])
-            existing_entry["closes"].append(row["close"])
-            existing_dates.add(row["date"])
-            added += 1
-            if row["date"] > latest_date:
-                latest_date = row["date"]
+            by_date[row["date"]] = (row["volume"], row["open"], row["close"])
 
-        # Keep sorted by date
-        combined = sorted(
-            zip(existing_entry["dates"], existing_entry["volumes"], existing_entry["opens"], existing_entry["closes"]),
-            key=lambda x: x[0]
-        )
-        if combined:
-            existing_entry["dates"]   = [r[0] for r in combined]
-            existing_entry["volumes"] = [r[1] for r in combined]
-            existing_entry["opens"]   = [r[2] for r in combined]
-            existing_entry["closes"]  = [r[3] for r in combined]
+        added = len(set(by_date) - before)
+
+        # Rebuild sorted-by-date arrays.
+        sorted_dates = sorted(by_date)
+        existing_entry["dates"]   = sorted_dates
+        existing_entry["volumes"] = [by_date[d][0] for d in sorted_dates]
+        existing_entry["opens"]   = [by_date[d][1] for d in sorted_dates]
+        existing_entry["closes"]  = [by_date[d][2] for d in sorted_dates]
 
         existing_data[ticker] = existing_entry
         total_new += added
+        if sorted_dates and sorted_dates[-1] > latest_date:
+            latest_date = sorted_dates[-1]
         if added:
-            print(f"  {ticker:6s}: +{added} new week(s)  (total {len(existing_entry['dates'])} weeks)")
+            print(f"  {ticker:6s}: +{added} new week(s)  (total {len(sorted_dates)} weeks)")
         else:
-            print(f"  {ticker:6s}: already current")
+            print(f"  {ticker:6s}: current ({len(sorted_dates)} weeks)")
 
     # Derive baked_through from actual data (covers the purge case where
     # no new rows were added but stale future bars were removed).
