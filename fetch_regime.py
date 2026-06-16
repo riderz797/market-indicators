@@ -51,6 +51,7 @@ INFLATION_SERIES = {
 # is distorted by the 2022 inflation spike. Blend level-vs-trend with 6-month RoC.
 BASELINE = ("2015-01-01", "2019-12-31")
 W_LEVEL  = 0.6
+PERSIST_WEEKS = 3   # financial-market regime must hold this many weekly runs before it flips
 
 # ── Market basket (Yahoo Finance chart API, daily) ──────────────────────────
 # expected momentum sign per regime: [GOLDILOCKS, REFLATION, INFLATION, DEFLATION]
@@ -233,8 +234,31 @@ def main():
     shares, markets, n = market_breadth()
     if n == 0:                                   # markets unreachable: lean on fundamentals
         shares = {r: (55 if r == regime else 15) for r in REGIMES}
-    mkt_regime = max(shares, key=shares.get)
+    raw_mkt = max(shares, key=shares.get)
     risk_on = shares["GOLDILOCKS"] + shares["REFLATION"]
+
+    # Persistence filter: the financial-market regime only flips after a new
+    # regime persists PERSIST_WEEKS consecutive weekly runs (kills whipsaws).
+    # State carries across runs via the previous regime_data.json.
+    run_date = datetime.date.today().isoformat()
+    try:
+        with open(OUT_PATH) as f:
+            prev = json.load(f)
+    except Exception:
+        prev = {}
+    ps = prev.get("persistence", {})
+    prev_conf = prev.get("market_regime")
+    if not prev_conf:
+        confirmed, pending, pend_wks, since = raw_mkt, None, 0, run_date
+    elif raw_mkt == prev_conf:
+        confirmed, pending, pend_wks, since = prev_conf, None, 0, ps.get("confirmed_since", run_date)
+    else:
+        same = raw_mkt == ps.get("pending_regime")
+        pend_wks = (ps.get("pending_weeks", 0) + 1) if same else 1
+        if pend_wks >= PERSIST_WEEKS:
+            confirmed, pending, pend_wks, since = raw_mkt, None, 0, run_date
+        else:
+            confirmed, pending, since = prev_conf, raw_mkt, ps.get("confirmed_since", run_date)
 
     data = {
         "as_of": max(g_date, i_date),
@@ -245,17 +269,21 @@ def main():
                       "score": round(g_score, 2)},
         "inflation": {"dir": "Rising" if i_score >= 0 else "Easing",
                       "score": round(i_score, 2)},
-        "market_regime": mkt_regime,
+        "market_regime": confirmed,
+        "market_regime_raw": raw_mkt,
         "shares": shares,
         "signal_strength": max(shares.values()),
         "risk_on_prob": risk_on,
         "n_markets": n,
+        "persistence": {"filter_weeks": PERSIST_WEEKS, "pending_regime": pending,
+                        "pending_weeks": pend_wks, "confirmed_since": since},
         "components": {"growth": g_detail, "inflation": i_detail, "markets": markets},
     }
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, "w") as f:
         json.dump(data, f, indent=2)
-    print(f"Wrote {OUT_PATH}: fundamental={regime}  market={mkt_regime}  shares={shares}  n={n}")
+    print(f"Wrote {OUT_PATH}: real={regime}  market={confirmed} "
+          f"(raw {raw_mkt}, pending {pending} {pend_wks}/{PERSIST_WEEKS})  n={n}")
     return 0
 
 

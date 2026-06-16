@@ -1,6 +1,6 @@
 {
   "as_of": "2026-05-01",
-  "updated_utc": "2026-06-16T13:24:44Z",
+  "updated_utc": "2026-06-16T19:03:14Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
@@ -12,15 +12,22 @@
     "score": 2.8
   },
   "market_regime": "REFLATION",
+  "market_regime_raw": "REFLATION",
   "shares": {
-    "GOLDILOCKS": 30,
-    "REFLATION": 40,
-    "INFLATION": 21,
-    "DEFLATION": 9
+    "GOLDILOCKS": 33,
+    "REFLATION": 37,
+    "INFLATION": 18,
+    "DEFLATION": 12
   },
-  "signal_strength": 40,
+  "signal_strength": 37,
   "risk_on_prob": 70,
   "n_markets": 17,
+  "persistence": {
+    "filter_weeks": 3,
+    "pending_regime": null,
+    "pending_weeks": 0,
+    "confirmed_since": "2026-06-16"
+  },
   "components": {
     "growth": {
       "Nonfarm Payrolls": {
@@ -136,10 +143,10 @@
       },
       {
         "name": "Crude Oil",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {

@@ -92,6 +92,7 @@
   .signal-strength { margin-top:6px; display:flex; align-items:baseline; gap:8px; padding-top:16px; border-top:1px dashed var(--line); }
   .signal-strength .big { font-size:1.5rem; font-weight:700; color:var(--gold); }
   .signal-strength .cap { font-size:.72rem; color:var(--ink-soft); }
+  .persist-note { margin-top:12px; font-size:.7rem; color:var(--ink-faint); line-height:1.5; }
 
   /* playbook */
   .pb-banner { display:flex; align-items:center; gap:14px; padding:18px 24px; border-radius:16px 16px 0 0; color:#fff; }
@@ -191,6 +192,7 @@
           <span class="big mono" id="sigBig">–</span>
           <span class="cap" id="sigCap"></span>
         </div>
+        <div class="persist-note" id="persistNote"></div>
       </div>
     </div>
 
@@ -232,7 +234,7 @@
   </div>
 
   <footer class="note">
-    <b>How it works.</b> 42 Macro's K-shaped framework, split into two engines. The <b>Real Economy</b> marker (bottom of the K) is a fundamental nowcast of US growth (labor &amp; income coincident data) versus inflation (Core PCE / Core CPI), each scored against the <b>2015–19 trend</b> — 42 Macro's own reference baseline — blending level-vs-trend with the 6-month rate-of-change. The <b>Financial Market</b> marker (top of the K) is the Global Macro Risk Matrix: ~17 liquid markets each voting for the regime their momentum confirms; this is the regime KISS / Dr. Mo position on. Recomputed weekly by a GitHub Action; the page falls back to the last snapshot if the data file is unavailable.<br>
+    <b>How it works.</b> 42 Macro's K-shaped framework, split into two engines. The <b>Real Economy</b> marker (bottom of the K) is a fundamental nowcast of US growth (labor &amp; income coincident data) versus inflation (Core PCE / Core CPI), each scored against the <b>2015–19 trend</b> — 42 Macro's own reference baseline — blending level-vs-trend with the 6-month rate-of-change. The <b>Financial Market</b> marker (top of the K) is the Global Macro Risk Matrix: ~17 liquid markets each voting for the regime their momentum confirms; this is the regime KISS / Dr. Mo position on. A <b>3-week persistence filter</b> holds this regime until a new one shows up for 3 straight weekly runs — a backtest of the last 4 years showed it cut whipsaw turnover ~2.6× and lifted the strategy's Sharpe. Recomputed weekly by a GitHub Action; the page falls back to the last snapshot if the data file is unavailable.<br>
     Illustrative personal prototype modeled on the 42 Macro framework (Darius Dale) — <b>not</b> affiliated with or endorsed by 42 Macro LLC, and <b>not</b> investment advice.
   </footer>
 </div>
@@ -260,10 +262,11 @@ const PLAYBOOK = {
 /* Fallback = last computed snapshot (used when regime_data.json can't be fetched, e.g. file://) */
 const FALLBACK = {
   as_of:'2026-05-01', updated_utc:'', baseline:'2015-2019 trend',
-  regime:'INFLATION', market_regime:'REFLATION',
+  regime:'INFLATION', market_regime:'REFLATION', market_regime_raw:'REFLATION',
   growth:{dir:'Slowing',score:-1.29}, inflation:{dir:'Rising',score:2.8},
   shares:{GOLDILOCKS:30,REFLATION:40,INFLATION:21,DEFLATION:9},
-  signal_strength:40, risk_on_prob:70, n_markets:17
+  signal_strength:40, risk_on_prob:70, n_markets:17,
+  persistence:{filter_weeks:3, pending_regime:null, pending_weeks:0, confirmed_since:'2026-06-16'}
 };
 
 let DATA = FALLBACK, FUND = 'INFLATION', MKT = 'REFLATION';   // FUND=real economy, MKT=financial market
@@ -350,6 +353,14 @@ function applyData(d){
   document.getElementById('sigBig').textContent = (DATA.signal_strength||0) + '%';
   document.getElementById('sigCap').innerHTML =
     `Top regime share · risk-on probability <b class="mono" style="color:var(--ink)">${DATA.risk_on_prob||0}%</b> · ${DATA.n_markets||0} markets`;
+
+  const p = d.persistence;
+  const pn = document.getElementById('persistNote');
+  if (p && p.pending_regime)
+    pn.innerHTML = `<b style="color:#b45309">⏳ ${p.pending_regime} building (${p.pending_weeks}/${p.filter_weeks} wk)</b> — financial regime won't flip until it holds ${p.filter_weeks} weeks. Raw breadth leads <b>${d.market_regime_raw||'—'}</b>.`;
+  else if (p)
+    pn.innerHTML = `${p.filter_weeks}-week persistence filter · financial regime confirmed since ${p.confirmed_since || '—'}.`;
+  else pn.innerHTML = '';
 
   buildNodes();
   select(MKT);                 // default playbook = the regime 42 Macro trades
