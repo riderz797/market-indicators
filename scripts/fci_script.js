@@ -248,6 +248,37 @@ function renderMoversPanel(contributions, n) {
     if (tightenEl) tightenEl.innerHTML = tightenComps.length ? tightenComps.map(buildRow).join('') : '<div class="mover-empty">None</div>';
 }
 
+// Redraw the main index chart from computed values (no network required).
+// The baked Plotly.newPlot figure is only an initial placeholder; this keeps
+// the rendered chart in sync with whatever STATIC_DATA the build last baked.
+function renderIndexChart(indexValues, masterDates, n) {
+    const chartDiv = document.querySelector('.plotly-graph-div');
+    if (!chartDiv || !chartDiv.data || n < 2) return;
+    const periods = { '3M': 13, '1Y': 52, '5Y': 260 };
+    const order = ['3M', '1Y', '5Y'];
+    const traces = chartDiv.data;
+    for (let p = 0; p < 3; p++) {
+        const pName = order[p];
+        const start = Math.max(0, n - periods[pName]);
+        const pDates = masterDates.slice(start);
+        const pValues = rollingAvg(indexValues.slice(start), SMOOTH[pName]);
+        const pos = pValues.map(v => v != null && v > 0 ? v : 0);
+        const neg = pValues.map(v => v != null && v < 0 ? v : 0);
+        const base = p * 3;
+        traces[base].x = pDates;     traces[base].y = pos;
+        traces[base + 1].x = pDates; traces[base + 1].y = neg;
+        traces[base + 2].x = pDates; traces[base + 2].y = pValues;
+    }
+    const current = indexValues[n - 1], prev = indexValues[n - 2], dateStr = masterDates[n - 1];
+    const layout = chartDiv.layout;
+    if (layout.xaxis) layout.xaxis.domain = [0, 1];
+    if (layout.yaxis) layout.yaxis.domain = [0, 1];
+    if (layout.title && current != null) {
+        layout.title.text = `Financial Conditions Index<br><sup>As of ${dateStr} | Current: ${current >= 0 ? '+' : ''}${current.toFixed(2)}σ | WoW: ${(current - prev) >= 0 ? '+' : ''}${(current - prev).toFixed(2)}σ | Green = Easing, Red = Tightening</sup>`;
+    }
+    Plotly.react(chartDiv, traces, layout);
+}
+
 // On page load: use baked STATIC_DATA — no network call
 document.addEventListener('DOMContentLoaded', function() {
     try {
@@ -257,11 +288,12 @@ document.addEventListener('DOMContentLoaded', function() {
             rawMap[key] = { dates: data.dates, values: data.values };
         }
         const weekly = buildWeeklyFromMap(rawMap);
-        const { contributions, n } = computeContributions(weekly);
+        const { contributions, indexValues, masterDates, n } = computeContributions(weekly);
         renderMoversPanel(contributions, n);
-        console.log('[FCI] Movers loaded from static data (' + STATIC_DATA.generated + ')');
+        renderIndexChart(indexValues, masterDates, n);
+        console.log('[FCI] Chart + movers loaded from static data (' + STATIC_DATA.generated + ')');
     } catch (e) {
-        console.warn('[FCI] Static movers init failed:', e);
+        console.warn('[FCI] Static init failed:', e);
     }
 });
 
@@ -302,33 +334,10 @@ async function updateData() {
         const { contributions, indexValues, masterDates, n } = computeContributions(weekly);
         if (n < 2 || indexValues[n-1] == null) throw new Error('Insufficient data returned.');
 
-        const periods = { '3M': 13, '1Y': 52, '5Y': 260 };
-        const periodTraces = {};
-        for (const [pName, weeks] of Object.entries(periods)) {
-            const start = Math.max(0, n - weeks);
-            const pDates = masterDates.slice(start);
-            const pValues = rollingAvg(indexValues.slice(start), SMOOTH[pName]);
-            periodTraces[pName] = { dates: pDates, values: pValues, pos: pValues.map(v => v != null && v > 0 ? v : 0), neg: pValues.map(v => v != null && v < 0 ? v : 0) };
-        }
-
-        const chartDiv = document.querySelector('.plotly-graph-div');
-        const traces = chartDiv.data;
-        for (let p = 0; p < 3; p++) {
-            const pd = periodTraces[['3M','1Y','5Y'][p]], base = p * 3;
-            traces[base].x = pd.dates; traces[base].y = pd.pos;
-            traces[base + 1].x = pd.dates; traces[base + 1].y = pd.neg;
-            traces[base + 2].x = pd.dates; traces[base + 2].y = pd.values;
-        }
-
         renderMoversPanel(contributions, n);
+        renderIndexChart(indexValues, masterDates, n);
 
-        const current = indexValues[n - 1], prev = indexValues[n - 2], dateStr = masterDates[n - 1];
-        const layout = chartDiv.layout;
-        if (layout.xaxis) layout.xaxis.domain = [0, 1];
-        if (layout.yaxis) layout.yaxis.domain = [0, 1];
-        layout.title.text = `Financial Conditions Index<br><sup>As of ${dateStr} | Current: ${current >= 0 ? '+' : ''}${current.toFixed(2)}\u03c3 | WoW: ${(current - prev) >= 0 ? '+' : ''}${(current - prev).toFixed(2)}\u03c3 | Green = Easing, Red = Tightening</sup>`;
-        Plotly.react(chartDiv, traces, layout);
-
+        const current = indexValues[n - 1];
         const liveCount = fredResults.filter(r => r.status === 'fulfilled' && r.value).length;
         setStatus(`Updated ${new Date().toLocaleString()} | ${current >= 0 ? '+' : ''}${current.toFixed(2)}\u03c3 | ${liveCount} live series`, 'success');
     } catch (err) { setStatus('Error: ' + err.message, 'error'); console.error(err); }
