@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>42 Macro — Darius Dale Regime Indicator</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:#ffffff; --panel:#ffffff; --surface:#f7f8fa; --line:#e5e7eb;
+    --ink:#16181d; --ink-soft:#5b6573; --ink-faint:#94a0af;
+    --gold:#d4a017; --gold-soft:#f5c542; --real:#334155;
+    --goldilocks:#15803d; --reflation:#4d7c0f; --inflation:#dc2626; --deflation:#1e3a8a;
+    --favor:#15803d; --avoid:#c0392b;
+  }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg); color:var(--ink); min-height:100vh;
+    padding:64px 24px 72px; -webkit-font-smoothing:antialiased;
+  }
+  .mono { font-family:'JetBrains Mono',ui-monospace,monospace; }
+
+  .back-link {
+    position:fixed; top:14px; left:18px; z-index:100;
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 14px; font-size:12px; letter-spacing:.5px;
+    color:var(--ink-soft); text-decoration:none;
+    border:1px solid var(--line); border-radius:8px; background:#fff;
+    transition:color .2s,border-color .2s;
+  }
+  .back-link:hover { color:var(--gold); border-color:var(--gold-soft); }
+
+  .wrap { max-width:1140px; margin:0 auto; }
+
+  header { margin-bottom:22px; }
+  .kicker { font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+  header h1 { font-size:1.7rem; font-weight:700; letter-spacing:-.3px; }
+  header .sub { margin-top:6px; color:var(--ink-soft); font-size:.92rem; }
+  .demo-tag { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:1px; vertical-align:middle; background:#fff7e0; color:#9a7400; border:1px solid #f0dca0; }
+  .meta-line { margin-top:10px; font-size:.74rem; color:var(--ink-faint); display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+  .live-dot { display:inline-flex; align-items:center; gap:6px; }
+  .live-dot::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--goldilocks); box-shadow:0 0 0 3px rgba(21,128,61,.15); }
+
+  .b1 { display:grid; grid-template-columns:minmax(360px,470px) 1fr; gap:26px; align-items:start; margin-top:24px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.04); }
+  .card-pad { padding:22px 24px; }
+  .card-head { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--line); }
+  .card-head h2 { font-size:.82rem; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--ink-soft); }
+
+  /* diamond */
+  .diamond-wrap { display:flex; flex-direction:column; align-items:center; }
+  .diamond { position:relative; width:380px; height:380px; max-width:100%; margin-top:8px; }
+  .diamond svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .node {
+    position:absolute; width:132px; height:132px; margin:-66px 0 0 -66px;
+    border-radius:50%; cursor:pointer; border:2px solid;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; background:#fff; transition:transform .18s,box-shadow .18s; user-select:none;
+  }
+  .node:hover { transform:scale(1.05); }
+  .node .nm { font-size:.84rem; font-weight:700; letter-spacing:.3px; }
+  .node .gi { font-size:.62rem; margin-top:4px; color:var(--ink-soft); line-height:1.45; }
+  .node .ro { font-size:.58rem; font-weight:700; letter-spacing:1px; margin-top:5px; text-transform:uppercase; }
+  .node.sel { box-shadow:0 0 0 4px #fff,0 0 0 7px var(--gold-soft),0 10px 26px rgba(212,160,23,.28); transform:scale(1.06); }
+  .node.sel:hover { transform:scale(1.09); }
+  .badge { position:absolute; left:50%; transform:translateX(-50%); font-size:9px; font-weight:800; letter-spacing:.6px; padding:3px 8px; border-radius:999px; white-space:nowrap; }
+  .badge.fin  { background:var(--gold); color:#1a1300; box-shadow:0 3px 10px rgba(212,160,23,.4); }
+  .badge.real { background:var(--real); color:#fff; }
+  .at-top{top:66px;left:50%;} .at-right{top:50%;left:312px;} .at-bottom{top:314px;left:50%;} .at-left{top:50%;left:68px;}
+
+  .legend { margin-top:14px; font-size:.68rem; color:var(--ink-faint); display:flex; gap:18px; justify-content:center; flex-wrap:wrap; }
+  .legend b.real { color:var(--real); } .legend b.fin { color:var(--gold); }
+
+  .mini-lab { font-size:.62rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--ink-faint); margin:22px 0 8px; }
+
+  .gi-chips { display:flex; gap:10px; }
+  .gi-chip { flex:1; border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .gi-chip .lab { font-size:.62rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--ink-faint); }
+  .gi-chip .val { font-size:1.02rem; font-weight:700; margin-top:4px; display:flex; align-items:center; gap:7px; }
+  .gi-chip .val .sc { font-size:.7rem; font-weight:500; color:var(--ink-faint); margin-left:auto; }
+
+
+  .shares { margin-top:4px; }
+  .share-row { display:grid; grid-template-columns:96px 1fr 40px; align-items:center; gap:10px; margin-bottom:9px; cursor:pointer; }
+  .share-row .rn { font-size:.72rem; font-weight:600; }
+  .bar { height:9px; border-radius:999px; background:var(--surface); overflow:hidden; }
+  .bar>span { display:block; height:100%; border-radius:999px; transition:width .4s ease; }
+  .share-row .pct { font-size:.72rem; text-align:right; color:var(--ink-soft); }
+
+  .signal-strength { margin-top:6px; display:flex; align-items:baseline; gap:8px; padding-top:16px; border-top:1px dashed var(--line); }
+  .signal-strength .big { font-size:1.5rem; font-weight:700; color:var(--gold); }
+  .signal-strength .cap { font-size:.72rem; color:var(--ink-soft); }
+
+  /* playbook */
+  .pb-banner { display:flex; align-items:center; gap:14px; padding:18px 24px; border-radius:16px 16px 0 0; color:#fff; }
+  .pb-banner .dot { width:12px; height:12px; border-radius:50%; background:rgba(255,255,255,.9); }
+  .pb-banner h3 { font-size:1.15rem; font-weight:700; letter-spacing:.3px; }
+  .pb-banner .tags { margin-left:auto; display:flex; gap:7px; flex-wrap:wrap; }
+  .pb-banner .tag { font-size:.66rem; font-weight:700; letter-spacing:.6px; text-transform:uppercase; background:rgba(255,255,255,.18); padding:4px 10px; border-radius:999px; }
+  .pb-sub { padding:12px 24px; font-size:.82rem; color:var(--ink-soft); border-bottom:1px solid var(--line); background:var(--surface); }
+  table.pb { width:100%; border-collapse:collapse; }
+  table.pb th { text-align:left; font-size:.64rem; letter-spacing:1px; text-transform:uppercase; color:var(--ink-faint); padding:12px 24px 10px; border-bottom:1px solid var(--line); }
+  table.pb th.fav { color:var(--favor); } table.pb th.avo { color:var(--avoid); }
+  table.pb td { padding:10px 24px; font-size:.84rem; border-bottom:1px solid #f1f3f6; vertical-align:middle; }
+  table.pb tr:last-child td { border-bottom:none; }
+  table.pb .dim { color:var(--ink-faint); font-size:.74rem; font-weight:600; }
+  table.pb .fav { color:var(--favor); font-weight:600; } table.pb .avo { color:var(--avoid); font-weight:500; }
+  table.pb .fav::before { content:'▲ '; font-size:.62rem; } table.pb .avo::before { content:'▼ '; font-size:.62rem; }
+  table.pb tr:hover td { background:#fcfcfd; }
+
+  /* combination analyzer (bottom-right) */
+  .right-col { display:flex; flex-direction:column; gap:26px; min-width:0; }
+  .analyzer .combo-pills { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .combo-pill { display:inline-flex; align-items:center; padding:5px 11px; border-radius:999px; font-size:.64rem; font-weight:700; letter-spacing:.5px; text-transform:uppercase; }
+  .combo-pill.real { background:#eef1f5; color:var(--real); border:1px solid #dfe4ea; }
+  .combo-pill.fin  { background:#fff7e0; color:#9a7400; border:1px solid #f0dca0; }
+  .combo-x { color:var(--ink-faint); font-weight:800; }
+  .combo-card { border:1px solid var(--line); border-left-width:4px; border-radius:12px; padding:15px 17px; background:var(--surface); }
+  .combo-title { font-size:1.02rem; font-weight:700; margin-bottom:7px; }
+  .combo-body { font-size:.84rem; line-height:1.55; color:var(--ink-soft); }
+  .combo-posture { margin-top:11px; font-size:.8rem; color:var(--ink); }
+  .combo-posture b { font-weight:700; }
+  .alloc-lab { font-size:.62rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--ink-faint); margin:18px 0 10px; }
+  .alloc-row { display:grid; grid-template-columns:1fr 86px 34px; align-items:center; gap:10px; margin-bottom:7px; }
+  .alloc-row .lhs { display:flex; gap:8px; align-items:baseline; min-width:0; }
+  .alloc-row .tk { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.74rem; font-weight:700; }
+  .alloc-row .nm { font-size:.66rem; color:var(--ink-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .alloc-bar { height:8px; border-radius:999px; background:var(--surface); overflow:hidden; }
+  .alloc-bar>span { display:block; height:100%; border-radius:999px; transition:width .4s ease; }
+  .alloc-row .pct { font-size:.72rem; text-align:right; color:var(--ink-soft); }
+
+  footer.note { margin-top:36px; padding-top:18px; border-top:1px solid var(--line); font-size:.7rem; color:var(--ink-faint); line-height:1.6; }
+  footer.note b { color:var(--ink-soft); }
+
+  @media (max-width:900px){ .b1{grid-template-columns:1fr;} .diamond{width:340px;height:340px;} }
+</style>
+</head>
+<body>
+<a href="../../index.html" class="back-link">&#8592; Dashboard</a>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">42 Macro · K-Shaped GRID Framework</div>
+    <h1>Darius Dale Regime Indicator <span class="demo-tag">DEMO</span></h1>
+    <div class="sub">Where the <b>real economy</b> and the <b>financial market</b> each sit in the four-regime map — the two halves of 42 Macro's K.</div>
+    <div class="meta-line">
+      <span class="live-dot mono" id="asOf">loading…</span>
+      <span class="mono" id="updated"></span>
+      <span>Weekly · vs 2015–19 trend · FRED + Yahoo Finance</span>
+    </div>
+  </header>
+
+  <div class="b1">
+    <!-- LEFT: compass -->
+    <div class="card">
+      <div class="card-head"><h2>Regime Map · click to explore</h2></div>
+      <div class="card-pad">
+        <div class="diamond-wrap">
+          <div class="diamond">
+            <svg viewBox="0 0 380 380" aria-hidden="true">
+              <defs>
+                <marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#9aa6b4"></path>
+                </marker>
+              </defs>
+              <line x1="104" y1="158" x2="156" y2="104" stroke="#9aa6b4" stroke-width="2.4" marker-end="url(#ah)"/>
+              <line x1="224" y1="104" x2="276" y2="158" stroke="#9aa6b4" stroke-width="2.4" marker-end="url(#ah)"/>
+              <line x1="276" y1="222" x2="224" y2="276" stroke="#9aa6b4" stroke-width="2.4" marker-end="url(#ah)"/>
+              <line x1="156" y1="276" x2="104" y2="222" stroke="#9aa6b4" stroke-width="2.4" marker-end="url(#ah)"/>
+            </svg>
+            <div class="node at-top"    data-regime="REFLATION"></div>
+            <div class="node at-right"  data-regime="INFLATION"></div>
+            <div class="node at-bottom" data-regime="DEFLATION"></div>
+            <div class="node at-left"   data-regime="GOLDILOCKS"></div>
+          </div>
+          <div class="legend">
+            <span><b class="real">◆ REAL ECONOMY</b> — bottom of the K (labor &amp; income)</span>
+            <span><b class="fin">◆ FINANCIAL MARKET</b> — top of the K (asset prices)</span>
+          </div>
+        </div>
+
+        <div class="mini-lab">Real Economy · growth &amp; inflation vs 2015–19 trend</div>
+        <div class="gi-chips" id="giChips"></div>
+
+        <div class="mini-lab">Financial Market · share of confirming markets</div>
+        <div class="shares" id="shareBars"></div>
+
+        <div class="signal-strength">
+          <span class="big mono" id="sigBig">–</span>
+          <span class="cap" id="sigCap"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-col">
+    <!-- RIGHT: playbook -->
+    <div class="card" style="overflow:hidden;">
+      <div class="pb-banner" id="pbBanner">
+        <span class="dot"></span>
+        <h3 id="pbName">—</h3>
+        <div class="tags" id="pbTags"></div>
+      </div>
+      <div class="pb-sub" id="pbSub"></div>
+      <table class="pb">
+        <thead><tr>
+          <th style="width:30%">Dimension</th>
+          <th class="fav" style="width:38%">Overweight / Favor</th>
+          <th class="avo" style="width:32%">Underweight / Avoid</th>
+        </tr></thead>
+        <tbody id="pbBody"></tbody>
+      </table>
+    </div>
+
+    <!-- BOTTOM-RIGHT: combination analyzer -->
+    <div class="card analyzer">
+      <div class="card-head"><h2>Combination Analyzer · Real Economy × Financial Market</h2></div>
+      <div class="card-pad">
+        <div class="combo-pills" id="comboPills"></div>
+        <div class="combo-card" id="comboCard">
+          <div class="combo-title" id="comboTitle"></div>
+          <div class="combo-body" id="comboBody"></div>
+          <div class="combo-posture" id="comboPosture"></div>
+        </div>
+
+        <div class="alloc-lab">Optimal allocation · 65% market regime / 35% real economy</div>
+        <div id="comboAlloc"></div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <footer class="note">
+    <b>How it works.</b> 42 Macro's K-shaped framework, split into two engines. The <b>Real Economy</b> marker (bottom of the K) is a fundamental nowcast of US growth (labor &amp; income coincident data) versus inflation (Core PCE / Core CPI), each scored against the <b>2015–19 trend</b> — 42 Macro's own reference baseline — blending level-vs-trend with the 6-month rate-of-change. The <b>Financial Market</b> marker (top of the K) is the Global Macro Risk Matrix: ~17 liquid markets each voting for the regime their momentum confirms; this is the regime KISS / Dr. Mo position on. Recomputed weekly by a GitHub Action; the page falls back to the last snapshot if the data file is unavailable.<br>
+    Illustrative personal prototype modeled on the 42 Macro framework (Darius Dale) — <b>not</b> affiliated with or endorsed by 42 Macro LLC, and <b>not</b> investment advice.
+  </footer>
+</div>
+
+<script>
+const getCSS = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const COLORS = { GOLDILOCKS:getCSS('--goldilocks'), REFLATION:getCSS('--reflation'),
+                 INFLATION:getCSS('--inflation'), DEFLATION:getCSS('--deflation') };
+
+const META = {
+  GOLDILOCKS:{ gi:'Growth ↑ · Inflation ↓', ro:'Risk-On',  bias:'Disinflationary bias' },
+  REFLATION: { gi:'Growth ↑ · Inflation ↑', ro:'Risk-On',  bias:'Inflationary bias' },
+  INFLATION: { gi:'Growth ↓ · Inflation ↑', ro:'Risk-Off', bias:'Inflationary bias' },
+  DEFLATION: { gi:'Growth ↓ · Inflation ↓', ro:'Risk-Off', bias:'Disinflationary bias' }
+};
+
+/* Factor long-short playbook per regime (42 Macro process table, deck p.40) */
+const PLAYBOOK = {
+  GOLDILOCKS:[['General Bias','Risk Assets','Defensive Assets'],['Beta','High Beta','Low Beta'],['Cyclicality','Cyclicals','Defensives'],['Style','Growth','Value'],['Market Cap','SMID Caps','Large Caps'],['Regional','US','International'],['Geographic','Emerging Markets','Developed Markets'],['Fixed Income','Spread Products','Treasurys'],['Treasury Curve','Short Rates','Long Rates'],['Credit','High Yield','Investment Grade'],['Commodities','Industrial','Agricultural'],['Currencies','Gold','US Dollar']],
+  REFLATION: [['General Bias','Risk Assets','Defensive Assets'],['Beta','High Beta','Low Beta'],['Cyclicality','Cyclicals','Defensives'],['Style','Growth','Value'],['Market Cap','SMID Caps','Large Caps'],['Regional','International','US'],['Geographic','Emerging Markets','Developed Markets'],['Fixed Income','Spread Products','Treasurys'],['Treasury Curve','Short Rates','Long Rates'],['Credit','High Yield','Investment Grade'],['Commodities','Industrial','Agricultural'],['Currencies','Gold','US Dollar']],
+  INFLATION: [['General Bias','Defensive Assets','Risk Assets'],['Beta','Low Beta','High Beta'],['Cyclicality','Defensives','Cyclicals'],['Style','Value','Growth'],['Market Cap','Large Caps','SMID Caps'],['Regional','US','International'],['Geographic','Developed Markets','Emerging Markets'],['Fixed Income','Treasurys','Spread Products'],['Treasury Curve','Short Rates','Long Rates'],['Credit','Investment Grade','High Yield'],['Commodities','Agricultural','Industrial'],['Currencies','US Dollar','Foreign Currencies']],
+  DEFLATION: [['General Bias','Defensive Assets','Risk Assets'],['Beta','Low Beta','High Beta'],['Cyclicality','Defensives','Cyclicals'],['Style','Growth','Value'],['Market Cap','Large Caps','SMID Caps'],['Regional','US','International'],['Geographic','Developed Markets','Emerging Markets'],['Fixed Income','Treasurys','Spread Products'],['Treasury Curve','Long Rates','Short Rates'],['Credit','Investment Grade','High Yield'],['Commodities','Agricultural','Industrial'],['Currencies','Gold','Foreign Currencies']]
+};
+
+/* Fallback = last computed snapshot (used when regime_data.json can't be fetched, e.g. file://) */
+const FALLBACK = {
+  as_of:'2026-05-01', updated_utc:'', baseline:'2015-2019 trend',
+  regime:'INFLATION', market_regime:'REFLATION',
+  growth:{dir:'Slowing',score:-1.29}, inflation:{dir:'Rising',score:2.8},
+  shares:{GOLDILOCKS:30,REFLATION:40,INFLATION:21,DEFLATION:9},
+  signal_strength:40, risk_on_prob:70, n_markets:17
+};
+
+let DATA = FALLBACK, FUND = 'INFLATION', MKT = 'REFLATION';   // FUND=real economy, MKT=financial market
+
+/* ── render ── */
+function badgesFor(r){
+  const out = [];
+  if (r === MKT)  out.push(['FINANCIAL MARKET', 'fin']);
+  if (r === FUND) out.push(['REAL ECONOMY', 'real']);
+  return out;
+}
+function buildNodes(){
+  document.querySelectorAll('.node').forEach(n => {
+    const r = n.dataset.regime, m = META[r];
+    n.style.borderColor = COLORS[r]; n.style.color = COLORS[r];
+    const badges = badgesFor(r).map((b, i) =>
+      `<span class="badge ${b[1]}" style="top:${-13 - i*19}px">${b[0]}</span>`).join('');
+    n.innerHTML = badges +
+      `<span class="nm">${r}</span><span class="gi">${m.gi}</span>` +
+      `<span class="ro" style="color:${COLORS[r]}">${m.ro}</span>`;
+    n.onclick = () => select(r);
+  });
+}
+
+function renderShares(active){
+  const order = ['REFLATION','INFLATION','GOLDILOCKS','DEFLATION'];
+  document.getElementById('shareBars').innerHTML = order.map(r => {
+    const v = DATA.shares[r] || 0, on = r === active;
+    return `<div class="share-row" data-r="${r}" style="${on?'':'opacity:.78'}">
+      <span class="rn" style="color:${COLORS[r]}">${r}</span>
+      <span class="bar"><span style="width:${Math.min(v*2,100)}%;background:${COLORS[r]}"></span></span>
+      <span class="pct mono">${v}%</span></div>`;
+  }).join('');
+  document.querySelectorAll('.share-row').forEach(row =>
+    row.onclick = () => select(row.dataset.r));
+}
+
+function select(r){
+  const m = META[r];
+  document.querySelectorAll('.node').forEach(n => n.classList.toggle('sel', n.dataset.regime === r));
+  const banner = document.getElementById('pbBanner');
+  banner.style.background = COLORS[r];
+  document.getElementById('pbName').textContent = r;
+
+  let tag = '';
+  if (r === MKT && r === FUND) tag = '<span class="tag" style="background:rgba(255,255,255,.32)">● Both halves</span>';
+  else if (r === MKT)  tag = '<span class="tag" style="background:rgba(255,255,255,.32)">● Financial market</span>';
+  else if (r === FUND) tag = '<span class="tag" style="background:rgba(255,255,255,.32)">● Real economy</span>';
+  document.getElementById('pbTags').innerHTML =
+    `<span class="tag">${m.ro}</span><span class="tag">${m.bias}</span>` + tag;
+
+  let sub;
+  if (r === MKT)       sub = 'The regime 42 Macro positions on (KISS / Dr. Mo). Long the “Favor” column, short / underweight the “Avoid” column.';
+  else if (r === FUND) sub = 'The real-economy regime — the lived growth/inflation mix for W-2 households at the bottom of the K.';
+  else                 sub = `Exploring the ${r} playbook. ${m.ro==='Risk-On'?'Investors are generally rewarded for taking risk.':'Capital preservation is favored over risk-taking.'}`;
+  document.getElementById('pbSub').innerHTML = `<b style="color:${COLORS[r]}">${m.gi}.</b> ` + sub;
+
+  document.getElementById('pbBody').innerHTML = PLAYBOOK[r].map(([d,f,a]) =>
+    `<tr><td class="dim">${d}</td><td class="fav">${f}</td><td class="avo">${a}</td></tr>`).join('');
+  renderShares(r);
+}
+
+function chip(lab, val, arrow, color, score){
+  return `<div class="gi-chip"><div class="lab">${lab}</div>
+    <div class="val"><span style="color:${color}">${arrow}</span> ${val}
+    <span class="sc mono">z ${score>=0?'+':''}${score}</span></div></div>`;
+}
+
+function applyData(d){
+  DATA = d; FUND = d.regime; MKT = d.market_regime;
+
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dt = new Date(d.as_of + 'T00:00:00');
+  document.getElementById('asOf').textContent = 'Data through ' + mo[dt.getMonth()] + ' ' + dt.getFullYear();
+  document.getElementById('updated').textContent = d.updated_utc ? 'refreshed ' + d.updated_utc.slice(0,10) : '';
+
+  // real-economy chips
+  const g = d.growth, i = d.inflation, up = '▲', dn = '▼';
+  const gUp = g.dir === 'Improving', iUp = i.dir === 'Rising';
+  document.getElementById('giChips').innerHTML =
+    chip('Growth', g.dir, gUp?up:dn, gUp?'var(--goldilocks)':'var(--inflation)', g.score) +
+    chip('Inflation', i.dir, iUp?up:dn, iUp?'#b45309':'var(--goldilocks)', i.score);
+
+  document.getElementById('sigBig').textContent = (DATA.signal_strength||0) + '%';
+  document.getElementById('sigCap').innerHTML =
+    `Top regime share · risk-on probability <b class="mono" style="color:var(--ink)">${DATA.risk_on_prob||0}%</b> · ${DATA.n_markets||0} markets`;
+
+  buildNodes();
+  select(MKT);                 // default playbook = the regime 42 Macro trades
+  renderCombo(FUND, MKT);
+}
+
+/* ── combination analyzer: what each Real Economy × Financial Market pairing implies ── */
+const TONE = { bull:COLORS.GOLDILOCKS, caution:'#b45309', dip:'#2563eb', bear:COLORS.INFLATION };
+const COMBO = {
+  'GOLDILOCKS|GOLDILOCKS':{tone:'bull',title:'Broad Goldilocks',body:'Both halves aligned — growth firming, inflation cooling. The cleanest, lowest-stress bull: gains are broad and fundamentally earned, not just liquidity-driven.',posture:'Risk-on; the one regime where it is safe to add duration.'},
+  'GOLDILOCKS|REFLATION':{tone:'bull',title:'Goldilocks economy, reflation-priced market',body:'The real economy is disinflationary-growth, but markets are chasing reflation — front-running an inflation pickup the data has not shown yet. Broadly bullish with an inflation tilt.',posture:'Risk-on; favor real assets, watch for an inflation surprise.'},
+  'GOLDILOCKS|INFLATION':{tone:'dip',title:'Growth scare',body:'Fundamentals are fine (growth up) but the tape has flipped risk-off on inflation fear. Usually a correction inside a bull — a buy-the-dip setup once momentum turns back up.',posture:'Respect the tape now; fade the fear when the market marker stabilizes.'},
+  'GOLDILOCKS|DEFLATION':{tone:'dip',title:'Deflation scare vs. a solid economy',body:'A strong real economy with markets pricing a liquidity or credit accident. These washouts tend to mean-revert hard when the economy holds.',posture:'Do not catch the knife; build a buy list for the snapback.'},
+  'REFLATION|GOLDILOCKS':{tone:'bull',title:'Hot economy, soft-landing market',body:'The economy is running hot (growth + inflation) while markets price a disinflationary soft landing. Bullish, but the market may be complacent that inflation simply rolls over.',posture:'Risk-on; hedge inflation/duration risk.'},
+  'REFLATION|REFLATION':{tone:'bull',title:'Broad reflation boom',body:'Both halves aligned — growth and inflation rising together. The textbook reflation trade: own cyclicals, commodities and real assets; long bonds are the enemy.',posture:'Aggressive risk-on with an inflation tilt.'},
+  'REFLATION|INFLATION':{tone:'caution',title:'Late-cycle top risk',body:'The economy is still booming, but markets are rolling over as inflation forces a policy threat. The tape is discounting the squeeze before growth actually cracks.',posture:'Trim risk; rotate toward value and inflation-defensives.'},
+  'REFLATION|DEFLATION':{tone:'caution',title:'Boom into a financial shock',body:'A hot economy hit by a deflationary risk-off — a policy or financial accident rather than a demand collapse. Violent but often V-shaped if the economy holds.',posture:'Defensive until the market marker steadies, then prep to re-risk.'},
+  'INFLATION|GOLDILOCKS':{tone:'caution',title:'Stagflated economy, euphoric market',body:'The real economy is stagflating while markets price perfection. The widest, most complacent divergence — the melt-up most detached from Main Street.',posture:'Ride it but tighten stops; richly priced and fragile.'},
+  'INFLATION|REFLATION':{tone:'caution',title:'K-divergence melt-up',body:'The real economy is stagflating (growth slowing, inflation sticky) while markets boom on reflation — pulled by liquidity and top-of-K flows, not broad fundamentals. Risk-on keeps working until liquidity or policy turns, and the snapback risk is high.',posture:'Stay risk-on with inflation hedges (gold/commodities, short duration); keep dry powder and watch the market marker for the turn.'},
+  'INFLATION|INFLATION':{tone:'bear',title:'Broad stagflation',body:'Both halves aligned — growth down, inflation up. The hardest regime: defensives, value and real assets beat both high-beta and long bonds, while cash is quietly debased.',posture:'Capital preservation with inflation protection.'},
+  'INFLATION|DEFLATION':{tone:'bear',title:'Stagflation tipping into bust',body:'A weak, sticky-priced economy with markets now pricing deflationary risk-off — inflation cracking into demand destruction. Recession entry.',posture:'Defensive; quality + cash. As inflation rolls over, duration starts to work.'},
+  'DEFLATION|GOLDILOCKS':{tone:'dip',title:'Recession economy, recovery-priced market',body:'The real economy is in a deflationary bust but markets are ripping on goldilocks — the early-cycle V-bottom. Markets lead out of recessions; this is often the birth of a new bull.',posture:'Lean into the turning tape; it is discounting recovery before the data confirms.'},
+  'DEFLATION|REFLATION':{tone:'dip',title:'Bust economy, reflation rally',body:'A weak, deflationary economy but markets pricing reflation on a policy/liquidity flood — the classic stimulus-driven jump condition off a low.',posture:'Risk-on with the liquidity wave; it is policy-powered, so watch for the fade.'},
+  'DEFLATION|INFLATION':{tone:'caution',title:'Whipsaw zone',body:'A deflationary economy but markets risk-off on inflation — conflicting signals that usually mark a noisy transition between regimes.',posture:'Cut gross; wait for the two markers to agree before pressing a view.'},
+  'DEFLATION|DEFLATION':{tone:'bear',title:'Broad deflationary bust',body:'Both halves aligned — growth and inflation falling. A recession / credit cycle: the one regime where long-duration Treasuries and cash shine and commodities get crushed.',posture:'Defensive; lengthen duration.'}
+};
+/* ETF universe (42 Macro exposures, deck pp.58-60) + per-regime optimal sleeves.
+   A combination's book = 65% of the financial-market regime + 35% of the real-economy regime. */
+const ETFS = {
+  SPY:['S&P 500','eq'], QQQ:['Nasdaq 100','eq'], IWM:['Small Caps','eq'], XLK:['Technology','eq'],
+  XLY:['Cons. Discretionary','eq'], XLF:['Financials','eq'], XLE:['Energy','eq'], XLI:['Industrials','eq'],
+  XLB:['Materials','eq'], XLP:['Cons. Staples','eq'], XLV:['Health Care','eq'], XLU:['Utilities','eq'],
+  SPHB:['High Beta','eq'], SPLV:['Low Volatility','eq'], IWD:['Value','eq'], EEM:['Emerging Mkts','eq'],
+  TLT:['20+yr Treasurys','bond'], IEF:['7-10yr Treasurys','bond'], LQD:['IG Corp Bonds','bond'],
+  HYG:['High Yield','bond'], BIL:['T-Bills / Cash','bond'], UUP:['US Dollar','bond'],
+  TIP:['TIPS','real'], DBB:['Base Metals','real'], DBC:['Broad Commodities','real'], DBA:['Agriculture','real'],
+  GLD:['Gold','gold'], FBTC:['Bitcoin','crypto']
+};
+const CLS_COLOR = { eq:'#2563eb', real:'#b45309', gold:'#d4a017', bond:'#334155', crypto:'#ea580c' };
+const ALLOC = {
+  GOLDILOCKS:{QQQ:16,XLK:12,SPY:12,XLY:10,IWM:10,EEM:6,SPHB:5,IEF:8,TLT:5,HYG:6,GLD:5,FBTC:5},
+  REFLATION: {SPY:10,XLF:10,XLI:10,XLB:8,XLE:8,XLY:8,IWM:8,EEM:8,DBB:8,DBC:6,GLD:8,FBTC:4,HYG:4},
+  INFLATION: {XLP:12,XLV:12,XLU:8,XLE:12,DBA:8,DBC:6,GLD:10,TIP:8,UUP:8,IWD:8,BIL:8},
+  DEFLATION: {TLT:18,IEF:12,BIL:12,XLP:10,XLV:10,XLU:8,SPLV:8,LQD:8,UUP:8,GLD:6}
+};
+const W_MKT = 0.65, W_REAL = 0.35;
+function comboAllocation(real, mkt){
+  const blend = {};
+  const add = (al, w) => { for (const k in al) blend[k] = (blend[k]||0) + al[k]*w; };
+  add(ALLOC[mkt], W_MKT); add(ALLOC[real], W_REAL);
+  let rows = Object.keys(blend).map(k => ({tk:k, w:blend[k]})).sort((a,b)=>b.w-a.w).slice(0, 9);
+  const tot = rows.reduce((s,r)=>s+r.w,0) || 1;
+  rows.forEach(r => r.w = Math.round(r.w/tot*100));
+  const drift = 100 - rows.reduce((s,r)=>s+r.w,0);
+  if (drift && rows.length) rows[0].w += drift;
+  return rows;
+}
+
+function renderCombo(real, mkt){
+  const c = COMBO[real + '|' + mkt];
+  if (!c) return;
+  const col = TONE[c.tone];
+  document.getElementById('comboPills').innerHTML =
+    '<span class="combo-pill real">Real Economy · ' + real + '</span>' +
+    '<span class="combo-x">×</span>' +
+    '<span class="combo-pill fin">Financial Market · ' + mkt + '</span>';
+  document.getElementById('comboCard').style.borderLeftColor = col;
+  const t = document.getElementById('comboTitle');
+  t.textContent = c.title; t.style.color = col;
+  document.getElementById('comboBody').textContent = c.body;
+  document.getElementById('comboPosture').innerHTML = '<b>Posture:</b> ' + c.posture;
+
+  const rows = comboAllocation(real, mkt);
+  const maxW = rows[0] ? rows[0].w : 1;
+  document.getElementById('comboAlloc').innerHTML = rows.map(r => {
+    const m = ETFS[r.tk] || [r.tk, 'eq'];
+    return '<div class="alloc-row"><div class="lhs"><span class="tk">' + r.tk + '</span>'
+      + '<span class="nm">' + m[0] + '</span></div>'
+      + '<span class="alloc-bar"><span style="width:' + Math.round(r.w/maxW*100) + '%;background:' + CLS_COLOR[m[1]] + '"></span></span>'
+      + '<span class="pct mono">' + r.w + '%</span></div>';
+  }).join('');
+}
+
+/* ── load ── */
+fetch('regime_data.json', {cache:'no-store'})
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(applyData)
+  .catch(() => applyData(FALLBACK));
+</script>
+</body>
+</html>
