@@ -27,6 +27,7 @@ import requests
 import json
 import math
 import os
+import random
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -50,17 +51,57 @@ MIN_MOVES = {"spx": 20000, "gold": 11000, "ust10y": 13000, "dxy": 11000, "btc": 
 # ── FETCHERS ───────────────────────────────────────────────────────────────────
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
+# Yahoo rate-limits shared/datacenter IPs (e.g. GitHub Actions runners) with
+# HTTP 429, and occasionally gates the chart API behind a cookie with 401. A
+# single request is therefore unreliable from CI even when the data is fine, so
+# we reuse a session and retry across both Yahoo hosts with exponential backoff.
+SESSION = requests.Session()
+SESSION.headers.update(HEADERS)
+YAHOO_HOSTS = ("query1.finance.yahoo.com", "query2.finance.yahoo.com")
+YAHOO_RETRIES = 5
+
+
+def _warm_yahoo_cookies():
+    """Best-effort: grab Yahoo session cookies so the chart API is less likely
+    to answer 401 from a shared IP. Never fatal."""
+    try:
+        SESSION.get("https://finance.yahoo.com", timeout=30)
+    except requests.RequestException:
+        pass
+
+
+def _yahoo_chart(symbol):
+    """Fetch the chart JSON for one symbol, retrying across both Yahoo hosts
+    with exponential backoff. Raises only after every attempt is exhausted."""
+    path = f"/v8/finance/chart/{symbol}"
+    params = {"interval": "1d",
+              "period1": "-2208988800",                  # 1900-01-01
+              "period2": str(int(time.time()) + 86400)}
+    last_err = None
+    for attempt in range(YAHOO_RETRIES):
+        host = YAHOO_HOSTS[attempt % len(YAHOO_HOSTS)]
+        try:
+            r = SESSION.get(f"https://{host}{path}", params=params, timeout=120)
+            if r.status_code == 200:
+                return r.json()
+            last_err = f"HTTP {r.status_code}"
+            if r.status_code in (401, 403):       # cookie-gated → warm and retry
+                _warm_yahoo_cookies()
+        except requests.RequestException as e:
+            last_err = f"{type(e).__name__}: {e}"
+        if attempt < YAHOO_RETRIES - 1:
+            backoff = 2 ** attempt + random.uniform(0, 1)
+            print(f"  Yahoo {symbol}: attempt {attempt + 1}/{YAHOO_RETRIES} "
+                  f"failed ({last_err}); retrying in {backoff:.1f}s")
+            time.sleep(backoff)
+    raise RuntimeError(f"Yahoo fetch for {symbol} failed after "
+                       f"{YAHOO_RETRIES} attempts (last error: {last_err})")
+
 
 def fetch_yahoo(symbol):
     """Full daily history -> [(date_str, close)]. Uses epoch arithmetic for
     dates because Windows fromtimestamp() rejects pre-1970 timestamps."""
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-    params = {"interval": "1d",
-              "period1": "-2208988800",                  # 1900-01-01
-              "period2": str(int(time.time()) + 86400)}
-    r = requests.get(url, params=params, headers=HEADERS, timeout=120)
-    r.raise_for_status()
-    result = r.json()["chart"]["result"][0]
+    result = _yahoo_chart(symbol)["chart"]["result"][0]
     stamps = result["timestamp"]
     closes = result["indicators"]["quote"][0]["close"]
     out, seen = [], set()
