@@ -238,7 +238,8 @@
         <div class="data-row"><span class="sid">BITCOIN</span><span>Daily closes since Sep 2014 (Yahoo BTC-USD) &mdash; percent change</span></div>
         <p style="margin-top:12px;font-size:10px;color:#888;">
           Moves are computed between consecutive available closes (gaps over 7 calendar days are skipped).
-          Data is baked into this page by <span style="color:#C9971C;">fetch_daily_move.py</span>, refreshed daily
+          The latest move is fetched live from Yahoo Finance each time you open this page; the historical
+          distribution is baked by <span style="color:#C9971C;">fetch_daily_move.py</span>, refreshed daily
           at 22:30 UTC by GitHub Actions.
         </p>
       </div>
@@ -300,12 +301,9 @@
     // @@BAKED_DATA_END@@
 
     /* ─── BOARD RENDER ───────────────────────────────────────────────────── */
-    function buildBoard(a, wide) {
-      const cls  = a.cur.v > 0 ? 't-up' : (a.cur.v < 0 ? 't-down' : 't-flat');
-      const card = document.createElement('div');
-      card.className = 'board' + (wide ? ' wide' : '');
-      card.innerHTML =
-        (wide ? '<div class="watermark">' + WATERMARK_SVG + '</div>' : '') +
+    function boardInner(a, wide) {
+      const cls = a.cur.v > 0 ? 't-up' : (a.cur.v < 0 ? 't-down' : 't-flat');
+      return (wide ? '<div class="watermark">' + WATERMARK_SVG + '</div>' : '') +
         '<div class="board-head">' +
           '<div><div class="board-name">' + a.name + '</div>' +
           '<div class="board-sub">' + a.subLabel.toUpperCase() + ' &middot; SINCE ' + a.start.slice(0, 4) + '</div></div>' +
@@ -320,7 +318,21 @@
           fmtMove(a, a.recMin.v) + ' (' + a.recMin.d + ') / ' + fmtMove(a, a.recMax.v) + ' (' + a.recMax.d + ')' +
           (a.below + a.above > 0 ? ' &middot; ' + (a.below + a.above) + ' day(s) beyond chart range' : '') +
         '</div>';
+    }
+
+    function buildBoard(a, wide) {
+      const card = document.createElement('div');
+      card.className = 'board' + (wide ? ' wide' : '');
+      card.id = 'board-' + a.id;
+      card.innerHTML = boardInner(a, wide);
       $('boards').appendChild(card);
+    }
+
+    function updateBoard(a, wide) {
+      const card = $('board-' + a.id);
+      if (!card) return;
+      card.innerHTML = boardInner(a, wide);
+      plotBoard(a);
     }
 
     function plotBoard(a) {
@@ -392,6 +404,124 @@
       }, { responsive: true, displayModeBar: false });
     }
 
+    /* ─── LIVE REFRESH ───────────────────────────────────────────────────── */
+    // The historical distribution is baked daily by fetch_daily_move.py. On
+    // open we also pull the latest close from Yahoo (via CORS proxies, since
+    // Yahoo blocks direct cross-origin calls) so the gold "TODAY" line reflects
+    // the freshest move. z stays exact (mean/sd are baked); the percentile and
+    // 1-in odds are read off the baked histogram.
+    const LIVE = {
+      spx:    { symbol: '^GSPC',    kind: 'pct', maxAbs: 30 },
+      gold:   { symbol: 'GC=F',     kind: 'pct', maxAbs: 30 },   // futures lead the LBMA fix
+      ust10y: { symbol: '^TNX',     kind: 'bp',  maxAbs: 150, tnx: true },
+      dxy:    { symbol: 'DX-Y.NYB', kind: 'pct', maxAbs: 30 },
+      btc:    { symbol: 'BTC-USD',  kind: 'pct', maxAbs: 60 },
+    };
+
+    const YAHOO_PROXIES = [
+      u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+      u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+      u => u,
+    ];
+
+    async function fetchYahooChart(symbol) {
+      const p2 = Math.floor(Date.now() / 1000) + 86400;
+      const p1 = p2 - 30 * 86400;                          // 30 days → ≥2 closes
+      const base = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
+        encodeURIComponent(symbol) + '?period1=' + p1 + '&period2=' + p2 + '&interval=1d';
+      for (const wrap of YAHOO_PROXIES) {
+        try {
+          const resp = await fetch(wrap(base), { cache: 'no-store' });
+          if (!resp.ok) continue;
+          const json = await resp.json();
+          const r = json && json.chart && json.chart.result && json.chart.result[0];
+          if (r && r.timestamp && r.indicators && r.indicators.quote) return r;
+        } catch (e) { /* try next proxy */ }
+      }
+      return null;
+    }
+
+    const pad2 = n => String(n).padStart(2, '0');
+    const utcDate = ts => { const d = new Date(ts * 1000);
+      return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate()); };
+
+    // Most recent daily move from a Yahoo chart result, mirroring fetch_daily_move.py:
+    // consecutive UTC-dated closes, long gaps skipped, ^TNX un-10×'d.
+    function latestMove(result, kind, tnx) {
+      const ts = result.timestamp || [];
+      const q = (result.indicators.quote[0] || {}).close || [];
+      const series = [], seen = new Set();
+      for (let i = 0; i < ts.length; i++) {
+        const c = q[i];
+        if (c == null || c <= 0) continue;
+        const ds = utcDate(ts[i]);
+        if (seen.has(ds)) continue;
+        seen.add(ds);
+        series.push([ds, c]);
+      }
+      series.sort((x, y) => x[0] < y[0] ? -1 : 1);
+      if (series.length < 2) return null;
+      let [d0, v0] = series[series.length - 2];
+      let [d1, v1] = series[series.length - 1];
+      if (tnx && v1 > 20) { v0 /= 10; v1 /= 10; }          // ^TNX sometimes quoted at 10×
+      if ((Date.parse(d1) - Date.parse(d0)) / 86400000 > 7) return null;  // skip long gaps
+      const v = kind === 'bp' ? (v1 - v0) * 100 : (v1 / v0 - 1) * 100;
+      return { d: d1, v: v };
+    }
+
+    // Cumulative count of moves below x, read off the baked histogram.
+    function cumBelow(a, x) {
+      const nb = a.counts.length, hi = a.binLo + nb * a.binW;
+      if (x <= a.binLo) return a.below * 0.5;              // deep negative tail (unresolved)
+      if (x >= hi)      return a.n - a.above * 0.5;         // deep positive tail (unresolved)
+      let c = a.below;
+      const idx = Math.floor((x - a.binLo) / a.binW);
+      for (let i = 0; i < idx; i++) c += a.counts[i];
+      c += a.counts[idx] * ((x - (a.binLo + idx * a.binW)) / a.binW);  // partial bin
+      return c;
+    }
+
+    function deriveStats(a, x) {
+      const z = (x - a.mean) / a.sd;
+      const pctile = 100 * cumBelow(a, x) / a.n;
+      const ac = Math.abs(x);
+      const nBigger = (a.n - cumBelow(a, ac)) + cumBelow(a, -ac);
+      const oneIn = nBigger > 0 ? Math.round((a.n / nBigger) * 10) / 10 : null;
+      return { z: Math.round(z * 100) / 100, pctile: Math.round(pctile * 10) / 10, oneIn: oneIn };
+    }
+
+    // 'updated' = fresher move pulled · 'current' = fetch ok, baked already current · 'failed'
+    async function refreshAsset(a, wide) {
+      const cfg = LIVE[a.id];
+      if (!cfg) return 'failed';
+      const result = await fetchYahooChart(cfg.symbol);
+      if (!result) return 'failed';
+      const mv = latestMove(result, cfg.kind, cfg.tnx);
+      if (!mv || Math.abs(mv.v) > cfg.maxAbs) return 'failed';   // missing / bad tick
+      if (mv.d <= a.cur.d) return 'current';                     // baked is already current
+      const rd = a.unit === 'bp' ? 1 : 2, p = Math.pow(10, rd);
+      a.cur = { v: Math.round(mv.v * p) / p, d: mv.d };
+      const s = deriveStats(a, mv.v);
+      a.z = s.z; a.pctile = s.pctile; a.oneIn = s.oneIn;
+      updateBoard(a, wide);
+      return 'updated';
+    }
+
+    async function refreshLive() {
+      const res = await Promise.allSettled(DMHD_ASSETS.map((a, i) => refreshAsset(a, i === 0)));
+      const out = res.map(r => r.status === 'fulfilled' ? r.value : 'failed');
+      const updated = out.filter(s => s === 'updated').length;
+      const live    = out.filter(s => s !== 'failed').length;   // fetch succeeded
+      const latest  = DMHD_ASSETS.map(a => a.cur.d).sort().pop();
+      if (live === 0) {
+        setStatus('Showing baked data through ' + latest + ' · live unavailable · baked ' + DMHD_BAKED_ON, '');
+      } else if (updated > 0) {
+        setStatus('Live · data through ' + latest, '');
+      } else {
+        setStatus('Live · up to date through ' + latest, '');
+      }
+    }
+
     /* ─── MAIN ───────────────────────────────────────────────────────────── */
     function main() {
       if (!DMHD_ASSETS) throw new Error('No baked data — run fetch_daily_move.py');
@@ -400,7 +530,8 @@
       DMHD_ASSETS.forEach(a => plotBoard(a));
 
       const latest = DMHD_ASSETS.map(a => a.cur.d).sort().pop();
-      setStatus('Data through ' + latest + ' · baked ' + DMHD_BAKED_ON, '');
+      setStatus('Baked through ' + latest + ' · fetching live…', 'loading');
+      refreshLive();
     }
 
     try { main(); }
