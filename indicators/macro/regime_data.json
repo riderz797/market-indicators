@@ -1,31 +1,31 @@
 {
   "as_of": "2026-05-01",
-  "updated_utc": "2026-06-22T14:47:31Z",
+  "updated_utc": "2026-06-29T13:11:39Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -1.11
+    "score": -1.05
   },
   "inflation": {
     "dir": "Rising",
     "score": 2.8
   },
   "market_regime": "REFLATION",
-  "market_regime_raw": "REFLATION",
+  "market_regime_raw": "GOLDILOCKS",
   "shares": {
-    "GOLDILOCKS": 33,
-    "REFLATION": 37,
-    "INFLATION": 18,
-    "DEFLATION": 12
+    "GOLDILOCKS": 37,
+    "REFLATION": 27,
+    "INFLATION": 15,
+    "DEFLATION": 21
   },
   "signal_strength": 37,
-  "risk_on_prob": 70,
+  "risk_on_prob": 64,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
-    "pending_regime": null,
-    "pending_weeks": 0,
+    "pending_regime": "GOLDILOCKS",
+    "pending_weeks": 1,
     "confirmed_since": "2026-06-16"
   },
   "components": {
@@ -36,9 +36,9 @@
         "score": -2.97
       },
       "Real Income ex-Transfers": {
-        "yoy": -1.04,
-        "accel6m": -1.92,
-        "score": -2.92
+        "yoy": -0.43,
+        "accel6m": -1.01,
+        "score": -2.27
       },
       "Industrial Production": {
         "yoy": 1.67,
@@ -46,9 +46,9 @@
         "score": 0.41
       },
       "Real Mfg & Trade Sales": {
-        "yoy": 1.56,
-        "accel6m": 0.17,
-        "score": -0.04
+        "yoy": 1.28,
+        "accel6m": -0.57,
+        "score": -0.39
       },
       "Real Retail Sales": {
         "yoy": 1.38,
@@ -58,8 +58,8 @@
     },
     "inflation": {
       "Core PCE": {
-        "yoy": 3.29,
-        "accel6m": 0.53,
+        "yoy": 3.41,
+        "accel6m": 0.58,
         "score": 3.0
       },
       "Core CPI": {
@@ -151,18 +151,18 @@
       },
       {
         "name": "Long Bonds",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
         "name": "7-10y Treasurys",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
@@ -190,10 +190,10 @@
       },
       {
         "name": "Cyclicals / Defensives",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
