@@ -206,8 +206,8 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
       <div id="ageWarn" class="warn hide"></div>
     </div>
     <div class="card">
-      <h2>Data <span class="tip" tabindex="0" data-tip="Loads daily price history from GitHub (no key needed), resamples to quarter-end closes, and computes each bucket's quarterly mean, volatility, and the cross-bucket correlations. Replaces the zeros below. Tactical has no data file — enter it manually.">?</span></h2>
-      <p class="note" style="margin-top:0">Load market history to fill &mu; / &sigma; and correlations automatically, or type your own assumptions in the table.</p>
+      <h2>Data <span class="tip" tabindex="0" data-tip="Loads daily price history from GitHub (no key needed), resamples to quarter-end closes, and computes each bucket's quarterly average return, volatility, and the cross-bucket correlations. Tactical has no data file — paste its history in Advanced.">?</span></h2>
+      <p class="note" style="margin-top:0">Load market history to fill each bucket's average return, volatility, and correlations. Buckets without a data file (like Tactical) take pasted or uploaded history in Advanced.</p>
       <div class="toolbar">
         <button class="action" id="btnLoad">Load market data</button>
         <span class="chip" id="loadSummary">no data loaded</span>
@@ -217,11 +217,11 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
   </div>
 
   <div class="card">
-    <h2>Portfolio buckets <span class="tip" tabindex="0" data-tip="Target weight is your intended allocation (must sum to 100). Mu and sigma are the average and standard deviation of quarterly % returns — loaded from data or entered as your own assumptions. 0 means unset.">?</span></h2>
+    <h2>Portfolio buckets <span class="tip" tabindex="0" data-tip="Target weight is your intended allocation (must sum to 100). Average return and volatility are quarterly, computed only from loaded or pasted price history — they cannot be typed in.">?</span></h2>
     <div style="overflow-x:auto">
       <table id="bucketTable">
         <thead><tr>
-          <th>Bucket</th><th>Target %</th><th><span class="gk">&mu;</span> qtr %</th><th><span class="gk">&sigma;</span> qtr %</th>
+          <th>Bucket</th><th>Target %</th><th>Avg qtr return</th><th>Qtr volatility</th>
           <th id="thActual" class="hide">Actual %</th><th>Data</th><th></th>
         </tr></thead>
         <tbody id="bucketRows"></tbody>
@@ -290,7 +290,7 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Bucket</th><th>Weight %</th><th><span class="gk">&mu;</span> qtr %</th><th><span class="gk">&sigma;</span> qtr %</th>
+          <th>Bucket</th><th>Weight %</th><th>Avg qtr return</th><th>Qtr volatility</th>
           <th>Bucket CPL</th><th>Rebalance band</th><th id="thBandStatus" class="hide">Status</th>
         </tr></thead>
         <tbody id="detailRows"></tbody>
@@ -325,7 +325,7 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
     <h2>Centering <span class="tip" tabindex="0" data-tip="How centered the portfolio mean sits inside the band. k = 0 is perfectly centered. Cp is band width over process width; Cpk penalizes off-center. Reference only — CPL governs the verdict.">?</span></h2>
     <div class="gauge-track" id="gaugeTrack">
       <div class="gauge-mark center" id="gaugeCenter" style="left:50%"><span class="flag">center</span></div>
-      <div class="gauge-mark" id="gaugeMu" style="left:50%"><span class="flag">&mu;</span></div>
+      <div class="gauge-mark" id="gaugeMu" style="left:50%"><span class="flag">avg</span></div>
     </div>
     <div class="gauge-ends"><span id="gaugeL">LSL</span><span id="gaugeU">USL</span></div>
     <div class="bt-stats" style="margin-top:16px">
@@ -341,7 +341,7 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
     <div class="adv-body">
 
       <div class="adv-section">
-        <h3>Data source &mdash; GitHub <span class="tip" tabindex="0" data-tip="Files are fetched with the public GitHub contents API (60 requests/hour per IP, one per bucket, no token). Expected CSV: a header row, then one row per day with an ISO date column and a price column. The tool resamples to quarter-end closes. {bucket} in the path becomes the bucket name, lowercased with spaces removed.">?</span></h3>
+        <h3>Data source &mdash; GitHub <span class="tip" tabindex="0" data-tip="Files are fetched with the public GitHub contents API (60 requests/hour per IP, no token), falling back automatically to the raw file mirror if the API is rate-limited or blocked. Expected CSV: a header row, then one row per day with an ISO date column and a price column. The tool resamples to quarter-end closes. {bucket} in the path becomes the bucket name, lowercased with spaces removed.">?</span></h3>
         <div class="inputs-row">
           <div class="field"><label>Owner</label><input type="text" id="ghOwner" value="riderz797"></div>
           <div class="field"><label>Repo</label><input type="text" id="ghRepo" value="market-indicators"></div>
@@ -554,21 +554,37 @@ function applySeries(bucket, rows, sourceLabel) {
 async function ghFetchFile(path) {
   const o = el('ghOwner').value.trim(), r = el('ghRepo').value.trim(), br = el('ghBranch').value.trim() || 'main';
   if (!o || !r) throw new Error('owner/repo not set');
-  const url = `https://api.github.com/repos/${o}/${r}/contents/${path}?ref=${encodeURIComponent(br)}`;
-  let resp;
-  try { resp = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } }); }
-  catch (e) { throw new Error('network error — offline?'); }
-  if (resp.status === 404) throw new Error(`404 — ${path} not found`);
-  if (resp.status === 403 || resp.status === 429) {
-    const rem = resp.headers.get('x-ratelimit-remaining');
-    throw new Error(rem === '0'
-      ? 'GitHub rate limit hit (60/hr per IP) — wait an hour or paste the CSV in Advanced'
-      : `HTTP ${resp.status} — access denied`);
+  // primary: contents API
+  let apiErr;
+  try {
+    const url = `https://api.github.com/repos/${o}/${r}/contents/${path}?ref=${encodeURIComponent(br)}`;
+    const resp = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
+    if (resp.ok) {
+      const j = await resp.json();
+      if (!j.content) throw new Error('file too large for the contents API (1 MB cap)');
+      return atob(j.content.replace(/\n/g, ''));
+    }
+    if (resp.status === 404) apiErr = new Error(`404 — ${path} not found`);
+    else if (resp.status === 403 || resp.status === 429) {
+      const rem = resp.headers.get('x-ratelimit-remaining');
+      apiErr = new Error(rem === '0'
+        ? 'GitHub API rate limit hit (60/hr per IP)'
+        : `HTTP ${resp.status} — access denied`);
+    } else apiErr = new Error(`HTTP ${resp.status}`);
+  } catch (e) {
+    apiErr = (e instanceof TypeError)
+      ? new Error('API request blocked (rate limit, privacy blocker, or offline)') : e;
   }
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const j = await resp.json();
-  if (!j.content) throw new Error('file too large for the contents API (1 MB cap)');
-  return atob(j.content.replace(/\n/g, ''));
+  // fallback: raw file mirror — same repo, no API rate limit
+  try {
+    const resp = await fetch(`https://raw.githubusercontent.com/${o}/${r}/${encodeURIComponent(br)}/${path}`);
+    if (resp.ok) return await resp.text();
+    if (resp.status === 404) throw new Error(`404 — ${path} not found`);
+    throw apiErr;
+  } catch (e) {
+    if (e && e.message && e.message.indexOf('404') === 0) throw e;
+    throw apiErr || e;
+  }
 }
 async function loadAllData() {
   if (state.loading) return;
@@ -847,10 +863,10 @@ function renderBucketInputs() {
     tr.innerHTML = `
       <td class="bucket-name"><span class="swatch" style="background:${bucketColor(b, idx)}"></span><input type="text" data-f="name" data-id="${b.id}" value="${esc(b.name)}" style="width:110px;display:inline-block"></td>
       <td><input type="number" data-f="target" data-id="${b.id}" value="${b.target}" step="5" min="0" max="100" style="width:72px"></td>
-      <td><input type="number" data-f="mu" data-id="${b.id}" value="${b.mu}" step="0.1" style="width:72px"></td>
-      <td><input type="number" data-f="sigma" data-id="${b.id}" value="${b.sigma}" step="0.1" min="0" style="width:72px"></td>
+      <td class="num">${b.qKeys ? fmtPct(b.mu) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td class="num">${b.qKeys ? b.sigma.toFixed(2) + '%' : '<span style="color:var(--muted)">—</span>'}</td>
       <td class="actual-cell ${state.view === 'actual' ? '' : 'hide'}"><input type="number" data-f="actual" data-id="${b.id}" value="${b.actual}" step="1" min="0" max="100" style="width:72px"></td>
-      <td style="font-size:11.5px; color:${b.qKeys ? 'var(--pass)' : 'var(--muted)'}; max-width:170px">${b.qKeys ? b.dataInfo : 'manual'}</td>
+      <td style="font-size:11.5px; color:${b.qKeys ? 'var(--pass)' : 'var(--muted)'}; max-width:170px">${b.qKeys ? b.dataInfo : 'no data'}</td>
       <td><button class="rm-btn" data-rm="${b.id}" title="Remove bucket">&times;</button></td>`;
     tb.appendChild(tr);
   });
@@ -963,7 +979,7 @@ function renderAll() {
   const unsetWeighted = state.buckets.filter(b => b.sigma <= 0 && b.target > 0);
   let bw = [];
   if (sumBad && m.sumAll > 0) bw.push('Target weights must sum to 100% — currently ' + m.sumAll.toFixed(0) + '%.');
-  if (unsetWeighted.length) bw.push('No μ/σ for: ' + unsetWeighted.map(b => esc(b.name)).join(', ') + ' — load data or enter assumptions; these buckets are excluded from the screen.');
+  if (unsetWeighted.length) bw.push('No return history for: ' + unsetWeighted.map(b => esc(b.name)).join(', ') + ' — load or paste data; these buckets are excluded from the screen.');
   el('bucketWarn').classList.toggle('hide', !bw.length);
   el('bucketWarn').innerHTML = bw.join('<br>');
   const age = readNum('inAge'), ret = readNum('inRet');
@@ -981,9 +997,9 @@ function renderAll() {
   el('bandUSL').innerHTML = m.USL != null ? fmtPct(m.USL, 1) : '&mdash;';
   el('bandYears').textContent = m.Y != null ? m.Y : '—';
   el('bandG').textContent = m.g != null
-    ? `band = ${(m.g * 100).toFixed(0)}% of max width (γD ${m.gammaD.toFixed(2)}, φ ${m.phi.toFixed(2)})` : 'band width —';
+    ? `band = ${(m.g * 100).toFixed(0)}% of max width (demand factor ${m.gammaD.toFixed(2)}, capacity ${m.phi.toFixed(2)})` : 'band width —';
   el('factorNote').textContent = m.gammaD != null
-    ? `Demand factor γD = ${m.gammaD.toFixed(2)} (BTC+Tactical share), capacity factor φ = ${m.phi.toFixed(2)} → effective max loss ${m.LmaxEff.toFixed(1)}% before the glidepath.` : '';
+    ? `Demand factor ${m.gammaD.toFixed(2)} (grows with the Bitcoin + Tactical share), capacity factor ${m.phi.toFixed(2)} → effective max loss ${m.LmaxEff.toFixed(1)}% before the glidepath.` : '';
 
   // verdict
   const stamp = el('verdictStamp');
@@ -995,15 +1011,15 @@ function renderAll() {
     el('vShort').textContent = fmtProb(m.shortfall);
     el('vCVaR').textContent = fmtPct(m.cvar, 1);
     el('verdictNote').textContent = m.pass
-      ? `Portfolio μ ${fmtPct(m.muP)} / σ ${m.sigmaP.toFixed(2)}% per quarter clears the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor.`
-      : `Portfolio μ ${fmtPct(m.muP)} / σ ${m.sigmaP.toFixed(2)}% per quarter does not clear the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor — see the suggested adjustment below.`;
+      ? `Portfolio average ${fmtPct(m.muP)} / volatility ${m.sigmaP.toFixed(2)}% per quarter clears the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor.`
+      : `Portfolio average ${fmtPct(m.muP)} / volatility ${m.sigmaP.toFixed(2)}% per quarter does not clear the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor — see the suggested adjustment below.`;
   } else {
     stamp.textContent = '—';
     stamp.className = 'stamp na';
     el('vCPL').textContent = '—'; el('vCPL').style.color = '';
     el('vShort').textContent = '—'; el('vCVaR').textContent = '—';
     el('verdictNote').textContent = !m.agesOk ? 'Waiting on ages.' :
-      sumBad ? 'Waiting on weights summing to 100%.' : 'Waiting on bucket μ/σ (load data or enter assumptions).';
+      sumBad ? 'Waiting on weights summing to 100%.' : 'Waiting on bucket return history (load or paste data).';
   }
 
   renderDonut(m);
@@ -1024,7 +1040,7 @@ function renderAll() {
             <td class="num" style="font-weight:600">${best.w[i].toFixed(0)}%</td>
             <td class="num" style="color:${best.w[i] === b.target ? 'var(--muted)' : 'var(--header)'}">${fmtPct(best.w[i] - b.target, 0)}</td></tr>`).join('')}
           </tbody></table></div>
-        <p class="note">Resulting CPL ${best.cpl.toFixed(2)} (μ ${fmtPct(best.mu)}, σ ${best.sigma.toFixed(2)}%), total drift ${best.drift.toFixed(0)} points on a 5-point grid. A suggestion — apply it yourself if it makes sense.</p>`;
+        <p class="note">Resulting CPL ${best.cpl.toFixed(2)} (average ${fmtPct(best.mu)}, volatility ${best.sigma.toFixed(2)}%), total drift ${best.drift.toFixed(0)} points on a 5-point grid. A suggestion — apply it yourself if it makes sense.</p>`;
     } else {
       el('fixerBody').innerHTML = '<p class="note">No allocation on the 5-point grid passes the floor within your per-bucket limits — the band may be too tight for these assumptions (check Advanced limits, or the loss floor).</p>';
     }
@@ -1037,7 +1053,7 @@ function renderAll() {
     banner.className = 'bt-banner sim';
     banner.textContent = 'Waiting on inputs';
     el('btStats').innerHTML = '';
-    el('btNote').textContent = 'The backtest needs ages, weights summing to 100%, and μ/σ (or loaded data) to run.';
+    el('btNote').textContent = 'The backtest needs ages, weights summing to 100%, and loaded return history to run.';
   } else {
     banner.className = 'bt-banner ' + (bt.sim ? 'sim' : 'hist');
     banner.textContent = bt.sim ? 'Monte Carlo of assumptions — not historical' : 'Historical backtest';
@@ -1091,9 +1107,6 @@ document.addEventListener('input', e => {
     } else {
       const v = parseFloat(t.value);
       b[t.dataset.f] = isFinite(v) ? v : 0;
-      if ((t.dataset.f === 'mu' || t.dataset.f === 'sigma') && b.muFromData) {
-        b.muFromData = false; // user override of loaded stats
-      }
     }
     recompute();
     return;
