@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capability Portfolio — Acumen</title>
+<style>
+:root {
+  --bg: #F5F0E8;
+  --card: #FFFFFF;
+  --accent: #F0A030;
+  --header: #B8860B;
+  --body: #333333;
+  --muted: #999999;
+  --border: #E0D8CC;
+  --pass: #3E7A4E;
+  --fail: #C0392B;
+  --shadow: 0 4px 24px rgba(184, 134, 11, 0.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg);
+  color: var(--body);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body { padding: 24px 16px 64px; }
+.container { max-width: 1080px; margin: 0 auto; }
+h1, h2, h3 { font-family: Fraunces, Georgia, serif; color: var(--header); font-weight: 600; }
+h1 { font-size: 30px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin-bottom: 14px; }
+.subtitle { color: var(--muted); font-size: 13.5px; margin-top: 5px; line-height: 1.5; }
+.back { font-size: 12.5px; color: var(--muted); text-decoration: none; display: inline-block; margin-bottom: 14px; }
+.back:hover { color: var(--header); }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+  margin-top: 18px;
+}
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+
+/* inputs */
+label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+input[type=number], input[type=text], select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--body);
+  background: #FAFAF7;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px 10px;
+  width: 100%;
+}
+input[type=number] { text-align: right; font-variant-numeric: tabular-nums; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+.field { margin-bottom: 12px; }
+.inputs-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th .gk { text-transform: none; font-style: italic; font-size: 12px; }
+th:first-child, td:first-child { text-align: left; }
+td { padding: 7px 8px; border-bottom: 1px solid #F0EBE1; text-align: right; font-variant-numeric: tabular-nums; }
+td input[type=number], td input[type=text] { padding: 5px 7px; font-size: 13.5px; }
+td .num { font-family: ui-monospace, Consolas, monospace; }
+tr:last-child td { border-bottom: none; }
+.bucket-name input { min-width: 90px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: baseline; }
+.rm-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 2px 6px; }
+.rm-btn:hover { color: var(--fail); }
+
+button.action {
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  background: var(--accent); color: #fff; border: none; border-radius: 2px;
+  padding: 9px 16px; cursor: pointer;
+}
+button.action:hover { filter: brightness(1.05); }
+button.action:disabled { background: var(--border); cursor: default; }
+button.ghost {
+  font-family: inherit; font-size: 12.5px; background: none;
+  border: 1px solid var(--border); border-radius: 2px; color: var(--body);
+  padding: 7px 13px; cursor: pointer;
+}
+button.ghost:hover { border-color: var(--accent); color: var(--header); }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+
+/* chips & warnings */
+.chip { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.chip.bad { color: var(--fail); border-color: var(--fail); }
+.chip.ok { color: var(--pass); border-color: #BFD8C6; }
+.warn { font-size: 12.5px; color: var(--fail); margin-top: 8px; line-height: 1.5; }
+.note { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+/* tooltips */
+.tip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--muted); font-size: 10px; font-weight: 600;
+  cursor: help; position: relative; margin-left: 5px; vertical-align: 1px;
+  text-transform: none; letter-spacing: 0;
+}
+.tip::after {
+  content: attr(data-tip);
+  position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+  background: #3A342A; color: #F5F0E8;
+  font-size: 11.5px; font-weight: 400; line-height: 1.45; letter-spacing: 0;
+  text-transform: none; text-align: left;
+  padding: 9px 11px; border-radius: 3px; width: 240px;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 20;
+  white-space: normal;
+}
+.tip:hover::after, .tip:focus::after { opacity: 1; }
+
+/* header band */
+.band { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; text-align: center; }
+@media (max-width: 640px) { .band { grid-template-columns: 1fr; } }
+.band .cell { padding: 10px 6px; }
+.band .big { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.band .lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.band .lsl { color: var(--fail); }
+.band .usl { color: var(--pass); }
+
+/* verdict */
+.verdict { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+.verdict .stamp {
+  font-family: Fraunces, Georgia, serif; font-size: 42px; font-weight: 700;
+  letter-spacing: 0.02em; padding: 6px 26px; border-radius: 4px; border: 2px solid;
+}
+.stamp.pass { color: var(--pass); border-color: var(--pass); background: #F2F8F3; }
+.stamp.fail { color: var(--fail); border-color: var(--fail); background: #FBF1EF; }
+.stamp.na { color: var(--muted); border-color: var(--border); background: var(--bg); font-size: 26px; }
+.verdict .stats { display: flex; gap: 30px; flex-wrap: wrap; }
+.stat .v { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+
+/* donut */
+.donut-wrap { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; }
+.donut-center-label { font-size: 26px; font-weight: 600; fill: var(--body); font-variant-numeric: tabular-nums; }
+.donut-center-sub { font-size: 11px; fill: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.legend { flex: 1; min-width: 210px; }
+.legend .row { display: flex; align-items: center; font-size: 13.5px; padding: 5px 0; border-bottom: 1px solid #F0EBE1; }
+.legend .row:last-child { border-bottom: none; }
+.legend .name { flex: 1; margin-left: 9px; }
+.legend .val { font-variant-numeric: tabular-nums; font-weight: 500; }
+.seg-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+.seg-toggle button { font-family: inherit; font-size: 12px; padding: 6px 14px; border: none; background: none; cursor: pointer; color: var(--muted); }
+.seg-toggle button.active { background: var(--accent); color: #fff; }
+
+/* backtest */
+.bt-banner { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 2px; display: inline-block; margin-bottom: 12px; font-weight: 600; }
+.bt-banner.hist { background: #F2F8F3; color: var(--pass); border: 1px solid #BFD8C6; }
+.bt-banner.sim { background: #FBF4E8; color: var(--header); border: 1px solid var(--border); }
+.bt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-top: 14px; }
+
+/* gauge */
+.gauge-track { position: relative; height: 14px; border-radius: 7px; background: linear-gradient(90deg, #F6DBD5, #EFEAE0 30%, #EFEAE0 70%, #DDEBE0); border: 1px solid var(--border); margin: 26px 4px 8px; }
+.gauge-mark { position: absolute; top: -7px; width: 2px; height: 28px; background: var(--body); }
+.gauge-mark.center { background: var(--muted); opacity: 0.6; }
+.gauge-mark .flag { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.gauge-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 0 4px; font-variant-numeric: tabular-nums; }
+
+/* advanced */
+details.adv { margin-top: 18px; }
+details.adv > summary {
+  cursor: pointer; list-style: none; font-family: Fraunces, Georgia, serif;
+  font-size: 17px; color: var(--header); font-weight: 600;
+  background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+  padding: 14px 24px; box-shadow: var(--shadow);
+}
+details.adv > summary::after { content: " +"; color: var(--muted); }
+details.adv[open] > summary::after { content: " –"; }
+.adv-body { background: var(--card); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; padding: 20px 24px; }
+.adv-section { margin-bottom: 24px; }
+.adv-section h3 { font-size: 14.5px; margin-bottom: 10px; }
+.corr-table td input { width: 58px; padding: 4px 5px; font-size: 12px; }
+.corr-table th, .corr-table td { padding: 3px 4px; }
+.mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.status-line { font-size: 12.5px; margin-top: 4px; }
+.status-line.ok { color: var(--pass); }
+.status-line.err { color: var(--fail); }
+footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.7; }
+.hide { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="../../index.html">&larr; Back to dashboard</a>
+  <h1>Capability Portfolio</h1>
+  <p class="subtitle">Enter your portfolio and age profile. The tool sets a two-sided quarterly tolerance band from your years to retirement, screens the mix against a downside-risk floor, suggests weight fixes if it fails, and gives per-bucket rebalancing triggers.</p>
+
+  <!-- ===== Inputs ===== -->
+  <div class="grid2">
+    <div class="card">
+      <h2>Age profile <span class="tip" tabindex="0" data-tip="Years to retirement set how wide your quarterly tolerance band is: wide and flat when young, tapering as retirement approaches.">?</span></h2>
+      <div class="inputs-row">
+        <div class="field"><label for="inAge">Current age</label><input id="inAge" type="number" min="0" step="1" value="0"></div>
+        <div class="field"><label for="inRet">Retirement age</label><input id="inRet" type="number" min="0" step="1" value="0"></div>
+        <div class="field"><label for="inNW">Net worth ($)</label><input id="inNW" type="number" min="0" step="1000" value="0"></div>
+      </div>
+      <div id="ageWarn" class="warn hide"></div>
+    </div>
+    <div class="card">
+      <h2>Data <span class="tip" tabindex="0" data-tip="Loads daily price history from GitHub (no key needed), resamples to quarter-end closes, and computes each bucket's quarterly mean, volatility, and the cross-bucket correlations. Replaces the zeros below. Tactical has no data file — enter it manually.">?</span></h2>
+      <p class="note" style="margin-top:0">Load market history to fill &mu; / &sigma; and correlations automatically, or type your own assumptions in the table.</p>
+      <div class="toolbar">
+        <button class="action" id="btnLoad">Load market data</button>
+        <span class="chip" id="loadSummary">no data loaded</span>
+      </div>
+      <div id="loadStatus" class="note"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Portfolio buckets <span class="tip" tabindex="0" data-tip="Target weight is your intended allocation (must sum to 100). Mu and sigma are the average and standard deviation of quarterly % returns — loaded from data or entered as your own assumptions. 0 means unset.">?</span></h2>
+    <div style="overflow-x:auto">
+      <table id="bucketTable">
+        <thead><tr>
+          <th>Bucket</th><th>Target %</th><th><span class="gk">&mu;</span> qtr %</th><th><span class="gk">&sigma;</span> qtr %</th>
+          <th id="thActual" class="hide">Actual %</th><th>Data</th><th></th>
+        </tr></thead>
+        <tbody id="bucketRows"></tbody>
+      </table>
+    </div>
+    <div class="toolbar">
+      <button class="ghost" id="btnAddBucket">+ Add bucket</button>
+      <span class="chip" id="sumChip">sum 0%</span>
+    </div>
+    <div id="bucketWarn" class="warn hide"></div>
+  </div>
+
+  <!-- ===== 1. Header band ===== -->
+  <div class="card">
+    <div class="band">
+      <div class="cell">
+        <div class="lbl">Loss floor (LSL) <span class="tip" tabindex="0" data-tip="Worst quarterly return your plan tolerates at your horizon, after safety factors. The governing limit: the portfolio's mean must sit far enough above it.">?</span></div>
+        <div class="big lsl" id="bandLSL">&mdash;</div>
+        <div class="note">per quarter</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">Years to retirement</div>
+        <div class="big" id="bandYears" style="color:var(--header)">&mdash;</div>
+        <div class="note" id="bandG">band width &mdash;</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">Profit-taking trigger (USL) <span class="tip" tabindex="0" data-tip="A realized quarter above this suggests harvesting gains back toward target — the band is symmetric in width, but the upper edge is an opportunity, not a danger.">?</span></div>
+        <div class="big usl" id="bandUSL">&mdash;</div>
+        <div class="note">per quarter</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 2. Verdict ===== -->
+  <div class="card">
+    <div class="verdict">
+      <div class="stamp na" id="verdictStamp">&mdash;</div>
+      <div class="stats">
+        <div class="stat"><div class="v" id="vCPL">&mdash;</div><div class="k">CPL <span class="tip" tabindex="0" data-tip="Lower capability index: (portfolio mean − loss floor) / (3 × portfolio volatility). Passes at or above the floor you set (default 1.00). Normal-distribution screen.">?</span></div></div>
+        <div class="stat"><div class="v" id="vShort">&mdash;</div><div class="k">Shortfall prob <span class="tip" tabindex="0" data-tip="Chance a quarter lands below the loss floor, assuming normal returns. CPL 1.00 → 0.135%, 1.33 → 0.0032%, 1.50 → 0.0003%.">?</span></div></div>
+        <div class="stat"><div class="v" id="vCVaR">&mdash;</div><div class="k">CVaR 5% <span class="tip" tabindex="0" data-tip="Expected loss in the worst 5% of quarters, from the chosen distribution (default Student-t, fatter tails) with your portfolio's mean and volatility. A parametric approximation, reported for context — not optimized against.">?</span></div></div>
+      </div>
+    </div>
+    <div class="note" id="verdictNote"></div>
+  </div>
+
+  <!-- ===== 3. Donut ===== -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
+      <h2 style="margin-bottom:0">Allocation</h2>
+      <div class="seg-toggle">
+        <button id="tgTarget" class="active">Target</button>
+        <button id="tgActual">Actual</button>
+      </div>
+    </div>
+    <div class="donut-wrap" style="margin-top:16px">
+      <svg id="donut" width="240" height="240" viewBox="0 0 240 240" role="img" aria-label="Portfolio allocation donut chart"></svg>
+      <div class="legend" id="donutLegend"></div>
+    </div>
+    <div class="note" id="donutNote"></div>
+  </div>
+
+  <!-- ===== 4. Per-bucket table ===== -->
+  <div class="card">
+    <h2>Bucket detail &amp; rebalancing bands <span class="tip" tabindex="0" data-tip="No-trade band per the 5/25 rule: trigger = min(5 percentage points, 25% of the target weight). Drift above the band → trim; below → top up. Bucket CPL is each bucket judged alone against the same loss floor.">?</span></h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Bucket</th><th>Weight %</th><th><span class="gk">&mu;</span> qtr %</th><th><span class="gk">&sigma;</span> qtr %</th>
+          <th>Bucket CPL</th><th>Rebalance band</th><th id="thBandStatus" class="hide">Status</th>
+        </tr></thead>
+        <tbody id="detailRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== 5. Suggested adjustment ===== -->
+  <div class="card hide" id="fixerCard">
+    <h2>Suggested adjustment <span class="tip" tabindex="0" data-tip="Nearest allocation on a 5-percentage-point grid that passes the CPL floor, minimizing total drift from your targets. A suggestion — never applied automatically.">?</span></h2>
+    <div id="fixerBody"></div>
+  </div>
+
+  <!-- ===== 6. Backtest ===== -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
+      <h2 style="margin-bottom:0">Backtest</h2>
+      <div class="seg-toggle" id="btPeriods">
+        <button data-p="1">1Y</button><button data-p="3">3Y</button><button data-p="5">5Y</button>
+        <button data-p="10">10Y</button><button data-p="max" class="active">Max</button>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <span class="bt-banner sim" id="btBanner">Monte Carlo of assumptions &mdash; not historical</span>
+      <div class="bt-stats" id="btStats"></div>
+      <div class="note" id="btNote"></div>
+    </div>
+  </div>
+
+  <!-- ===== 7. Centering gauge ===== -->
+  <div class="card">
+    <h2>Centering <span class="tip" tabindex="0" data-tip="How centered the portfolio mean sits inside the band. k = 0 is perfectly centered. Cp is band width over process width; Cpk penalizes off-center. Reference only — CPL governs the verdict.">?</span></h2>
+    <div class="gauge-track" id="gaugeTrack">
+      <div class="gauge-mark center" id="gaugeCenter" style="left:50%"><span class="flag">center</span></div>
+      <div class="gauge-mark" id="gaugeMu" style="left:50%"><span class="flag">&mu;</span></div>
+    </div>
+    <div class="gauge-ends"><span id="gaugeL">LSL</span><span id="gaugeU">USL</span></div>
+    <div class="bt-stats" style="margin-top:16px">
+      <div class="stat"><div class="v" id="gK">&mdash;</div><div class="k">k (off-center)</div></div>
+      <div class="stat"><div class="v" id="gCp">&mdash;</div><div class="k">Cp</div></div>
+      <div class="stat"><div class="v" id="gCpk">&mdash;</div><div class="k">Cpk</div></div>
+    </div>
+  </div>
+
+  <!-- ===== 8. Advanced ===== -->
+  <details class="adv">
+    <summary>Advanced</summary>
+    <div class="adv-body">
+
+      <div class="adv-section">
+        <h3>Data source &mdash; GitHub <span class="tip" tabindex="0" data-tip="Files are fetched with the public GitHub contents API (60 requests/hour per IP, one per bucket, no token). Expected CSV: a header row, then one row per day with an ISO date column and a price column. The tool resamples to quarter-end closes. {bucket} in the path becomes the bucket name, lowercased with spaces removed.">?</span></h3>
+        <div class="inputs-row">
+          <div class="field"><label>Owner</label><input type="text" id="ghOwner" value="riderz797"></div>
+          <div class="field"><label>Repo</label><input type="text" id="ghRepo" value="market-indicators"></div>
+          <div class="field"><label>Branch</label><input type="text" id="ghBranch" value="main"></div>
+          <div class="field"><label>Path template</label><input type="text" id="ghPath" value="data/{bucket}.csv"></div>
+          <div class="field"><label>Date column</label><input type="text" id="ghDateCol" value="date"></div>
+          <div class="field"><label>Price column</label><input type="text" id="ghPriceCol" value="close"></div>
+        </div>
+        <div class="field" style="max-width:340px"><label><input type="checkbox" id="ghCombined" style="width:auto; margin-right:6px">Combined-file mode <span class="tip" tabindex="0" data-tip="One file at the literal path (no {bucket} substitution): a date column plus one price column per bucket, named as the bucket's lowercased, space-stripped name.">?</span></label></div>
+      </div>
+
+      <div class="adv-section">
+        <h3>Paste or upload data for one bucket</h3>
+        <div class="inputs-row" style="max-width:560px">
+          <div class="field"><label>Bucket</label><select id="pasteBucket"></select></div>
+          <div class="field"><label>Or upload a CSV file</label><input type="file" id="pasteFile" accept=".csv,text/csv" style="font-size:12px"></div>
+        </div>
+        <div class="field"><label>Paste CSV text (same columns as above)</label><textarea id="pasteText" rows="4" class="mono" placeholder="date,close&#10;2020-01-02,100.5&#10;..."></textarea></div>
+        <button class="ghost" id="btnPasteLoad">Load pasted data</button>
+        <div class="status-line" id="pasteStatus"></div>
+      </div>
+
+      <div class="adv-section">
+        <h3>Model settings</h3>
+        <div class="inputs-row">
+          <div class="field"><label>CPL floor <span class="tip" tabindex="0" data-tip="Required distance between the portfolio mean and the loss floor, in units of 3 sigma. Shortfall odds per quarter: 1.00 → 0.135%, 1.33 → 0.0032%, 1.50 → 0.0003%.">?</span></label>
+            <select id="setFloor"><option value="1">1.00</option><option value="1.33">1.33</option><option value="1.5">1.50</option></select></div>
+          <div class="field"><label>Max loss % (Lmax) <span class="tip" tabindex="0" data-tip="Worst tolerable quarterly loss at the full horizon, before safety factors shrink it.">?</span></label><input type="number" id="setLmax" value="25" step="1" min="1"></div>
+          <div class="field"><label>Glidepath taper p</label><input type="number" id="setP" value="2" step="0.5" min="0.5"></div>
+          <div class="field"><label>Horizon cap (yrs)</label><input type="number" id="setHCap" value="40" step="1" min="1"></div>
+          <div class="field"><label>Distribution <span class="tip" tabindex="0" data-tip="Used for the CVaR and simulation readouts. Student-t (nu = 5) has fatter tails than normal. The CPL screen itself is the normal approximation. Parametric assumption, not measured truth.">?</span></label>
+            <select id="setDist"><option value="t">Student-t (&nu;=5)</option><option value="normal">Normal</option></select></div>
+          <div class="field"><label>Essential annual spend ($) <span class="tip" tabindex="0" data-tip="If set, activates the capacity factor: fewer than 10 years of reserves (net worth / spend) shrinks the tolerable loss, down to half at 5 years or less.">?</span></label><input type="number" id="setSpend" value="0" step="1000" min="0"></div>
+        </div>
+        <div class="note" id="factorNote"></div>
+      </div>
+
+      <div class="adv-section">
+        <h3>Correlation matrix <span class="tip" tabindex="0" data-tip="Quarterly return correlations between buckets. When price history is loaded, empirical correlations from the common overlap window replace these defaults. Buckets you add default to 0.30 against everything.">?</span></h3>
+        <div class="field" style="max-width:340px"><label><input type="checkbox" id="corrUseEmp" checked style="width:auto; margin-right:6px">Use empirical correlations when data is loaded</label></div>
+        <div style="overflow-x:auto"><table class="corr-table" id="corrTable"></table></div>
+        <div class="note" id="corrNote"></div>
+      </div>
+
+      <div class="adv-section">
+        <h3>Per-bucket weight limits (for the fixer)</h3>
+        <div style="overflow-x:auto"><table id="limitsTable">
+          <thead><tr><th>Bucket</th><th>Min %</th><th>Max %</th></tr></thead>
+          <tbody id="limitRows"></tbody>
+        </table></div>
+      </div>
+
+      <p class="note">Not implemented: extreme-value (GPD) tail fitting and block bootstrap. The backtest uses realized returns directly rather than a fitted tail model; the CVaR and safety factors are parametric approximations.</p>
+    </div>
+  </details>
+
+  <footer>
+    <p>Acumen Research &mdash; capability screen on quarterly returns; age sets the band, CPL governs, rebalancing centers the process.</p>
+    <p>Nothing here is investment advice. All computation runs in your browser; no data is stored.</p>
+  </footer>
+</div>
+
+<script>
+'use strict';
+/* ================= state ================= */
+const BUCKET_COLORS = {
+  bitcoin: '#F0A030', stocks: '#3E6B8C', realestate: '#8B7355',
+  gold: '#B8860B', cash: '#C0C0C0', tactical: '#C0392B'
+};
+const EXTRA_COLORS = ['#6B8E7B', '#7A6B8C', '#8C6B3E', '#5C7A8C'];
+const DEFAULT_CORR = {   // canonical keys
+  bitcoin:    { bitcoin: 1, stocks: 0.35, realestate: 0.15, gold: 0.10, cash: 0, tactical: 0.60 },
+  stocks:     { bitcoin: 0.35, stocks: 1, realestate: 0.40, gold: 0.05, cash: 0, tactical: 0.55 },
+  realestate: { bitcoin: 0.15, stocks: 0.40, realestate: 1, gold: 0.10, cash: 0, tactical: 0.20 },
+  gold:       { bitcoin: 0.10, stocks: 0.05, realestate: 0.10, gold: 1, cash: 0, tactical: 0.15 },
+  cash:       { bitcoin: 0, stocks: 0, realestate: 0, gold: 0, cash: 1, tactical: 0 },
+  tactical:   { bitcoin: 0.60, stocks: 0.55, realestate: 0.20, gold: 0.15, cash: 0, tactical: 1 }
+};
+const canon = name => String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+let nextId = 1;
+function mkBucket(name) {
+  const key = canon(name);
+  return { id: nextId++, name, target: 0, mu: 0, sigma: 0, actual: 0, min: 0, max: 100,
+           qKeys: null, qRets: null, dataInfo: '', muFromData: false };
+}
+const state = {
+  buckets: ['Bitcoin', 'Stocks', 'Real Estate', 'Gold', 'Cash', 'Tactical'].map(mkBucket),
+  manualCorr: {},          // 'idA|idB' -> value (edited cells)
+  useEmpCorr: true,
+  view: 'target',
+  btPeriod: 'max',
+  loading: false
+};
+function bucketColor(b, idx) {
+  return BUCKET_COLORS[canon(b.name)] || EXTRA_COLORS[idx % EXTRA_COLORS.length];
+}
+
+/* ================= math ================= */
+function erf(x) { // Abramowitz–Stegun 7.1.26
+  const s = x < 0 ? -1 : 1; x = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return s * y;
+}
+const normCdf = x => 0.5 * (1 + erf(x / Math.SQRT2));
+const normPdf = x => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+// Student-t nu=5 constants for CVaR
+const T5_Q05 = -2.0150483726;                       // 5% quantile
+const T5_PDF = x => 2 / (1.3293403882 * Math.sqrt(5 * Math.PI)) * Math.pow(1 + x * x / 5, -3);
+function cvar5(mu, sigma, dist) {
+  if (dist === 'normal') return mu - sigma * normPdf(-1.6448536270) / 0.05;
+  const nu = 5, q = T5_Q05;
+  const s = sigma * Math.sqrt((nu - 2) / nu);       // scale so variance matches sigma^2
+  return mu - s * (T5_PDF(q) / 0.05) * ((nu + q * q) / (nu - 1));
+}
+const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+function sd(a) {
+  if (a.length < 2) return 0;
+  const m = mean(a);
+  return Math.sqrt(a.reduce((s, v) => s + (v - m) * (v - m), 0) / (a.length - 1));
+}
+function corrOf(a, b) {
+  const n = a.length, ma = mean(a), mb = mean(b);
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { const da = a[i] - ma, db = b[i] - mb; sab += da * db; saa += da * da; sbb += db * db; }
+  return (saa > 0 && sbb > 0) ? sab / Math.sqrt(saa * sbb) : 0;
+}
+// Box–Muller + t5 sampler
+let _spare = null;
+function randn() {
+  if (_spare !== null) { const v = _spare; _spare = null; return v; }
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  v = Math.random();
+  const r = Math.sqrt(-2 * Math.log(u)), t = 2 * Math.PI * v;
+  _spare = r * Math.sin(t);
+  return r * Math.cos(t);
+}
+function randT5() {
+  let chi = 0;
+  for (let i = 0; i < 5; i++) { const z = randn(); chi += z * z; }
+  return randn() / Math.sqrt(chi / 5);
+}
+
+/* ================= quarterly resampling ================= */
+function toQuarterly(rows) {  // rows: [[isoDate, close]] sorted asc
+  const lastInQ = new Map(); // qKey -> [dateStr, close]
+  for (const [d, c] of rows) {
+    const y = +d.slice(0, 4), m = +d.slice(5, 7);
+    if (!y || !m || !(c > 0)) continue;
+    const key = y * 4 + Math.floor((m - 1) / 3);
+    const cur = lastInQ.get(key);
+    if (!cur || d > cur[0]) lastInQ.set(key, [d, c]);
+  }
+  // keep only quarters whose last observation falls near the quarter end
+  const keys = [...lastInQ.keys()].sort((a, b) => a - b);
+  const closes = new Map();
+  for (const k of keys) {
+    const [d, c] = lastInQ.get(k);
+    const y = Math.floor(k / 4), q = k % 4;
+    const qEnd = new Date(Date.UTC(y, q * 3 + 3, 0));
+    const obs = new Date(d + 'T00:00:00Z');
+    if ((qEnd - obs) / 86400000 <= 10) closes.set(k, c);
+  }
+  // consecutive-quarter returns (%)
+  const rKeys = [], rets = [];
+  const ck = [...closes.keys()].sort((a, b) => a - b);
+  for (let i = 1; i < ck.length; i++) {
+    if (ck[i] - ck[i - 1] !== 1) continue;
+    rKeys.push(ck[i]);
+    rets.push((closes.get(ck[i]) / closes.get(ck[i - 1]) - 1) * 100);
+  }
+  return { rKeys, rets };
+}
+const qLabel = k => Math.floor(k / 4) + ' Q' + (k % 4 + 1);
+
+/* ================= CSV parsing ================= */
+function parseCsv(text, dateCol, priceCol) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 3) throw new Error('too few rows');
+  const head = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const di = head.indexOf(dateCol.trim().toLowerCase());
+  const pi = head.indexOf(priceCol.trim().toLowerCase());
+  if (di < 0) throw new Error(`no "${dateCol}" column`);
+  if (pi < 0) throw new Error(`no "${priceCol}" column`);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const c = lines[i].split(',');
+    const d = (c[di] || '').trim().slice(0, 10);
+    const p = parseFloat(c[pi]);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d) && p > 0) rows.push([d, p]);
+  }
+  if (rows.length < 8) throw new Error('too few valid rows');
+  rows.sort((a, b) => a[0] < b[0] ? -1 : 1);
+  return rows;
+}
+function applySeries(bucket, rows, sourceLabel) {
+  const { rKeys, rets } = toQuarterly(rows);
+  if (rets.length < 8) throw new Error('under 8 full quarters of history');
+  bucket.qKeys = rKeys;
+  bucket.qRets = rets;
+  bucket.mu = +mean(rets).toFixed(2);
+  bucket.sigma = +sd(rets).toFixed(2);
+  bucket.muFromData = true;
+  bucket.dataInfo = `${rets.length} qtrs (${qLabel(rKeys[0])}–${qLabel(rKeys[rKeys.length - 1])}, ${sourceLabel})`;
+}
+
+/* ================= GitHub loading ================= */
+async function ghFetchFile(path) {
+  const o = el('ghOwner').value.trim(), r = el('ghRepo').value.trim(), br = el('ghBranch').value.trim() || 'main';
+  if (!o || !r) throw new Error('owner/repo not set');
+  const url = `https://api.github.com/repos/${o}/${r}/contents/${path}?ref=${encodeURIComponent(br)}`;
+  let resp;
+  try { resp = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } }); }
+  catch (e) { throw new Error('network error — offline?'); }
+  if (resp.status === 404) throw new Error(`404 — ${path} not found`);
+  if (resp.status === 403 || resp.status === 429) {
+    const rem = resp.headers.get('x-ratelimit-remaining');
+    throw new Error(rem === '0'
+      ? 'GitHub rate limit hit (60/hr per IP) — wait an hour or paste the CSV in Advanced'
+      : `HTTP ${resp.status} — access denied`);
+  }
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const j = await resp.json();
+  if (!j.content) throw new Error('file too large for the contents API (1 MB cap)');
+  return atob(j.content.replace(/\n/g, ''));
+}
+async function loadAllData() {
+  if (state.loading) return;
+  state.loading = true;
+  el('btnLoad').disabled = true;
+  const dc = el('ghDateCol').value || 'date', pc = el('ghPriceCol').value || 'close';
+  const status = [];
+  const show = () => { el('loadStatus').innerHTML = status.map(s =>
+    `<div class="status-line ${s.ok ? 'ok' : 'err'}">${esc(s.txt)}</div>`).join(''); };
+  try {
+    if (el('ghCombined').checked) {
+      const path = el('ghPath').value.replace('{bucket}', '').trim();
+      try {
+        const text = await ghFetchFile(path);
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        const head = lines[0].split(',').map(h => h.trim().toLowerCase());
+        for (const b of state.buckets) {
+          const col = canon(b.name);
+          if (head.indexOf(col) < 0) { status.push({ ok: false, txt: `${b.name}: no "${col}" column in combined file` }); continue; }
+          try { applySeries(b, parseCsv(text, dc, col), 'GitHub'); status.push({ ok: true, txt: `${b.name}: ${b.dataInfo}` }); }
+          catch (e) { status.push({ ok: false, txt: `${b.name}: ${e.message}` }); }
+        }
+      } catch (e) { status.push({ ok: false, txt: `combined file: ${e.message}` }); }
+    } else {
+      for (const b of state.buckets) {
+        const path = el('ghPath').value.replace('{bucket}', canon(b.name));
+        try {
+          const text = await ghFetchFile(path);
+          applySeries(b, parseCsv(text, dc, pc), 'GitHub');
+          status.push({ ok: true, txt: `${b.name}: ${b.dataInfo}` });
+        } catch (e) {
+          status.push({ ok: false, txt: `${b.name}: ${e.message}` });
+        }
+        show();
+      }
+    }
+  } finally {
+    state.loading = false;
+    el('btnLoad').disabled = false;
+    show();
+    renderBucketInputs();
+    recompute();
+  }
+}
+
+/* ================= core model ================= */
+function readNum(id) { const v = parseFloat(el(id).value); return isFinite(v) ? v : 0; }
+function el(id) { return document.getElementById(id); }
+
+function includedBuckets() { // buckets that participate in calculation
+  return state.buckets.filter(b => b.sigma > 0);
+}
+function effCorr(a, b) { // effective pairwise correlation
+  if (a.id === b.id) return 1;
+  if (state.useEmpCorr && a.qKeys && b.qKeys) {
+    const bMap = new Map(b.qKeys.map((k, i) => [k, b.qRets[i]]));
+    const xa = [], xb = [];
+    a.qKeys.forEach((k, i) => { if (bMap.has(k)) { xa.push(a.qRets[i]); xb.push(bMap.get(k)); } });
+    if (xa.length >= 8) return corrOf(xa, xb);
+  }
+  const key = a.id < b.id ? a.id + '|' + b.id : b.id + '|' + a.id;
+  if (key in state.manualCorr) return state.manualCorr[key];
+  const d = DEFAULT_CORR[canon(a.name)];
+  if (d && canon(b.name) in d) return d[canon(b.name)];
+  return 0.30;
+}
+function corrSource(a, b) {
+  if (state.useEmpCorr && a.qKeys && b.qKeys) return 'emp';
+  const key = a.id < b.id ? a.id + '|' + b.id : b.id + '|' + a.id;
+  return (key in state.manualCorr) ? 'manual' : 'default';
+}
+function buildCorrMatrix(bks) {
+  const n = bks.length, C = [];
+  for (let i = 0; i < n; i++) {
+    C.push([]);
+    for (let j = 0; j < n; j++) C[i][j] = j < i ? C[j][i] : effCorr(bks[i], bks[j]);
+  }
+  return C;
+}
+function portfolioMoments(weightsPct, bks, C) { // weights aligned with bks, in %
+  const w = weightsPct.map(x => x / 100);
+  let mu = 0, varr = 0;
+  for (let i = 0; i < bks.length; i++) {
+    mu += w[i] * bks[i].mu;
+    for (let j = 0; j < bks.length; j++)
+      varr += w[i] * w[j] * C[i][j] * bks[i].sigma * bks[j].sigma;
+  }
+  return { mu, sigma: Math.sqrt(Math.max(varr, 0)) };
+}
+
+function computeModel() {
+  const age = readNum('inAge'), ret = readNum('inRet');
+  const nw = readNum('inNW'), spend = readNum('setSpend');
+  const Lmax = readNum('setLmax') || 25, p = readNum('setP') || 2, hCap = readNum('setHCap') || 40;
+  const floor = parseFloat(el('setFloor').value);
+  const dist = el('setDist').value;
+  const agesOk = age > 0 && ret > age;
+
+  const bks = includedBuckets();
+  const targetW = bks.map(b => b.target);
+  const sumAll = state.buckets.reduce((s, b) => s + b.target, 0);
+  const sumActual = state.buckets.reduce((s, b) => s + b.actual, 0);
+
+  const m = { agesOk, floor, dist, nw, bks, sumAll, sumActual };
+  if (!agesOk) return m;
+
+  const Y = ret - age;
+  const h = Math.min(Y, hCap) / hCap;
+  m.g = 1 - Math.pow(1 - h, p);
+  // LRFD factors
+  const wBT = state.buckets.filter(b => ['bitcoin', 'tactical'].includes(canon(b.name)))
+                           .reduce((s, b) => s + b.target, 0) / 100;
+  m.gammaD = Math.min(3, Math.max(1.5, 1.5 + 1.5 * wBT));
+  m.phi = spend > 0 && nw > 0 ? Math.min(1, Math.max(0.5, (nw / spend) / 10)) : 1;
+  m.LmaxEff = m.phi * Lmax / m.gammaD;
+  m.LSL = -m.LmaxEff * m.g;
+  m.USL = +m.LmaxEff * m.g;
+  m.Y = Y;
+
+  if (bks.length && Math.abs(sumAll - 100) < 0.5) {
+    m.corrM = buildCorrMatrix(bks);
+    const mo = portfolioMoments(targetW, bks, m.corrM); // CPL screen always on target weights
+    m.muP = mo.mu; m.sigmaP = mo.sigma;
+    if (mo.sigma > 0) {
+      m.CPL = (mo.mu - m.LSL) / (3 * mo.sigma);
+      m.pass = m.CPL >= floor;
+      m.shortfall = normCdf(-3 * m.CPL);
+      m.cvar = cvar5(mo.mu, mo.sigma, dist);
+      const mid = (m.USL + m.LSL) / 2, half = (m.USL - m.LSL) / 2;
+      m.k = Math.abs(mo.mu - mid) / half;
+      m.Cp = (m.USL - m.LSL) / (6 * mo.sigma);
+      m.Cpk = m.Cp * (1 - m.k);
+    }
+  }
+  return m;
+}
+
+/* ================= fixer ================= */
+function runFixer(m) {
+  const bks = m.bks;
+  const targets = bks.map(b => b.target);
+  const mins = bks.map(b => Math.ceil((b.min || 0) / 5));
+  const maxs = bks.map(b => Math.floor((b.max == null ? 100 : b.max) / 5));
+  const UNITS = 20; // 100% in 5-pt steps
+  let varIdx = bks.map((_, i) => i);
+  if (bks.length > 6) { // vary only the 4 highest-sigma buckets, hold the rest at target
+    const order = bks.map((b, i) => i).sort((a, c) => bks[c].sigma - bks[a].sigma);
+    varIdx = order.slice(0, 4).sort((a, c) => a - c);
+  }
+  const units = bks.map((_, i) => varIdx.includes(i) ? 0 : Math.round(targets[i] / 5));
+  const budget = UNITS - units.reduce((s, u, i) => s + (varIdx.includes(i) ? 0 : u), 0);
+  if (budget < 0) return null;
+
+  let best = null, evals = 0;
+  function evalCombo() {
+    evals++;
+    const w = units.map(u => u * 5);
+    const mo = portfolioMoments(w, bks, m.corrM);
+    if (mo.sigma <= 0) return;
+    const cpl = (mo.mu - m.LSL) / (3 * mo.sigma);
+    if (cpl < m.floor) return;
+    const drift = w.reduce((s, x, i) => s + Math.abs(x - targets[i]), 0);
+    if (!best || drift < best.drift - 1e-9 || (Math.abs(drift - best.drift) < 1e-9 && cpl > best.cpl)) {
+      best = { w: w.slice(), drift, cpl, mu: mo.mu, sigma: mo.sigma };
+    }
+  }
+  (function rec(pos, remaining) {
+    if (evals > 400000) return;
+    if (pos === varIdx.length - 1) {
+      const i = varIdx[pos];
+      if (remaining >= mins[i] && remaining <= maxs[i]) { units[i] = remaining; evalCombo(); }
+      return;
+    }
+    const i = varIdx[pos];
+    for (let u = mins[i]; u <= Math.min(maxs[i], remaining); u++) {
+      units[i] = u;
+      rec(pos + 1, remaining - u);
+    }
+  })(0, budget);
+  return best;
+}
+
+/* ================= backtest / simulation ================= */
+function periodQuarters() {
+  const p = state.btPeriod;
+  return p === 'max' ? Infinity : (+p) * 4;
+}
+function runBacktest(m) {
+  const bks = m.bks.filter(b => (state.view === 'actual' ? b.actual : b.target) > 0 || b.target > 0);
+  const withW = m.bks.filter(b => b.target > 0);
+  const allData = withW.length > 0 && withW.every(b => b.qKeys);
+  if (!allData || Math.abs(m.sumAll - 100) >= 0.5) return simMode(m);
+
+  // align on common quarters
+  const maps = withW.map(b => new Map(b.qKeys.map((k, i) => [k, b.qRets[i]])));
+  let common = withW[0].qKeys.filter(k => maps.every(mp => mp.has(k)));
+  common.sort((a, b) => a - b);
+  const nWant = periodQuarters();
+  if (common.length > nWant) common = common.slice(common.length - nWant);
+  if (common.length < 4) return simMode(m);
+
+  const w = withW.map(b => b.target / 100);
+  const rets = common.map(k => withW.reduce((s, b, i) => s + w[i] * maps[i].get(k), 0));
+  const n = rets.length;
+  let cum = 1, peak = 1, maxDD = 0;
+  for (const r of rets) { cum *= 1 + r / 100; peak = Math.max(peak, cum); maxDD = Math.min(maxDD, cum / peak - 1); }
+  const mu = mean(rets), s = sd(rets);
+  const out = {
+    sim: false,
+    label: `${qLabel(common[0])} – ${qLabel(common[common.length - 1])} · ${n} quarters · quarterly rebalanced to target`,
+    cagr: (Math.pow(cum, 4 / n) - 1) * 100,
+    vol: s * 2,
+    maxDD: maxDD * 100,
+    latest: rets[n - 1]
+  };
+  if (m.LSL != null && s > 0) {
+    out.empCPL = (mu - m.LSL) / (3 * s);
+    out.empShort = rets.filter(r => r < m.LSL).length / n;
+    out.beyondUSL = rets.filter(r => r > m.USL).length;
+    out.latestBreach = rets[n - 1] > m.USL;
+  }
+  return out;
+}
+function simMode(m) {
+  if (m.muP == null || !(m.sigmaP > 0)) return { none: true };
+  const nQ = state.btPeriod === 'max' ? 40 : (+state.btPeriod) * 4;
+  const PATHS = 1000, dist = m.dist;
+  const s5 = Math.sqrt(3 / 5);
+  const cagrs = [], dds = [];
+  let below = 0, total = 0, sum = 0, sumsq = 0;
+  for (let p = 0; p < PATHS; p++) {
+    let cum = 1, peak = 1, dd = 0;
+    for (let q = 0; q < nQ; q++) {
+      const z = dist === 'normal' ? randn() : randT5() * s5;
+      const r = m.muP + m.sigmaP * z;
+      cum *= Math.max(1 + r / 100, 0.01);
+      peak = Math.max(peak, cum); dd = Math.min(dd, cum / peak - 1);
+      total++; sum += r; sumsq += r * r;
+      if (m.LSL != null && r < m.LSL) below++;
+    }
+    cagrs.push((Math.pow(cum, 4 / nQ) - 1) * 100);
+    dds.push(dd * 100);
+  }
+  cagrs.sort((a, b) => a - b); dds.sort((a, b) => a - b);
+  const med = a => a[Math.floor(a.length / 2)];
+  const simMu = sum / total, simSd = Math.sqrt(Math.max(sumsq / total - simMu * simMu, 0));
+  const out = {
+    sim: true,
+    label: `${PATHS} simulated paths of ${nQ} quarters from your assumptions (${dist === 'normal' ? 'normal' : 'Student-t ν=5'})`,
+    cagr: med(cagrs), vol: simSd * 2, maxDD: med(dds)
+  };
+  if (m.LSL != null && simSd > 0) {
+    out.empCPL = (simMu - m.LSL) / (3 * simSd);
+    out.empShort = below / total;
+  }
+  return out;
+}
+
+/* ================= formatting ================= */
+const fmtPct = (v, d = 2) => (v == null || !isFinite(v)) ? '—' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d) + '%';
+const fmtNum = (v, d = 2) => (v == null || !isFinite(v)) ? '—' : v.toFixed(d);
+const fmtProb = v => {
+  if (v == null || !isFinite(v)) return '—';
+  if (v < 1e-6) return '<0.0001%';
+  return (v * 100).toPrecision(2) + '%';
+};
+const fmtMoney = v => '$' + Math.round(v).toLocaleString('en-US');
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* ================= rendering ================= */
+function renderBucketInputs() {
+  const tb = el('bucketRows');
+  tb.innerHTML = '';
+  state.buckets.forEach((b, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="bucket-name"><span class="swatch" style="background:${bucketColor(b, idx)}"></span><input type="text" data-f="name" data-id="${b.id}" value="${esc(b.name)}" style="width:110px;display:inline-block"></td>
+      <td><input type="number" data-f="target" data-id="${b.id}" value="${b.target}" step="5" min="0" max="100" style="width:72px"></td>
+      <td><input type="number" data-f="mu" data-id="${b.id}" value="${b.mu}" step="0.1" style="width:72px"></td>
+      <td><input type="number" data-f="sigma" data-id="${b.id}" value="${b.sigma}" step="0.1" min="0" style="width:72px"></td>
+      <td class="actual-cell ${state.view === 'actual' ? '' : 'hide'}"><input type="number" data-f="actual" data-id="${b.id}" value="${b.actual}" step="1" min="0" max="100" style="width:72px"></td>
+      <td style="font-size:11.5px; color:${b.qKeys ? 'var(--pass)' : 'var(--muted)'}; max-width:170px">${b.qKeys ? b.dataInfo : 'manual'}</td>
+      <td><button class="rm-btn" data-rm="${b.id}" title="Remove bucket">&times;</button></td>`;
+    tb.appendChild(tr);
+  });
+  el('thActual').classList.toggle('hide', state.view !== 'actual');
+  // paste bucket selector
+  el('pasteBucket').innerHTML = state.buckets.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  renderLimits();
+  renderCorr();
+}
+function renderLimits() {
+  el('limitRows').innerHTML = state.buckets.map(b => `<tr>
+    <td>${esc(b.name)}</td>
+    <td><input type="number" data-f="min" data-id="${b.id}" value="${b.min}" step="5" min="0" max="100" style="width:70px"></td>
+    <td><input type="number" data-f="max" data-id="${b.id}" value="${b.max}" step="5" min="0" max="100" style="width:70px"></td></tr>`).join('');
+}
+function renderCorr() {
+  const bs = state.buckets;
+  let html = '<tr><th></th>' + bs.map(b => `<th>${esc(b.name.slice(0, 6))}</th>`).join('') + '</tr>';
+  let anyEmp = false;
+  for (let i = 0; i < bs.length; i++) {
+    html += `<tr><th style="text-align:left">${esc(bs[i].name.slice(0, 10))}</th>`;
+    for (let j = 0; j < bs.length; j++) {
+      const v = effCorr(bs[i], bs[j]);
+      if (i === j) { html += '<td class="mono" style="color:var(--muted)">1.00</td>'; continue; }
+      const src = corrSource(bs[i], bs[j]);
+      if (src === 'emp') { anyEmp = true; html += `<td class="mono" style="color:var(--pass)" title="empirical">${v.toFixed(2)}</td>`; }
+      else html += `<td><input type="number" data-ci="${bs[i].id}" data-cj="${bs[j].id}" value="${v.toFixed(2)}" step="0.05" min="-1" max="1"></td>`;
+    }
+    html += '</tr>';
+  }
+  el('corrTable').innerHTML = html;
+  el('corrNote').textContent = anyEmp
+    ? 'Green values are empirical (from the common overlap of loaded quarterly returns). Others are editable defaults.'
+    : 'Editable defaults — load price data to replace these with empirical correlations.';
+}
+
+function renderDonut(m) {
+  const svg = el('donut');
+  const useActual = state.view === 'actual';
+  const rows = state.buckets.map((b, i) => ({ b, i, w: useActual ? b.actual : b.target }))
+                            .filter(r => r.w > 0);
+  const total = rows.reduce((s, r) => s + r.w, 0);
+  let html = '';
+  const cx = 120, cy = 120, r = 86, C = 2 * Math.PI * r, W = 34;
+  if (total > 0) {
+    let acc = 0;
+    for (const row of rows) {
+      const frac = row.w / total, len = frac * C;
+      const gap = Math.min(2, len * 0.4);
+      html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+        stroke="${bucketColor(row.b, row.i)}" stroke-width="${W}"
+        stroke-dasharray="${Math.max(len - gap, 0.5)} ${C - Math.max(len - gap, 0.5)}"
+        stroke-dashoffset="${-acc}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+      acc += len;
+    }
+  } else {
+    html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#EFEAE0" stroke-width="${W}"></circle>`;
+  }
+  const nw = readNum('inNW');
+  const center = nw > 0 && total > 0 ? fmtMoney(nw * total / 100) : total.toFixed(0) + '%';
+  html += `<text x="${cx}" y="${cy - 2}" text-anchor="middle" class="donut-center-label">${center}</text>`;
+  html += `<text x="${cx}" y="${cy + 18}" text-anchor="middle" class="donut-center-sub">${useActual ? 'actual' : 'target'}</text>`;
+  svg.innerHTML = html;
+
+  el('donutLegend').innerHTML = rows.length ? rows.map(row => `
+    <div class="row"><span class="swatch" style="background:${bucketColor(row.b, row.i)}"></span>
+      <span class="name">${esc(row.b.name)}</span><span class="val">${row.w.toFixed(0)}%</span></div>`).join('')
+    : '<div class="note">Enter target weights to see the allocation.</div>';
+  el('donutNote').textContent = useActual && Math.abs((m.sumActual || 0) - 100) >= 0.5 && m.sumActual > 0
+    ? `Actual weights sum to ${m.sumActual.toFixed(0)}%.` : '';
+}
+
+function renderDetail(m) {
+  const useActual = state.view === 'actual';
+  el('thBandStatus').classList.toggle('hide', !useActual);
+  el('detailRows').innerHTML = state.buckets.map((b, i) => {
+    const trig = Math.min(5, 0.25 * b.target);
+    const lo = b.target - trig, hi = b.target + trig;
+    const cpl = (m.LSL != null && b.sigma > 0) ? (b.mu - m.LSL) / (3 * b.sigma) : null;
+    const w = useActual ? b.actual : b.target;
+    let statusCell = '';
+    if (useActual) {
+      let st = '<span style="color:var(--muted)">—</span>';
+      if (b.target > 0 || b.actual > 0) {
+        if (b.actual > hi) st = '<span style="color:var(--fail);font-weight:600">TRIM</span>';
+        else if (b.actual < lo) st = '<span style="color:var(--header);font-weight:600">TOP UP</span>';
+        else st = '<span style="color:var(--pass)">in band</span>';
+      }
+      statusCell = `<td>${st}</td>`;
+    }
+    const unset = b.sigma <= 0 && (b.target > 0 || b.actual > 0);
+    return `<tr${unset ? ' style="opacity:0.55"' : ''}>
+      <td><span class="swatch" style="background:${bucketColor(b, i)}"></span>${esc(b.name)}${unset ? ' <span style="color:var(--fail);font-size:11px">(unset — excluded)</span>' : ''}</td>
+      <td class="num">${w.toFixed(0)}%</td>
+      <td class="num">${b.sigma > 0 ? fmtPct(b.mu) : '—'}</td>
+      <td class="num">${b.sigma > 0 ? b.sigma.toFixed(2) + '%' : '—'}</td>
+      <td class="num">${cpl == null ? '—' : cpl.toFixed(2)}</td>
+      <td class="num">${b.target > 0 ? lo.toFixed(1) + '% – ' + hi.toFixed(1) + '%' : '—'}</td>
+      ${statusCell}</tr>`;
+  }).join('');
+}
+
+function renderAll() {
+  const m = computeModel();
+
+  // warnings
+  const sumBad = Math.abs(m.sumAll - 100) >= 0.5;
+  el('sumChip').textContent = 'sum ' + m.sumAll.toFixed(0) + '%';
+  el('sumChip').className = 'chip ' + (sumBad ? 'bad' : 'ok');
+  const unsetWeighted = state.buckets.filter(b => b.sigma <= 0 && b.target > 0);
+  let bw = [];
+  if (sumBad && m.sumAll > 0) bw.push('Target weights must sum to 100% — currently ' + m.sumAll.toFixed(0) + '%.');
+  if (unsetWeighted.length) bw.push('No μ/σ for: ' + unsetWeighted.map(b => esc(b.name)).join(', ') + ' — load data or enter assumptions; these buckets are excluded from the screen.');
+  el('bucketWarn').classList.toggle('hide', !bw.length);
+  el('bucketWarn').innerHTML = bw.join('<br>');
+  const age = readNum('inAge'), ret = readNum('inRet');
+  const ageMsg = (age > 0 && ret > 0 && ret <= age) ? 'Retirement age must be greater than current age.'
+    : (age <= 0 || ret <= 0) ? 'Enter current and retirement age to activate the screen.' : '';
+  el('ageWarn').classList.toggle('hide', !ageMsg);
+  el('ageWarn').textContent = ageMsg;
+
+  const loaded = state.buckets.filter(b => b.qKeys).length;
+  el('loadSummary').textContent = loaded ? `${loaded}/${state.buckets.length} buckets loaded` : 'no data loaded';
+  el('loadSummary').className = 'chip ' + (loaded ? 'ok' : '');
+
+  // header band
+  el('bandLSL').innerHTML = m.LSL != null ? fmtPct(m.LSL, 1) : '&mdash;';
+  el('bandUSL').innerHTML = m.USL != null ? fmtPct(m.USL, 1) : '&mdash;';
+  el('bandYears').textContent = m.Y != null ? m.Y : '—';
+  el('bandG').textContent = m.g != null
+    ? `band = ${(m.g * 100).toFixed(0)}% of max width (γD ${m.gammaD.toFixed(2)}, φ ${m.phi.toFixed(2)})` : 'band width —';
+  el('factorNote').textContent = m.gammaD != null
+    ? `Demand factor γD = ${m.gammaD.toFixed(2)} (BTC+Tactical share), capacity factor φ = ${m.phi.toFixed(2)} → effective max loss ${m.LmaxEff.toFixed(1)}% before the glidepath.` : '';
+
+  // verdict
+  const stamp = el('verdictStamp');
+  if (m.CPL != null) {
+    stamp.textContent = m.pass ? 'PASS' : 'FAIL';
+    stamp.className = 'stamp ' + (m.pass ? 'pass' : 'fail');
+    el('vCPL').textContent = m.CPL.toFixed(2);
+    el('vCPL').style.color = m.pass ? 'var(--pass)' : 'var(--fail)';
+    el('vShort').textContent = fmtProb(m.shortfall);
+    el('vCVaR').textContent = fmtPct(m.cvar, 1);
+    el('verdictNote').textContent = m.pass
+      ? `Portfolio μ ${fmtPct(m.muP)} / σ ${m.sigmaP.toFixed(2)}% per quarter clears the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor.`
+      : `Portfolio μ ${fmtPct(m.muP)} / σ ${m.sigmaP.toFixed(2)}% per quarter does not clear the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor — see the suggested adjustment below.`;
+  } else {
+    stamp.textContent = '—';
+    stamp.className = 'stamp na';
+    el('vCPL').textContent = '—'; el('vCPL').style.color = '';
+    el('vShort').textContent = '—'; el('vCVaR').textContent = '—';
+    el('verdictNote').textContent = !m.agesOk ? 'Waiting on ages.' :
+      sumBad ? 'Waiting on weights summing to 100%.' : 'Waiting on bucket μ/σ (load data or enter assumptions).';
+  }
+
+  renderDonut(m);
+  renderDetail(m);
+
+  // fixer
+  const fc = el('fixerCard');
+  if (m.CPL != null && !m.pass) {
+    const best = runFixer(m);
+    fc.classList.remove('hide');
+    if (best) {
+      const bks = m.bks;
+      el('fixerBody').innerHTML = `
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Bucket</th><th>Target %</th><th>Suggested %</th><th>Drift</th></tr></thead>
+          <tbody>${bks.map((b, i) => `<tr>
+            <td>${esc(b.name)}</td><td class="num">${b.target.toFixed(0)}%</td>
+            <td class="num" style="font-weight:600">${best.w[i].toFixed(0)}%</td>
+            <td class="num" style="color:${best.w[i] === b.target ? 'var(--muted)' : 'var(--header)'}">${fmtPct(best.w[i] - b.target, 0)}</td></tr>`).join('')}
+          </tbody></table></div>
+        <p class="note">Resulting CPL ${best.cpl.toFixed(2)} (μ ${fmtPct(best.mu)}, σ ${best.sigma.toFixed(2)}%), total drift ${best.drift.toFixed(0)} points on a 5-point grid. A suggestion — apply it yourself if it makes sense.</p>`;
+    } else {
+      el('fixerBody').innerHTML = '<p class="note">No allocation on the 5-point grid passes the floor within your per-bucket limits — the band may be too tight for these assumptions (check Advanced limits, or the loss floor).</p>';
+    }
+  } else fc.classList.add('hide');
+
+  // backtest
+  const bt = (m.agesOk || m.muP != null) ? runBacktest(m) : { none: true };
+  const banner = el('btBanner');
+  if (bt.none) {
+    banner.className = 'bt-banner sim';
+    banner.textContent = 'Waiting on inputs';
+    el('btStats').innerHTML = '';
+    el('btNote').textContent = 'The backtest needs ages, weights summing to 100%, and μ/σ (or loaded data) to run.';
+  } else {
+    banner.className = 'bt-banner ' + (bt.sim ? 'sim' : 'hist');
+    banner.textContent = bt.sim ? 'Monte Carlo of assumptions — not historical' : 'Historical backtest';
+    const cells = [
+      ['CAGR' + (bt.sim ? ' (median)' : ''), fmtPct(bt.cagr, 1)],
+      ['Ann. volatility', bt.vol != null ? bt.vol.toFixed(1) + '%' : '—'],
+      ['Max drawdown' + (bt.sim ? ' (median)' : ''), fmtPct(bt.maxDD, 1)],
+      ['Empirical CPL', bt.empCPL != null ? bt.empCPL.toFixed(2) : '—'],
+      ['Shortfall freq', bt.empShort != null ? (bt.empShort * 100).toFixed(2) + '%' : '—']
+    ];
+    el('btStats').innerHTML = cells.map(c => `<div class="stat"><div class="v">${c[1]}</div><div class="k">${c[0]}</div></div>`).join('');
+    let note = bt.label + '.';
+    if (!bt.sim && m.shortfall != null) note += ` Parametric shortfall said ${fmtProb(m.shortfall)}; history shows ${(bt.empShort * 100).toFixed(2)}% of quarters below the floor.`;
+    if (!bt.sim && bt.beyondUSL > 0) note += ` ${bt.beyondUSL} quarter${bt.beyondUSL > 1 ? 's' : ''} exceeded the profit-taking trigger.`;
+    if (!bt.sim && bt.latestBreach) note += ' The most recent quarter breached the trigger — profit-taking / rebalance now.';
+    el('btNote').textContent = note;
+  }
+
+  // gauge
+  if (m.k != null) {
+    const half = (m.USL - m.LSL) / 2, mid = (m.USL + m.LSL) / 2;
+    const pos = Math.min(Math.max((m.muP - m.LSL) / (m.USL - m.LSL), 0.02), 0.98);
+    el('gaugeMu').style.left = (pos * 100).toFixed(1) + '%';
+    el('gK').textContent = m.k.toFixed(2);
+    el('gCp').textContent = m.Cp.toFixed(2);
+    el('gCpk').textContent = m.Cpk.toFixed(2);
+    el('gaugeL').textContent = 'LSL ' + fmtPct(m.LSL, 1);
+    el('gaugeU').textContent = 'USL ' + fmtPct(m.USL, 1);
+  } else {
+    el('gaugeMu').style.left = '50%';
+    el('gK').textContent = el('gCp').textContent = el('gCpk').textContent = '—';
+    el('gaugeL').textContent = 'LSL'; el('gaugeU').textContent = 'USL';
+  }
+}
+let _raf = null;
+function recompute() { // debounce via rAF so typing stays smooth
+  if (_raf) cancelAnimationFrame(_raf);
+  _raf = requestAnimationFrame(() => { _raf = null; renderAll(); });
+}
+
+/* ================= events ================= */
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.f && t.dataset.id) {
+    const b = state.buckets.find(x => x.id === +t.dataset.id);
+    if (!b) return;
+    if (t.dataset.f === 'name') {
+      b.name = t.value;
+      renderLimits(); renderCorr();
+      el('pasteBucket').innerHTML = state.buckets.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+    } else {
+      const v = parseFloat(t.value);
+      b[t.dataset.f] = isFinite(v) ? v : 0;
+      if ((t.dataset.f === 'mu' || t.dataset.f === 'sigma') && b.muFromData) {
+        b.muFromData = false; // user override of loaded stats
+      }
+    }
+    recompute();
+    return;
+  }
+  if (t.dataset && t.dataset.ci) {
+    const a = +t.dataset.ci, c = +t.dataset.cj;
+    const v = parseFloat(t.value);
+    const key = a < c ? a + '|' + c : c + '|' + a;
+    state.manualCorr[key] = isFinite(v) ? Math.min(1, Math.max(-1, v)) : 0;
+    recompute();
+    return;
+  }
+  if (['inAge', 'inRet', 'inNW', 'setFloor', 'setLmax', 'setP', 'setHCap', 'setDist', 'setSpend',
+       'ghOwner', 'ghRepo', 'ghBranch', 'ghPath', 'ghDateCol', 'ghPriceCol'].includes(t.id)) recompute();
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'corrUseEmp') { state.useEmpCorr = e.target.checked; renderCorr(); recompute(); }
+});
+document.addEventListener('click', e => {
+  const rm = e.target.dataset && e.target.dataset.rm;
+  if (rm) {
+    if (state.buckets.length <= 1) return;
+    state.buckets = state.buckets.filter(b => b.id !== +rm);
+    renderBucketInputs(); recompute();
+  }
+});
+el('btnAddBucket').addEventListener('click', () => {
+  state.buckets.push(mkBucket('New bucket'));
+  renderBucketInputs(); recompute();
+});
+el('btnLoad').addEventListener('click', loadAllData);
+el('tgTarget').addEventListener('click', () => setView('target'));
+el('tgActual').addEventListener('click', () => setView('actual'));
+function setView(v) {
+  state.view = v;
+  el('tgTarget').classList.toggle('active', v === 'target');
+  el('tgActual').classList.toggle('active', v === 'actual');
+  document.querySelectorAll('.actual-cell').forEach(td => td.classList.toggle('hide', v !== 'actual'));
+  el('thActual').classList.toggle('hide', v !== 'actual');
+  recompute();
+}
+el('btPeriods').addEventListener('click', e => {
+  const p = e.target.dataset && e.target.dataset.p;
+  if (!p) return;
+  state.btPeriod = p;
+  el('btPeriods').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.p === p));
+  recompute();
+});
+el('btnPasteLoad').addEventListener('click', () => {
+  const b = state.buckets.find(x => x.id === +el('pasteBucket').value);
+  const text = el('pasteText').value;
+  const st = el('pasteStatus');
+  if (!b) return;
+  if (!text.trim()) { st.className = 'status-line err'; st.textContent = 'Nothing pasted.'; return; }
+  try {
+    applySeries(b, parseCsv(text, el('ghDateCol').value || 'date', el('ghPriceCol').value || 'close'), 'pasted');
+    st.className = 'status-line ok'; st.textContent = `${b.name}: ${b.dataInfo}`;
+    renderBucketInputs(); recompute();
+  } catch (err) {
+    st.className = 'status-line err'; st.textContent = `${b.name}: ${err.message}`;
+  }
+});
+el('pasteFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { el('pasteText').value = rd.result; };
+  rd.readAsText(f);
+});
+
+/* ================= init ================= */
+renderBucketInputs();
+renderAll();
+</script>
+</body>
+</html>
