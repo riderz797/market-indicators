@@ -1,11 +1,11 @@
 {
-  "as_of": "2026-05-01",
-  "updated_utc": "2026-06-29T13:11:39Z",
+  "as_of": "2026-06-01",
+  "updated_utc": "2026-07-06T12:54:04Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -1.05
+    "score": -1.0
   },
   "inflation": {
     "dir": "Rising",
@@ -15,25 +15,25 @@
   "market_regime_raw": "GOLDILOCKS",
   "shares": {
     "GOLDILOCKS": 37,
-    "REFLATION": 27,
+    "REFLATION": 33,
     "INFLATION": 15,
-    "DEFLATION": 21
+    "DEFLATION": 15
   },
   "signal_strength": 37,
-  "risk_on_prob": 64,
+  "risk_on_prob": 70,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
     "pending_regime": "GOLDILOCKS",
-    "pending_weeks": 1,
+    "pending_weeks": 2,
     "confirmed_since": "2026-06-16"
   },
   "components": {
     "growth": {
       "Nonfarm Payrolls": {
         "yoy": 0.32,
-        "accel6m": 0.08,
-        "score": -2.97
+        "accel6m": 0.25,
+        "score": -2.72
       },
       "Real Income ex-Transfers": {
         "yoy": -0.43,
@@ -127,10 +127,10 @@
       },
       {
         "name": "Base Metals",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
@@ -151,18 +151,18 @@
       },
       {
         "name": "Long Bonds",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
         "name": "7-10y Treasurys",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
@@ -190,10 +190,10 @@
       },
       {
         "name": "Cyclicals / Defensives",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
