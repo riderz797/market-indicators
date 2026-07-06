@@ -217,12 +217,12 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
   </div>
 
   <div class="card">
-    <h2>Portfolio buckets <span class="tip" tabindex="0" data-tip="Target weight is your intended allocation (must sum to 100). Average return and volatility are quarterly, computed only from loaded or pasted price history — they cannot be typed in.">?</span></h2>
+    <h2>Portfolio buckets <span class="tip" tabindex="0" data-tip="Target weight is your intended allocation (must sum to 100). Actual % is what you hold today — it drives the TRIM / TOP UP flags and the Actual donut view. Average return and volatility are quarterly, computed only from loaded or pasted price history — they cannot be typed in.">?</span></h2>
     <div style="overflow-x:auto">
       <table id="bucketTable">
         <thead><tr>
           <th>Bucket</th><th>Target %</th><th>Avg qtr return</th><th>Qtr volatility</th>
-          <th id="thActual" class="hide">Actual %</th><th>Data</th><th></th>
+          <th id="thActual">Actual %</th><th>Data</th><th></th>
         </tr></thead>
         <tbody id="bucketRows"></tbody>
       </table>
@@ -290,8 +290,8 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Bucket</th><th>Weight %</th><th>Avg qtr return</th><th>Qtr volatility</th>
-          <th>Bucket CPL</th><th>Rebalance band</th><th id="thBandStatus" class="hide">Status</th>
+          <th>Bucket</th><th>Target %</th><th>Avg qtr return</th><th>Qtr volatility</th>
+          <th>Bucket CPL</th><th>Rebalance band</th><th>Status</th>
         </tr></thead>
         <tbody id="detailRows"></tbody>
       </table>
@@ -852,6 +852,18 @@ const fmtProb = v => {
   return (v * 100).toPrecision(2) + '%';
 };
 const fmtMoney = v => '$' + Math.round(v).toLocaleString('en-US');
+function missingSteps(m) {
+  const steps = [];
+  const age = readNum('inAge'), ret = readNum('inRet');
+  if (!(age > 0 && ret > age)) steps.push('enter your current and retirement age (Age profile card, top left)');
+  if (Math.abs(m.sumAll - 100) >= 0.5) steps.push('fill the Target % column in Portfolio buckets so it sums to 100 (now ' + m.sumAll.toFixed(0) + '%)');
+  if (state.buckets.every(b => !(b.sigma > 0))) steps.push('click \u201CLoad market data\u201D (Data card, top right) to pull return history');
+  else {
+    const noData = state.buckets.filter(b => b.target > 0 && !(b.sigma > 0));
+    if (noData.length) steps.push('load or paste history for ' + noData.map(b => b.name).join(', ') + ' (Advanced \u2192 paste/upload)');
+  }
+  return steps;
+}
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /* ================= rendering ================= */
@@ -865,12 +877,11 @@ function renderBucketInputs() {
       <td><input type="number" data-f="target" data-id="${b.id}" value="${b.target}" step="5" min="0" max="100" style="width:72px"></td>
       <td class="num">${b.qKeys ? fmtPct(b.mu) : '<span style="color:var(--muted)">—</span>'}</td>
       <td class="num">${b.qKeys ? b.sigma.toFixed(2) + '%' : '<span style="color:var(--muted)">—</span>'}</td>
-      <td class="actual-cell ${state.view === 'actual' ? '' : 'hide'}"><input type="number" data-f="actual" data-id="${b.id}" value="${b.actual}" step="1" min="0" max="100" style="width:72px"></td>
+      <td><input type="number" data-f="actual" data-id="${b.id}" value="${b.actual}" step="1" min="0" max="100" style="width:72px"></td>
       <td style="font-size:11.5px; color:${b.qKeys ? 'var(--pass)' : 'var(--muted)'}; max-width:170px">${b.qKeys ? b.dataInfo : 'no data'}</td>
       <td><button class="rm-btn" data-rm="${b.id}" title="Remove bucket">&times;</button></td>`;
     tb.appendChild(tr);
   });
-  el('thActual').classList.toggle('hide', state.view !== 'actual');
   // paste bucket selector
   el('pasteBucket').innerHTML = state.buckets.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
   renderLimits();
@@ -935,37 +946,33 @@ function renderDonut(m) {
     <div class="row"><span class="swatch" style="background:${bucketColor(row.b, row.i)}"></span>
       <span class="name">${esc(row.b.name)}</span><span class="val">${row.w.toFixed(0)}%</span></div>`).join('')
     : '<div class="note">Enter target weights to see the allocation.</div>';
-  el('donutNote').textContent = useActual && Math.abs((m.sumActual || 0) - 100) >= 0.5 && m.sumActual > 0
+  el('donutNote').textContent = useActual && !(m.sumActual > 0)
+    ? 'Enter your current holdings in the Actual % column of Portfolio buckets above.'
+    : useActual && Math.abs(m.sumActual - 100) >= 0.5
     ? `Actual weights sum to ${m.sumActual.toFixed(0)}%.` : '';
 }
 
 function renderDetail(m) {
-  const useActual = state.view === 'actual';
-  el('thBandStatus').classList.toggle('hide', !useActual);
+  const anyActual = state.buckets.some(b => b.actual > 0);
   el('detailRows').innerHTML = state.buckets.map((b, i) => {
     const trig = Math.min(5, 0.25 * b.target);
     const lo = b.target - trig, hi = b.target + trig;
     const cpl = (m.LSL != null && b.sigma > 0) ? (b.mu - m.LSL) / (3 * b.sigma) : null;
-    const w = useActual ? b.actual : b.target;
-    let statusCell = '';
-    if (useActual) {
-      let st = '<span style="color:var(--muted)">—</span>';
-      if (b.target > 0 || b.actual > 0) {
-        if (b.actual > hi) st = '<span style="color:var(--fail);font-weight:600">TRIM</span>';
-        else if (b.actual < lo) st = '<span style="color:var(--header);font-weight:600">TOP UP</span>';
-        else st = '<span style="color:var(--pass)">in band</span>';
-      }
-      statusCell = `<td>${st}</td>`;
+    let st = '<span style="color:var(--muted)">—</span>';
+    if (anyActual && (b.target > 0 || b.actual > 0)) {
+      if (b.actual > hi) st = '<span style="color:var(--fail);font-weight:600">TRIM</span>';
+      else if (b.actual < lo) st = '<span style="color:var(--header);font-weight:600">TOP UP</span>';
+      else st = '<span style="color:var(--pass)">in band</span>';
     }
     const unset = b.sigma <= 0 && (b.target > 0 || b.actual > 0);
     return `<tr${unset ? ' style="opacity:0.55"' : ''}>
       <td><span class="swatch" style="background:${bucketColor(b, i)}"></span>${esc(b.name)}${unset ? ' <span style="color:var(--fail);font-size:11px">(unset — excluded)</span>' : ''}</td>
-      <td class="num">${w.toFixed(0)}%</td>
+      <td class="num">${b.target.toFixed(0)}%</td>
       <td class="num">${b.sigma > 0 ? fmtPct(b.mu) : '—'}</td>
       <td class="num">${b.sigma > 0 ? b.sigma.toFixed(2) + '%' : '—'}</td>
       <td class="num">${cpl == null ? '—' : cpl.toFixed(2)}</td>
       <td class="num">${b.target > 0 ? lo.toFixed(1) + '% – ' + hi.toFixed(1) + '%' : '—'}</td>
-      ${statusCell}</tr>`;
+      <td>${st}</td></tr>`;
   }).join('');
 }
 
@@ -1018,8 +1025,7 @@ function renderAll() {
     stamp.className = 'stamp na';
     el('vCPL').textContent = '—'; el('vCPL').style.color = '';
     el('vShort').textContent = '—'; el('vCVaR').textContent = '—';
-    el('verdictNote').textContent = !m.agesOk ? 'Waiting on ages.' :
-      sumBad ? 'Waiting on weights summing to 100%.' : 'Waiting on bucket return history (load or paste data).';
+    el('verdictNote').textContent = 'To run the screen: ' + missingSteps(m).join('; ') + '.';
   }
 
   renderDonut(m);
@@ -1053,7 +1059,7 @@ function renderAll() {
     banner.className = 'bt-banner sim';
     banner.textContent = 'Waiting on inputs';
     el('btStats').innerHTML = '';
-    el('btNote').textContent = 'The backtest needs ages, weights summing to 100%, and loaded return history to run.';
+    el('btNote').textContent = 'To run the backtest: ' + missingSteps(m).join('; ') + '.';
   } else {
     banner.className = 'bt-banner ' + (bt.sim ? 'sim' : 'hist');
     banner.textContent = bt.sim ? 'Monte Carlo of assumptions — not historical' : 'Historical backtest';
@@ -1076,6 +1082,7 @@ function renderAll() {
   if (m.k != null) {
     const half = (m.USL - m.LSL) / 2, mid = (m.USL + m.LSL) / 2;
     const pos = Math.min(Math.max((m.muP - m.LSL) / (m.USL - m.LSL), 0.02), 0.98);
+    el('gaugeMu').style.display = '';
     el('gaugeMu').style.left = (pos * 100).toFixed(1) + '%';
     el('gK').textContent = m.k.toFixed(2);
     el('gCp').textContent = m.Cp.toFixed(2);
@@ -1083,7 +1090,7 @@ function renderAll() {
     el('gaugeL').textContent = 'LSL ' + fmtPct(m.LSL, 1);
     el('gaugeU').textContent = 'USL ' + fmtPct(m.USL, 1);
   } else {
-    el('gaugeMu').style.left = '50%';
+    el('gaugeMu').style.display = 'none';
     el('gK').textContent = el('gCp').textContent = el('gCpk').textContent = '—';
     el('gaugeL').textContent = 'LSL'; el('gaugeU').textContent = 'USL';
   }
@@ -1144,8 +1151,6 @@ function setView(v) {
   state.view = v;
   el('tgTarget').classList.toggle('active', v === 'target');
   el('tgActual').classList.toggle('active', v === 'actual');
-  document.querySelectorAll('.actual-cell').forEach(td => td.classList.toggle('hide', v !== 'actual'));
-  el('thActual').classList.toggle('hide', v !== 'actual');
   recompute();
 }
 el('btPeriods').addEventListener('click', e => {
