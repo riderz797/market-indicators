@@ -253,6 +253,10 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
         <div class="note">per quarter</div>
       </div>
     </div>
+    <div id="glidepathWrap" style="display:none; margin-top:14px">
+      <svg id="glidepathChart" viewBox="0 0 720 170" style="width:100%;height:auto" role="img" aria-label="Tolerance band by age"></svg>
+      <div class="note">Your tolerance band from today to retirement — the limits tighten as the horizon shrinks.</div>
+    </div>
   </div>
 
   <!-- ===== 2. Verdict ===== -->
@@ -264,6 +268,10 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
         <div class="stat"><div class="v" id="vShort">&mdash;</div><div class="k">Shortfall prob <span class="tip" tabindex="0" data-tip="Chance a quarter lands below the loss floor, assuming normal returns. CPL 1.00 → 0.135%, 1.33 → 0.0032%, 1.50 → 0.0003%.">?</span></div></div>
         <div class="stat"><div class="v" id="vCVaR">&mdash;</div><div class="k">CVaR 5% <span class="tip" tabindex="0" data-tip="Expected loss in the worst 5% of quarters, from the chosen distribution (default Student-t, fatter tails) with your portfolio's mean and volatility. A parametric approximation, reported for context — not optimized against.">?</span></div></div>
       </div>
+    </div>
+    <div id="capCurveWrap" style="display:none; margin-top:18px">
+      <svg id="capCurve" viewBox="0 0 720 210" style="width:100%;height:auto" role="img" aria-label="Return distribution against the tolerance band"></svg>
+      <div class="note">The bell curve of quarterly returns (bars = actual history when loaded) against the loss floor and trigger. The red tail is the shortfall probability; CPL is how far the curve's left shoulder clears the floor.</div>
     </div>
     <div class="note" id="verdictNote"></div>
   </div>
@@ -282,6 +290,12 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
       <div class="legend" id="donutLegend"></div>
     </div>
     <div class="note" id="donutNote"></div>
+  </div>
+
+  <!-- ===== Risk & return map ===== -->
+  <div class="card" id="riskMapCard" style="display:none">
+    <h2>Risk &amp; return map <span class="tip" tabindex="0" data-tip="Each bucket plotted by quarterly volatility (across) and average quarterly return (up); dot size is its target weight. The dashed line is where CPL exactly equals the floor — a mix must sit above it to pass. The gold star is your blended portfolio; the outlined star is the suggested fix.">?</span></h2>
+    <svg id="riskMap" viewBox="0 0 720 280" style="width:100%;height:auto" role="img" aria-label="Bucket risk and return scatter"></svg>
   </div>
 
   <!-- ===== 4. Per-bucket table ===== -->
@@ -315,6 +329,9 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
     </div>
     <div style="margin-top:14px">
       <span class="bt-banner sim" id="btBanner">Monte Carlo of assumptions &mdash; not historical</span>
+      <div id="controlWrap" style="display:none; margin:12px 0 4px">
+        <svg id="controlChart" viewBox="0 0 720 250" style="width:100%;height:auto" role="img" aria-label="Quarterly returns control chart"></svg>
+      </div>
       <div class="bt-stats" id="btStats"></div>
       <div class="note" id="btNote"></div>
     </div>
@@ -800,6 +817,8 @@ function runBacktest(m) {
     maxDD: maxDD * 100,
     latest: rets[n - 1]
   };
+  out.rets = rets;
+  out.qKeys = common;
   if (m.LSL != null && s > 0) {
     out.empCPL = (mu - m.LSL) / (3 * s);
     out.empShort = rets.filter(r => r < m.LSL).length / n;
@@ -865,6 +884,202 @@ function missingSteps(m) {
   return steps;
 }
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* ================= charts (inline SVG) ================= */
+const CH = { grid: '#EFEAE0', axis: '#999999', fail: '#C0392B', pass: '#3E7A4E', gold: '#F0A030', ink: '#333333', darkgold: '#B8860B' };
+function pathOf(pts) { return pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(''); }
+function chLine(x0, y0, x1, y1, color, w, dash) {
+  return `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${color}" stroke-width="${w || 1.4}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`;
+}
+function chText(x, y, txt, anchor, color, size) {
+  return `<text x="${x}" y="${y}" text-anchor="${anchor || 'start'}" fill="${color || CH.axis}" font-size="${size || 10.5}" font-family="Inter, system-ui, sans-serif">${txt}</text>`;
+}
+function starPath(cx, cy, r, fill, stroke) {
+  let d = '';
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 ? r * 0.45 : r;
+    const a = -Math.PI / 2 + i * Math.PI / 5;
+    d += (i ? 'L' : 'M') + (cx + rad * Math.cos(a)).toFixed(1) + ' ' + (cy + rad * Math.sin(a)).toFixed(1);
+  }
+  return `<path d="${d}Z" fill="${fill}" stroke="${stroke}" stroke-width="1.6"/>`;
+}
+
+function renderControlChart(m, bt) {
+  const wrap = el('controlWrap'), svg = el('controlChart');
+  if (!bt || bt.none || bt.sim || !bt.rets || bt.rets.length < 4 || m.LSL == null) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  const W = 720, H = 250, L = 16, R = 16, T = 16, B = 30;
+  const rets = bt.rets, keys = bt.qKeys, n = rets.length;
+  let lo = Math.min(m.LSL, Math.min.apply(null, rets)), hi = Math.max(m.USL, Math.max.apply(null, rets));
+  const pad = (hi - lo) * 0.1 || 1; lo -= pad; hi += pad;
+  const X = i => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1));
+  const Y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  const mu = mean(rets);
+  let out = `<rect x="${L}" y="${Y(m.USL).toFixed(1)}" width="${W - L - R}" height="${(Y(m.LSL) - Y(m.USL)).toFixed(1)}" fill="rgba(240,160,48,0.07)"/>`;
+  if (lo < 0 && hi > 0) out += chLine(L, Y(0), W - R, Y(0), CH.grid, 1);
+  out += chLine(L, Y(m.LSL), W - R, Y(m.LSL), CH.fail, 1.6);
+  out += chLine(L, Y(m.USL), W - R, Y(m.USL), CH.pass, 1.6);
+  out += chLine(L, Y(mu), W - R, Y(mu), CH.gold, 1.4, '5 4');
+  out += chText(W - R, Y(m.LSL) + 13, 'loss floor ' + fmtPct(m.LSL, 1), 'end', CH.fail);
+  out += chText(W - R, Y(m.USL) - 5, 'trigger ' + fmtPct(m.USL, 1), 'end', CH.pass);
+  out += chText(L + 4, Y(mu) - 5, 'avg ' + fmtPct(mu, 1), 'start', CH.darkgold);
+  let d = '';
+  for (let i = 0; i < n; i++) d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(rets[i]).toFixed(1);
+  out += `<path d="${d}" fill="none" stroke="#C9BFAF" stroke-width="1.1"/>`;
+  for (let i = 0; i < n; i++) {
+    const r = rets[i];
+    const breach = r < m.LSL ? CH.fail : r > m.USL ? CH.pass : null;
+    out += `<circle cx="${X(i).toFixed(1)}" cy="${Y(r).toFixed(1)}" r="${breach ? 4 : 2.6}" fill="${breach || '#8A7F6E'}" stroke="#fff" stroke-width="1"><title>${qLabel(keys[i])}: ${fmtPct(r, 1)}${r < m.LSL ? ' — below the floor' : r > m.USL ? ' — profit-taking trigger' : ''}</title></circle>`;
+  }
+  const step = Math.max(1, Math.ceil(n / 8));
+  for (let i = 0; i < n; i += step) out += chText(X(i), H - 10, qLabel(keys[i]), 'middle');
+  svg.innerHTML = out;
+}
+
+function renderCapCurve(m, bt) {
+  const wrap = el('capCurveWrap'), svg = el('capCurve');
+  if (m.CPL == null) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  const W = 720, H = 210, L = 16, R = 16, T = 14, B = 28;
+  const s5c = m.sigmaP * Math.sqrt(3 / 5);
+  const pdf = m.dist === 'normal'
+    ? x => normPdf((x - m.muP) / m.sigmaP) / m.sigmaP
+    : x => T5_PDF((x - m.muP) / s5c) / s5c;
+  const x0 = Math.min(m.LSL - m.sigmaP, m.muP - 4 * m.sigmaP);
+  const x1 = Math.max(m.USL + m.sigmaP, m.muP + 4 * m.sigmaP);
+  const X = v => L + (W - L - R) * (v - x0) / (x1 - x0);
+  const N = 140, xs = [], ys = [];
+  for (let i = 0; i <= N; i++) { const x = x0 + (x1 - x0) * i / N; xs.push(x); ys.push(pdf(x)); }
+  let ymax = Math.max.apply(null, ys);
+  let counts = null, nb = 21, bw = (x1 - x0) / nb;
+  if (bt && !bt.sim && !bt.none && bt.rets && bt.rets.length >= 8) {
+    counts = new Array(nb).fill(0);
+    for (const r of bt.rets) { const bi = Math.floor((r - x0) / bw); if (bi >= 0 && bi < nb) counts[bi]++; }
+    const dens = counts.map(c => c / (bt.rets.length * bw));
+    ymax = Math.max(ymax, Math.max.apply(null, dens));
+  }
+  const Y = dv => T + (H - T - B) * (1 - dv / (ymax * 1.08));
+  let out = '';
+  if (counts) {
+    for (let i = 0; i < nb; i++) {
+      if (!counts[i]) continue;
+      const dv = counts[i] / (bt.rets.length * bw);
+      out += `<rect x="${(X(x0 + i * bw) + 1).toFixed(1)}" y="${Y(dv).toFixed(1)}" width="${(X(x0 + bw) - X(x0) - 2).toFixed(1)}" height="${(Y(0) - Y(dv)).toFixed(1)}" fill="#E4DCCE"><title>${counts[i]} of ${bt.rets.length} quarters between ${fmtPct(x0 + i * bw, 1)} and ${fmtPct(x0 + (i + 1) * bw, 1)}</title></rect>`;
+    }
+  }
+  let tail = `M${X(x0).toFixed(1)} ${Y(0).toFixed(1)}`;
+  for (let i = 0; i <= N && xs[i] <= m.LSL; i++) tail += `L${X(xs[i]).toFixed(1)} ${Y(ys[i]).toFixed(1)}`;
+  tail += `L${X(m.LSL).toFixed(1)} ${Y(pdf(m.LSL)).toFixed(1)} L${X(m.LSL).toFixed(1)} ${Y(0).toFixed(1)} Z`;
+  out += `<path d="${tail}" fill="rgba(192,57,43,0.30)" stroke="none"/>`;
+  let d = '';
+  for (let i = 0; i <= N; i++) d += (i ? 'L' : 'M') + X(xs[i]).toFixed(1) + ' ' + Y(ys[i]).toFixed(1);
+  out += `<path d="${d}" fill="none" stroke="#6B6154" stroke-width="1.8"/>`;
+  out += chLine(L, Y(0), W - R, Y(0), CH.grid, 1);
+  out += chLine(X(m.LSL), T, X(m.LSL), Y(0), CH.fail, 1.6);
+  out += chLine(X(m.USL), T, X(m.USL), Y(0), CH.pass, 1.6);
+  out += chLine(X(m.muP), T, X(m.muP), Y(0), CH.gold, 1.2, '5 4');
+  out += chText(X(m.LSL), H - 8, 'floor ' + fmtPct(m.LSL, 1), 'middle', CH.fail);
+  out += chText(X(m.USL), H - 8, 'trigger ' + fmtPct(m.USL, 1), 'middle', CH.pass);
+  out += chText(X(m.muP), T + 10, 'avg ' + fmtPct(m.muP, 1), X(m.muP) > W / 2 ? 'end' : 'start', CH.darkgold);
+  out += chText(Math.max(X(m.LSL) - 6, 60), T + 26, 'shortfall ' + fmtProb(m.shortfall), 'end', CH.fail);
+  svg.innerHTML = out;
+}
+
+function renderGlidepath(m) {
+  const wrap = el('glidepathWrap'), svg = el('glidepathChart');
+  if (m.LSL == null) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  const age = readNum('inAge'), ret = readNum('inRet');
+  const hCap = readNum('setHCap') || 40, p = readNum('setP') || 2;
+  const W = 720, H = 170, L = 46, R = 60, T = 14, B = 26;
+  const band = a => { const yr = Math.max(ret - a, 0), h = Math.min(yr, hCap) / hCap; return m.LmaxEff * (1 - Math.pow(1 - h, p)); };
+  const maxB = band(age) || 1;
+  const X = a => L + (W - L - R) * (a - age) / (ret - age);
+  const Y = v => T + (H - T - B) * (1 - (v + maxB * 1.1) / (2 * maxB * 1.1));
+  const N = 80, up = [], dn = [];
+  for (let i = 0; i <= N; i++) {
+    const a = age + (ret - age) * i / N, b = band(a);
+    up.push([X(a), Y(b)]); dn.push([X(a), Y(-b)]);
+  }
+  const poly = up.concat(dn.slice().reverse()).map(pt => pt[0].toFixed(1) + ',' + pt[1].toFixed(1)).join(' ');
+  let out = `<polygon points="${poly}" fill="rgba(240,160,48,0.10)"/>`;
+  out += chLine(L, Y(0), W - R, Y(0), CH.grid, 1);
+  out += `<path d="${pathOf(up)}" fill="none" stroke="${CH.pass}" stroke-width="1.6"/>`;
+  out += `<path d="${pathOf(dn)}" fill="none" stroke="${CH.fail}" stroke-width="1.6"/>`;
+  out += `<circle cx="${L}" cy="${Y(band(age)).toFixed(1)}" r="4" fill="${CH.pass}"/>`;
+  out += `<circle cx="${L}" cy="${Y(-band(age)).toFixed(1)}" r="4" fill="${CH.fail}"/>`;
+  out += chText(L, T - 2, 'now (age ' + age + ')', 'start', CH.ink, 11);
+  out += chText(L - 6, Y(band(age)) + 4, fmtPct(band(age), 1), 'end', CH.pass);
+  out += chText(L - 6, Y(-band(age)) + 4, fmtPct(-band(age), 1), 'end', CH.fail);
+  out += chText(W - R + 4, Y(0) + 4, 'retire (' + ret + ')', 'start', CH.ink, 11);
+  for (let a = Math.ceil(age / 5) * 5; a < ret; a += 5) {
+    if (a <= age + 1) continue;
+    out += chText(X(a), H - 8, String(a), 'middle');
+    out += chLine(X(a), Y(0) - 3, X(a), Y(0) + 3, CH.axis, 1);
+  }
+  svg.innerHTML = out;
+}
+
+function renderRiskMap(m) {
+  const card = el('riskMapCard'), svg = el('riskMap');
+  const bks = (m.bks || []).filter(b => b.sigma > 0);
+  if (bks.length < 2 || m.muP == null || m.LSL == null) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const W = 720, H = 280, L = 50, R = 20, T = 18, B = 34;
+  const sgMax = Math.max(Math.max.apply(null, bks.map(b => b.sigma)), m.sigmaP) * 1.2;
+  const mus = bks.map(b => b.mu).concat([m.muP, m.LSL, 0]);
+  const y0 = Math.min.apply(null, mus) - 2, y1 = Math.max.apply(null, mus) + 3.5;
+  const X = sg => L + (W - L - R) * Math.sqrt(Math.max(sg, 0) / sgMax);
+  const Y = v => T + (H - T - B) * (1 - (v - y0) / (y1 - y0));
+  const NB = 60, bpts = [];
+  for (let i = 0; i <= NB; i++) {
+    const sg = sgMax * i / NB;
+    bpts.push([X(sg), Math.max(Y(m.LSL + 3 * m.floor * sg), T)]);
+  }
+  let out = `<polygon points="${bpts.map(pt => pt[0].toFixed(1) + ',' + pt[1].toFixed(1)).join(' ')} ${W - R},${H - B} ${L},${H - B}" fill="rgba(192,57,43,0.06)"/>`;
+  out += `<path d="${pathOf(bpts)}" fill="none" stroke="${CH.fail}" stroke-width="1.2" stroke-dasharray="6 4"/>`;
+  if (y0 < 0 && y1 > 0) out += chLine(L, Y(0), W - R, Y(0), CH.grid, 1);
+  const labels = [];
+  bks.forEach(b => {
+    const i = state.buckets.indexOf(b);
+    const r = 4 + Math.sqrt(Math.max(b.target, 0)) * 1.4;
+    const cx = X(b.sigma), cy = Y(b.mu);
+    out += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${bucketColor(b, i)}" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>${esc(b.name)}: avg ${fmtPct(b.mu)} / volatility ${b.sigma.toFixed(1)}% / target ${b.target}%</title></circle>`;
+    let lx = cx + r + 4, ly = cy + 3.5;
+    while (labels.some(q => Math.abs(q.x - lx) < 64 && Math.abs(q.y - ly) < 12)) ly -= 12;
+    labels.push({ x: lx, y: ly });
+    out += chText(lx, ly, esc(b.name), 'start', CH.ink, 10.5);
+  });
+  if (m.fixerBest) {
+    out += starPath(X(m.fixerBest.sigma), Y(m.fixerBest.mu), 9, 'none', CH.darkgold);
+    out += chText(X(m.fixerBest.sigma), Y(m.fixerBest.mu) - 13, 'suggested', 'middle', CH.axis, 10.5);
+  }
+  out += starPath(X(m.sigmaP), Y(m.muP), 10, CH.gold, CH.darkgold);
+  out += chText(X(m.sigmaP), Y(m.muP) - 14, 'portfolio', 'middle', CH.darkgold, 11);
+  const lblSg = sgMax * 0.55;
+  const lblY = Y(m.LSL + 3 * m.floor * lblSg);
+  if (lblY > T + 14 && lblY < H - B) out += chText(X(lblSg), lblY - 7, 'pass line (CPL = floor)', 'middle', CH.fail, 10.5);
+  out += chText(W - R, H - 10, 'volatility per quarter (sqrt scale) →', 'end');
+  out += chText(L - 36, T - 4, '↑ avg qtr return', 'start');
+  svg.innerHTML = out;
+}
+
+function bulletCell(b, lo, hi, anyActual) {
+  if (!(b.target > 0)) return '—';
+  const W = 160, H = 18;
+  const max = Math.max(hi, b.actual || 0) * 1.2 || 1;
+  const S = v => (Math.max(v, 0) / max) * (W - 8) + 4;
+  let out = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="vertical-align:middle">`;
+  out += `<line x1="4" y1="${H / 2}" x2="${W - 4}" y2="${H / 2}" stroke="#F0EBE1" stroke-width="2"/>`;
+  out += `<rect x="${S(lo).toFixed(1)}" y="4" width="${(S(hi) - S(lo)).toFixed(1)}" height="${H - 8}" rx="2" fill="#E7DFD0"/>`;
+  out += `<line x1="${S(b.target).toFixed(1)}" y1="2" x2="${S(b.target).toFixed(1)}" y2="${H - 2}" stroke="#6B6154" stroke-width="2"/>`;
+  if (anyActual) {
+    const col = b.actual > hi ? '#C0392B' : b.actual < lo ? '#B8860B' : '#3E7A4E';
+    out += `<circle cx="${S(b.actual).toFixed(1)}" cy="${H / 2}" r="4.5" fill="${col}" stroke="#fff" stroke-width="1.2"/>`;
+  }
+  out += `<title>no-trade band ${lo.toFixed(1)}% – ${hi.toFixed(1)}% (target ${b.target}%${anyActual ? ', actual ' + b.actual + '%' : ''})</title></svg>`;
+  return out;
+}
 
 /* ================= rendering ================= */
 function renderBucketInputs() {
@@ -971,7 +1186,7 @@ function renderDetail(m) {
       <td class="num">${b.sigma > 0 ? fmtPct(b.mu) : '—'}</td>
       <td class="num">${b.sigma > 0 ? b.sigma.toFixed(2) + '%' : '—'}</td>
       <td class="num">${cpl == null ? '—' : cpl.toFixed(2)}</td>
-      <td class="num">${b.target > 0 ? lo.toFixed(1) + '% – ' + hi.toFixed(1) + '%' : '—'}</td>
+      <td>${bulletCell(b, lo, hi, anyActual)}</td>
       <td>${st}</td></tr>`;
   }).join('');
 }
@@ -1031,10 +1246,14 @@ function renderAll() {
   renderDonut(m);
   renderDetail(m);
 
+  const bt = (m.agesOk || m.muP != null) ? runBacktest(m) : { none: true };
+  renderCapCurve(m, bt);
+
   // fixer
   const fc = el('fixerCard');
   if (m.CPL != null && !m.pass) {
     const best = runFixer(m);
+    m.fixerBest = best;
     fc.classList.remove('hide');
     if (best) {
       const bks = m.bks;
@@ -1053,7 +1272,6 @@ function renderAll() {
   } else fc.classList.add('hide');
 
   // backtest
-  const bt = (m.agesOk || m.muP != null) ? runBacktest(m) : { none: true };
   const banner = el('btBanner');
   if (bt.none) {
     banner.className = 'bt-banner sim';
@@ -1077,6 +1295,10 @@ function renderAll() {
     if (!bt.sim && bt.latestBreach) note += ' The most recent quarter breached the trigger — profit-taking / rebalance now.';
     el('btNote').textContent = note;
   }
+
+  renderControlChart(m, bt);
+  renderGlidepath(m);
+  renderRiskMap(m);
 
   // gauge
   if (m.k != null) {
