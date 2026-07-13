@@ -4087,29 +4087,19 @@ const SIGNAL_Q4_ROC = 0.0373;   // top-quartile 13-week liquidity growth thresho
 const SIGNAL_TIERS = {
     strong: { label: 'STRONG', color: '#1a7f37',
         desc: 'Liquidity thrust — top-quartile momentum',
-        n: 119, ep: 11,
-        w13: { mean: '+41%', win: '72%', p20: '50%', pcall: '62%' },
-        w26: { mean: '+71%', win: '67%' } },
+        n: 119, win: '72%', avg: '+41%', callp: '62%' },
     active: { label: 'ACTIVE', color: '#9a6700',
         desc: 'Cheap vs model + liquidity rising',
-        n: 111, ep: 16,
-        w13: { mean: '+36%', win: '63%', p20: '50%', pcall: '57%' },
-        w26: { mean: '+78%', win: '68%' } },
+        n: 111, win: '63%', avg: '+36%', callp: '57%' },
     moderate: { label: 'MODERATE', color: '#57606a',
         desc: 'Liquidity rising, no valuation edge',
-        n: 265, ep: 15,
-        w13: { mean: '+27%', win: '58%', p20: '42%', pcall: '50%' },
-        w26: { mean: '+41%', win: '58%' } },
+        n: 265, win: '58%', avg: '+27%', callp: '50%' },
     avoid: { label: 'AVOID', color: '#cf222e',
         desc: 'BTC 10–30% above model — negative expectancy',
-        n: 28, ep: 15,
-        w13: { mean: '−11%', win: '32%', p20: '25%', pcall: '29%' },
-        w26: { mean: '−2%', win: '36%' } },
+        n: 28, win: '32%', avg: '−11%', callp: '29%' },
     stand: { label: 'STAND ASIDE', color: '#57606a',
         desc: 'Liquidity contracting — no tested edge',
-        n: 184, ep: 15,
-        w13: { mean: '+2%', win: '47%', p20: '25%', pcall: '32%' },
-        w26: { mean: '+22%', win: '57%' } },
+        n: 184, win: '47%', avg: '+2%', callp: '32%' },
 };
 
 function computeSignalTier(gap, roc) {
@@ -4120,7 +4110,34 @@ function computeSignalTier(gap, roc) {
     return 'stand';
 }
 
-function renderSignalCard(chartDiv, gap, roc, overlay) {
+function rocSparklineSVG(series, width, height) {
+    // series: last ~52 weekly values of 13-wk liquidity growth (fractions)
+    if (!series || series.length < 4) return '';
+    const lo = Math.min(...series, -0.005), hi = Math.max(...series, SIGNAL_Q4_ROC + 0.005);
+    const pad = (hi - lo) * 0.12;
+    const x = i => (i / (series.length - 1)) * (width - 8) + 2;
+    const y = v => height - 3 - ((v - (lo - pad)) / ((hi + pad) - (lo - pad))) * (height - 6);
+    let path = '';
+    for (let i = 0; i < series.length; i++) {
+        path += (i ? ' L' : 'M') + x(i).toFixed(1) + ' ' + y(series[i]).toFixed(1);
+    }
+    const last = series[series.length - 1];
+    return '<svg width="' + width + '" height="' + height + '" style="display:block">' +
+        '<line x1="2" x2="' + (width - 2) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) +
+            '" stroke="#8b949e" stroke-width="1" stroke-dasharray="3 3"/>' +
+        '<line x1="2" x2="' + (width - 2) + '" y1="' + y(SIGNAL_Q4_ROC).toFixed(1) + '" y2="' + y(SIGNAL_Q4_ROC).toFixed(1) +
+            '" stroke="#1a7f37" stroke-width="1" stroke-dasharray="2 4" opacity="0.55"/>' +
+        '<text x="' + (width - 4) + '" y="' + (y(SIGNAL_Q4_ROC) - 3).toFixed(1) +
+            '" text-anchor="end" font-size="9" fill="#1a7f37" opacity="0.8">thrust +3.7%</text>' +
+        '<text x="' + (width - 4) + '" y="' + (y(0) + 11).toFixed(1) +
+            '" text-anchor="end" font-size="9" fill="#8b949e">0</text>' +
+        '<path d="' + path + '" fill="none" stroke="#24292f" stroke-width="1.6" stroke-linejoin="round"/>' +
+        '<circle cx="' + x(series.length - 1).toFixed(1) + '" cy="' + y(last).toFixed(1) +
+            '" r="3.2" fill="' + (last > 0 ? '#1a7f37' : '#cf222e') + '" stroke="#fff" stroke-width="1"/>' +
+        '</svg>';
+}
+
+function renderSignalCard(chartDiv, gap, roc, overlay, rocSeries) {
     const old = document.getElementById('call-signal-card');
     if (old) old.remove();
     const tierKey = computeSignalTier(gap, roc);
@@ -4129,15 +4146,19 @@ function renderSignalCard(chartDiv, gap, roc, overlay) {
 
     let watch = '';
     if (tierKey === 'stand' && gap != null && gap < -0.20) {
-        watch = 'Watch: liquidity growth crossing above 0 activates ACTIVE ' +
-                '(13w: win 63%, mean +36%).';
+        watch = 'Trigger: growth crossing above 0 upgrades this to ACTIVE ' +
+                '(BTC higher 3 mo later 63% of the time, avg +36%).';
     } else if (tierKey === 'active' && roc != null && roc < SIGNAL_Q4_ROC) {
-        watch = 'Momentum below the +3.7% thrust threshold — weaker tier; ' +
-                'prefer 3–6 month expiries.';
+        watch = 'Growth is positive but below the +3.7% thrust level — ' +
+                'weaker tier; prefer 3–6 month expiries.';
     } else if (tierKey === 'strong') {
-        watch = 'Strongest tested condition; edge peaks at 8–13 weeks. ' +
-                'Only ' + t.ep + ' historical episodes — size to lose the premium.';
+        watch = 'Strongest tested signal; edge peaks at 2–3 months. ' +
+                'Rare condition — size to lose the full premium.';
     }
+
+    const row = (label, val) =>
+        '<div style="display:flex;justify-content:space-between;margin-top:2px">' +
+        '<span style="color:#57606a">' + label + '</span><b>' + val + '</b></div>';
 
     const card = document.createElement('div');
     card.id = 'call-signal-card';
@@ -4154,14 +4175,17 @@ function renderSignalCard(chartDiv, gap, roc, overlay) {
                 'font-size:11px;font-weight:bold">' + t.label + '</span></div>' +
         '<div style="color:#57606a;margin-bottom:8px">' + t.desc + '</div>' +
         '<div style="border-top:1px solid #eee;padding-top:7px">' +
-          'Gap vs model: <b>' + fmtPct(gap, 0) + '</b><br>' +
-          'Liquidity 13-wk growth: <b>' + fmtPct(roc, 1) + '</b> ' +
-          '<span style="color:#8b949e">(thrust ≥ +3.7%)</span></div>' +
+          row('Gap vs model', fmtPct(gap, 0)) +
+          row('Liquidity growth (13-wk)', fmtPct(roc, 1)) +
+          rocSparklineSVG(rocSeries, 210, 46) +
+          '<div style="color:#8b949e;font-size:10.5px">liquidity index now vs 13 weeks ago · last 12 months</div>' +
+        '</div>' +
         '<div style="border-top:1px solid #eee;margin-top:7px;padding-top:7px">' +
-          '<span style="color:#57606a">Backtest analogs (' + t.n + ' wks, ' + t.ep + ' episodes)</span><br>' +
-          '13 wks: mean <b>' + t.w13.mean + '</b> · win <b>' + t.w13.win + '</b><br>' +
-          'P(&gt;+20%) <b>' + t.w13.p20 + '</b> · ATM call P(profit) <b>' + t.w13.pcall + '</b><br>' +
-          '26 wks: mean <b>' + t.w26.mean + '</b> · win <b>' + t.w26.win + '</b></div>' +
+          '<div style="color:#57606a;margin-bottom:2px">In ' + t.n + ' similar weeks since 2017:</div>' +
+          row('BTC higher 3 mo later', t.win) +
+          row('Average 3-mo move', t.avg) +
+          row('ATM call profitable', t.callp) +
+        '</div>' +
         (watch ? '<div style="border-top:1px solid #eee;margin-top:7px;padding-top:7px;color:#9a6700">' +
                  watch + '</div>' : '') +
         '<div style="margin-top:7px;color:#8b949e;font-size:10.5px">Walk-forward backtest 2017–2026 · ' +
@@ -4245,6 +4269,10 @@ async function updateData() {
             ? Math.log(btcW.values[btcW.values.length - 1] / modelAtToday) : null;
         const sigRoc = glValues.length > 13
             ? glValues[glValues.length - 1] / glValues[glValues.length - 14] - 1 : null;
+        const sigRocSeries = [];   // 13-wk growth, last ~52 weeks, for the card sparkline
+        for (let i = Math.max(13, glValues.length - 52); i < glValues.length; i++) {
+            sigRocSeries.push(glValues[i] / glValues[i - 13] - 1);
+        }
 
         const chartDiv = document.querySelector('.plotly-graph-div');
         const traces = chartDiv.data;
@@ -4324,7 +4352,7 @@ async function updateData() {
 
         Plotly.react(chartDiv, traces, layout);
 
-        renderSignalCard(chartDiv, sigGap, sigRoc, wideChart);
+        renderSignalCard(chartDiv, sigGap, sigRoc, wideChart, sigRocSeries);
 
         // Watermark — HTML overlay so it always renders regardless of Plotly version
         (function addAcumenWatermark() {
