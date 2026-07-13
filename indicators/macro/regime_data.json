@@ -1,6 +1,6 @@
 {
   "as_of": "2026-06-01",
-  "updated_utc": "2026-07-06T12:54:04Z",
+  "updated_utc": "2026-07-13T12:11:37Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
@@ -12,20 +12,20 @@
     "score": 2.8
   },
   "market_regime": "REFLATION",
-  "market_regime_raw": "GOLDILOCKS",
+  "market_regime_raw": "REFLATION",
   "shares": {
-    "GOLDILOCKS": 37,
-    "REFLATION": 33,
-    "INFLATION": 15,
-    "DEFLATION": 15
+    "GOLDILOCKS": 27,
+    "REFLATION": 37,
+    "INFLATION": 24,
+    "DEFLATION": 12
   },
   "signal_strength": 37,
-  "risk_on_prob": 70,
+  "risk_on_prob": 64,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
-    "pending_regime": "GOLDILOCKS",
-    "pending_weeks": 2,
+    "pending_regime": null,
+    "pending_weeks": 0,
     "confirmed_since": "2026-06-16"
   },
   "components": {
@@ -103,10 +103,10 @@
       },
       {
         "name": "High Yield",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
@@ -127,18 +127,18 @@
       },
       {
         "name": "Base Metals",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
         "name": "Agriculture",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
