@@ -153,6 +153,99 @@ function shiftDatesForward(dates, weeks) {
     return dates.map(d => { const dt = new Date(d); dt.setDate(dt.getDate() + weeks * 7); return dt.toISOString().slice(0, 10); });
 }
 
+// ── Call-option signal (from backtest_btc_liquidity.py, walk-forward 2017-2026) ──
+const SIGNAL_Q4_ROC = 0.0373;   // top-quartile 13-week liquidity growth threshold
+const SIGNAL_TIERS = {
+    strong: { label: 'STRONG', color: '#1a7f37',
+        desc: 'Liquidity thrust — top-quartile momentum',
+        n: 119, ep: 11,
+        w13: { mean: '+41%', win: '72%', p20: '50%', pcall: '62%' },
+        w26: { mean: '+71%', win: '67%' } },
+    active: { label: 'ACTIVE', color: '#9a6700',
+        desc: 'Cheap vs model + liquidity rising',
+        n: 111, ep: 16,
+        w13: { mean: '+36%', win: '63%', p20: '50%', pcall: '57%' },
+        w26: { mean: '+78%', win: '68%' } },
+    moderate: { label: 'MODERATE', color: '#57606a',
+        desc: 'Liquidity rising, no valuation edge',
+        n: 265, ep: 15,
+        w13: { mean: '+27%', win: '58%', p20: '42%', pcall: '50%' },
+        w26: { mean: '+41%', win: '58%' } },
+    avoid: { label: 'AVOID', color: '#cf222e',
+        desc: 'BTC 10–30% above model — negative expectancy',
+        n: 28, ep: 15,
+        w13: { mean: '−11%', win: '32%', p20: '25%', pcall: '29%' },
+        w26: { mean: '−2%', win: '36%' } },
+    stand: { label: 'STAND ASIDE', color: '#57606a',
+        desc: 'Liquidity contracting — no tested edge',
+        n: 184, ep: 15,
+        w13: { mean: '+2%', win: '47%', p20: '25%', pcall: '32%' },
+        w26: { mean: '+22%', win: '57%' } },
+};
+
+function computeSignalTier(gap, roc) {
+    if (roc != null && roc >= SIGNAL_Q4_ROC) return 'strong';
+    if (gap != null && roc != null && gap < -0.20 && roc > 0) return 'active';
+    if (roc != null && roc > 0) return 'moderate';
+    if (gap != null && gap >= 0.10 && gap < 0.30) return 'avoid';
+    return 'stand';
+}
+
+function renderSignalCard(chartDiv, gap, roc, overlay) {
+    const old = document.getElementById('call-signal-card');
+    if (old) old.remove();
+    const tierKey = computeSignalTier(gap, roc);
+    const t = SIGNAL_TIERS[tierKey];
+    const fmtPct = (v, dec) => v == null ? 'n/a' : (v > 0 ? '+' : '−') + Math.abs(v * 100).toFixed(dec) + '%';
+
+    let watch = '';
+    if (tierKey === 'stand' && gap != null && gap < -0.20) {
+        watch = 'Watch: liquidity growth crossing above 0 activates ACTIVE ' +
+                '(13w: win 63%, mean +36%).';
+    } else if (tierKey === 'active' && roc != null && roc < SIGNAL_Q4_ROC) {
+        watch = 'Momentum below the +3.7% thrust threshold — weaker tier; ' +
+                'prefer 3–6 month expiries.';
+    } else if (tierKey === 'strong') {
+        watch = 'Strongest tested condition; edge peaks at 8–13 weeks. ' +
+                'Only ' + t.ep + ' historical episodes — size to lose the premium.';
+    }
+
+    const card = document.createElement('div');
+    card.id = 'call-signal-card';
+    card.style.cssText = (overlay
+        ? 'position:absolute;right:10px;top:90px;width:238px;z-index:3;'
+        : 'position:relative;max-width:420px;margin:12px auto;') +
+        'background:#fff;border:1px solid #d0d7de;border-left:4px solid ' + t.color + ';' +
+        'border-radius:8px;padding:12px 14px;font-family:Arial,sans-serif;font-size:12px;' +
+        'color:#24292f;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:left;';
+    card.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
+          '<span style="font-size:11px;letter-spacing:.6px;color:#57606a;font-weight:bold">CALL-OPTION SIGNAL</span>' +
+          '<span style="background:' + t.color + ';color:#fff;border-radius:10px;padding:1px 9px;' +
+                'font-size:11px;font-weight:bold">' + t.label + '</span></div>' +
+        '<div style="color:#57606a;margin-bottom:8px">' + t.desc + '</div>' +
+        '<div style="border-top:1px solid #eee;padding-top:7px">' +
+          'Gap vs model: <b>' + fmtPct(gap, 0) + '</b><br>' +
+          'Liquidity 13-wk growth: <b>' + fmtPct(roc, 1) + '</b> ' +
+          '<span style="color:#8b949e">(thrust ≥ +3.7%)</span></div>' +
+        '<div style="border-top:1px solid #eee;margin-top:7px;padding-top:7px">' +
+          '<span style="color:#57606a">Backtest analogs (' + t.n + ' wks, ' + t.ep + ' episodes)</span><br>' +
+          '13 wks: mean <b>' + t.w13.mean + '</b> · win <b>' + t.w13.win + '</b><br>' +
+          'P(&gt;+20%) <b>' + t.w13.p20 + '</b> · ATM call P(profit) <b>' + t.w13.pcall + '</b><br>' +
+          '26 wks: mean <b>' + t.w26.mean + '</b> · win <b>' + t.w26.win + '</b></div>' +
+        (watch ? '<div style="border-top:1px solid #eee;margin-top:7px;padding-top:7px;color:#9a6700">' +
+                 watch + '</div>' : '') +
+        '<div style="margin-top:7px;color:#8b949e;font-size:10.5px">Walk-forward backtest 2017–2026 · ' +
+          'analogs, not forecasts · not financial advice</div>';
+
+    if (overlay) {
+        chartDiv.style.position = 'relative';
+        chartDiv.appendChild(card);
+    } else {
+        chartDiv.parentNode.insertBefore(card, chartDiv.nextSibling);
+    }
+}
+
 async function updateData() {
     setLoading(true);
     try {
@@ -212,6 +305,18 @@ async function updateData() {
         }
 
         const projectedBTC = modelValues[modelValues.length - 1];
+
+        // signal inputs: gap vs model at the latest BTC date, 13w liquidity growth
+        const lastBtcDate = btcW.dates[btcW.dates.length - 1];
+        let modelAtToday = null;
+        for (let i = modelDates.length - 1; i >= 0; i--) {
+            if (modelDates[i] <= lastBtcDate) { modelAtToday = modelValues[i]; break; }
+        }
+        const sigGap = modelAtToday
+            ? Math.log(btcW.values[btcW.values.length - 1] / modelAtToday) : null;
+        const sigRoc = glValues.length > 13
+            ? glValues[glValues.length - 1] / glValues[glValues.length - 14] - 1 : null;
+
         const chartDiv = document.querySelector('.plotly-graph-div');
         const traces = chartDiv.data;
         for (let i = 0; i < traces.length; i++) {
@@ -284,7 +389,13 @@ async function updateData() {
             }
         }
 
+        // shift the plot left to make room for the signal card on wide screens
+        const wideChart = (chartDiv.offsetWidth || window.innerWidth) >= 900;
+        if (wideChart) layout.margin = Object.assign({}, layout.margin || {}, { r: 330 });
+
         Plotly.react(chartDiv, traces, layout);
+
+        renderSignalCard(chartDiv, sigGap, sigRoc, wideChart);
 
         // Watermark — HTML overlay so it always renders regardless of Plotly version
         (function addAcumenWatermark() {
