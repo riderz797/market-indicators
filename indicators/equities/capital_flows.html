@@ -605,6 +605,7 @@ function buildCycleSVG(activeClass, posHistory) {
   });
 
   // Markers: the last 3 weekly reads at their weighted top-3 spots.
+  // Gold diamonds so they read differently from the round phase dots.
   // Oldest drawn first and faintest; the current week sits on top at
   // full opacity, so the fade direction shows how the read is moving.
   const MARKER_OPACITY = { 0: 1, 1: 0.5, 2: 0.25 };
@@ -617,12 +618,14 @@ function buildCycleSVG(activeClass, posHistory) {
       const op = MARKER_OPACITY[h.weeksBack] != null ? MARKER_OPACITY[h.weeksBack] : 0.25;
       const lbl = h.weeksBack === 0 ? "Current week"
                 : h.weeksBack === 1 ? "1 week ago" : `${h.weeksBack} weeks ago`;
+      const r = 9;   // diamond half-diagonal
       svgContent += `
         <g opacity="${op}">
           <title>${lbl}</title>
-          <circle cx="${mx}" cy="${my}" r="10" fill="#C8960C" opacity="0.25"/>
-          <circle cx="${mx}" cy="${my}" r="6"  fill="#C8960C"/>
-          <circle cx="${mx}" cy="${my}" r="3"  fill="#FFFFFF"/>
+          <circle cx="${mx}" cy="${my}" r="13" fill="#C8960C" opacity="0.2"/>
+          <path d="M ${mx},${my - r} L ${mx + r},${my} L ${mx},${my + r} L ${mx - r},${my} Z"
+                fill="#C8960C" stroke="#7A5A06" stroke-width="1.5"/>
+          <circle cx="${mx}" cy="${my}" r="2.5" fill="#FFFFFF"/>
         </g>
       `;
     });
