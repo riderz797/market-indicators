@@ -257,15 +257,15 @@
 
   <!-- BOARD 2 -->
   <div class="panel">
-    <div class="panel-title">Board 2 — Last Week vs 12-Month Average</div>
-    <div class="panel-desc">Bar length = last week's volume as a percent of the 52-week average. Green bar = buy side. Red bar = sell side. Vertical line at 100%.</div>
+    <div class="panel-title">Board 2 — Last Week vs 12-Month Median</div>
+    <div class="panel-desc">Bar length = last week's volume as a percent of the 52-week median. Green bar = buy side. Red bar = sell side. Vertical line at 100%.</div>
     <div id="board2-chart"></div>
   </div>
 
   <!-- BOARD 3 -->
   <div class="panel">
     <div class="panel-title">Board 3 — Asset Allocation Cycle Position</div>
-    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) across 6 nodes: Debasement → Cyclical → Speculation → Commodities → Defensive → Fixed Income.</div>
+    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) across 6 nodes: Debasement → Cyclical → Speculation → Commodities → Defensive → Fixed Income. Marker = score-weighted average position of the 3 strongest classes.</div>
     <div class="cycle-wrapper">
       <div class="cycle-svg-container">
         <svg id="cycle-svg" viewBox="0 0 700 320" width="100%" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -312,6 +312,15 @@ function avgVolume(ticker, nWeeks) {
   if (!d || !d.volumes.length) return 0;
   const vols = d.volumes.slice(-nWeeks);
   return vols.reduce((a, b) => a + b, 0) / vols.length || 1;
+}
+
+function medianVolume(ticker, nWeeks) {
+  const d = CAPITAL_FLOWS.data[ticker];
+  if (!d || !d.volumes.length) return 0;
+  const vols = d.volumes.slice(-nWeeks).slice().sort((a, b) => a - b);
+  const mid = Math.floor(vols.length / 2);
+  const med = vols.length % 2 ? vols[mid] : (vols[mid - 1] + vols[mid]) / 2;
+  return med || 1;
 }
 
 function formatVol(v) {
@@ -422,9 +431,9 @@ function buildBoard2() {
   CAPITAL_FLOWS.tickers.forEach(ticker => {
     const d = CAPITAL_FLOWS.data[ticker];
     if (!d || !d.volumes.length) return;
-    const avg = avgVolume(ticker, WEEKS_12M) || 1;
+    const med = medianVolume(ticker, WEEKS_12M) || 1;
     const lastVol  = d.volumes.at(-1);
-    const pct      = (lastVol / avg) * 100;
+    const pct      = (lastVol / med) * 100;
     const side     = buyOrSell(d.opens.at(-1), d.closes.at(-1));
     rows.push({ ticker, pct, side });
   });
@@ -446,7 +455,7 @@ function buildBoard2() {
     textposition: "outside",
     textfont: { size: 10, color: "#555555", family: "JetBrains Mono" },
     cliponaxis: false,
-    hovertemplate: "<b>%{y}</b><br>%{x:.1f}% of 52-wk avg<extra></extra>",
+    hovertemplate: "<b>%{y}</b><br>%{x:.1f}% of 52-wk median<extra></extra>",
     showlegend: false,
   };
 
@@ -465,7 +474,7 @@ function buildBoard2() {
     plot_bgcolor:  "#FAFAFA",
     margin: { t: 10, b: 40, l: 60, r: 80 },
     xaxis: {
-      title: { text: "% of 52-Week Average Volume", font: { color: "#777", size: 10 } },
+      title: { text: "% of 52-Week Median Volume", font: { color: "#777", size: 10 } },
       gridcolor: "#E8E8E8", zeroline: false,
       tickfont: { color: "#777", size: 10 },
       ticksuffix: "%",
@@ -482,7 +491,7 @@ function buildBoard2() {
     }],
     annotations: [{
       x: 100, y: tickers.length - 0.5,
-      text: "avg", showarrow: false,
+      text: "median", showarrow: false,
       font: { color: "#777", size: 9 }, yshift: 10,
     }],
   }, { displayModeBar: false, responsive: true });
@@ -519,7 +528,27 @@ function computeCycleScores() {
   return scores;
 }
 
-function buildCycleSVG(activeClass) {
+// Marker spot: score-weighted circular mean of the 3 highest-scoring classes'
+// positions on the cycle (weights clipped at 0 so outflows don't pull the
+// marker). Returns a fractional index into CYCLE_ORDER, or null if the top 3
+// are all net outflows.
+function computeCyclePosition(scores) {
+  const n = CYCLE_ORDER.length;
+  const top3 = CYCLE_ORDER.slice().sort((a, b) => scores[b] - scores[a]).slice(0, 3);
+  let sinSum = 0, cosSum = 0, wSum = 0;
+  top3.forEach(cls => {
+    const w = Math.max(0, scores[cls]);
+    const th = 2 * Math.PI * CYCLE_ORDER.indexOf(cls) / n;
+    sinSum += w * Math.sin(th);
+    cosSum += w * Math.cos(th);
+    wSum   += w;
+  });
+  if (wSum <= 0) return null;
+  const idx = Math.atan2(sinSum, cosSum) * n / (2 * Math.PI);
+  return (idx + n) % n;
+}
+
+function buildCycleSVG(activeClass, cyclePos) {
   const svg = document.getElementById("cycle-svg");
   const W = 700, H = 320;
   const cx = W / 2, cy = H / 2 - 10;
@@ -528,25 +557,24 @@ function buildCycleSVG(activeClass) {
   const n = phases.length;
   const xStep = W / (n + 1);
 
+  const waveY = x => {
+    const t = (x / W) * 2 * Math.PI;
+    return cy - A * Math.sin(t - Math.PI / 2 + Math.PI / n);
+  };
+
   // Generate sinusoidal wave path
   const pts = [];
-  for (let x = 0; x <= W; x += 2) {
-    const t = (x / W) * 2 * Math.PI;
-    const y = cy - A * Math.sin(t - Math.PI / 2 + Math.PI / n);
-    pts.push(`${x},${y}`);
-  }
+  for (let x = 0; x <= W; x += 2) pts.push(`${x},${waveY(x)}`);
   const wavePath = "M " + pts.join(" L ");
 
   // Phase x-positions
   const phaseX = phases.map((_, i) => xStep * (i + 1));
-  const phaseY = phaseX.map(x => {
-    const t = (x / W) * 2 * Math.PI;
-    return cy - A * Math.sin(t - Math.PI / 2 + Math.PI / n);
-  });
+  const phaseY = phaseX.map(waveY);
 
-  const activeIdx = phases.indexOf(activeClass);
-  const markerX = activeIdx >= 0 ? phaseX[activeIdx] : -999;
-  const markerY = activeIdx >= 0 ? phaseY[activeIdx] : -999;
+  // Marker sits at the weighted top-3 spot, not snapped to a node
+  const hasMarker = cyclePos != null;
+  const markerX = hasMarker ? xStep * (cyclePos + 1) : -999;
+  const markerY = hasMarker ? waveY(markerX) : -999;
 
   let svgContent = `
     <!-- Background -->
@@ -567,7 +595,7 @@ function buildCycleSVG(activeClass) {
     const textAnchor = i === 0 ? "start" : i === n - 1 ? "end" : "middle";
 
     svgContent += `
-      <circle cx="${x}" cy="${y}" r="${isActive ? 0 : 5}" fill="${isActive ? "#C8960C" : "#FFFFFF"}" stroke="${cls.color}" stroke-width="2"/>
+      <circle cx="${x}" cy="${y}" r="5" fill="${isActive ? "#C8960C" : "#FFFFFF"}" stroke="${cls.color}" stroke-width="2"/>
       <text x="${x}" y="${labelY}" text-anchor="${textAnchor}"
             font-family="JetBrains Mono, monospace" font-size="10"
             fill="${isActive ? "#B8860B" : "#777"}" font-weight="${isActive ? "700" : "400"}">
@@ -580,8 +608,8 @@ function buildCycleSVG(activeClass) {
     `;
   });
 
-  // Active marker
-  if (activeIdx >= 0) {
+  // Active marker at the interpolated spot
+  if (hasMarker) {
     svgContent += `
       <circle cx="${markerX}" cy="${markerY}" r="10" fill="#C8960C" opacity="0.25"/>
       <circle cx="${markerX}" cy="${markerY}" r="6"  fill="#C8960C"/>
@@ -623,6 +651,9 @@ function buildCycleSidebar(scores, activeClass) {
   const topClass = sorted[0];
   const topScore = scores[topClass];
   const summary = document.getElementById("cycle-summary");
+  const top3 = sorted.slice(0, 3)
+    .map(c => `${c} ${scores[c] >= 0 ? "+" : ""}${scores[c].toFixed(2)}`)
+    .join(" · ");
 
   // No confident winner: the leading class is below threshold (or everything is
   // negative). Report churn rather than naming a phase off near-zero noise.
@@ -631,7 +662,8 @@ function buildCycleSidebar(scores, activeClass) {
       <strong>No dominant inflow.</strong><br>
       The strongest class is <strong>${topClass}</strong> at ${topScore >= 0 ? "+" : ""}${topScore.toFixed(2)},
       below the +${CONFIDENCE_THRESHOLD.toFixed(2)} confidence threshold. Capital is churning or
-      rotating without a decisive destination — no single phase is being clearly bought.
+      rotating without a decisive destination — no single phase is being clearly bought.<br>
+      Marker = score-weighted spot across the 3 strongest classes: ${top3}.
     `;
     return;
   }
@@ -641,7 +673,8 @@ function buildCycleSidebar(scores, activeClass) {
   summary.innerHTML = `
     <strong>Estimated Phase: ${activeCfg.phase}</strong><br>
     Capital is rotating into <strong>${activeClass}</strong> assets (13-week net flow score: ${activeScore >= 0 ? "+" : ""}${activeScore.toFixed(2)}).
-    ${activeScore > 0.3 ? "Strong inflow signal." : activeScore > 0 ? "Mild inflow signal." : "Net outflow — positioning may be rotating elsewhere."}
+    ${activeScore > 0.3 ? "Strong inflow signal." : activeScore > 0 ? "Mild inflow signal." : "Net outflow — positioning may be rotating elsewhere."}<br>
+    Marker = score-weighted spot across the 3 strongest classes: ${top3}.
   `;
 }
 
@@ -664,7 +697,10 @@ function init() {
     // Only name a phase when the leader clears the confidence threshold;
     // otherwise activeClass is null and Board 3 reports "no dominant inflow".
     const activeClass = topScore >= CONFIDENCE_THRESHOLD ? topClass : null;
-    buildCycleSVG(activeClass);
+    // The weighted top-3 spot is drawn even below the threshold — approximating
+    // a position is exactly what it's for when no single class dominates.
+    const cyclePos = computeCyclePosition(scores);
+    buildCycleSVG(activeClass, cyclePos);
     buildCycleSidebar(scores, activeClass);
 
     statusBar.textContent =

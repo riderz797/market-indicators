@@ -125,6 +125,22 @@
       padding: 14px 18px 0;
     }
 
+    .range-toggle { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
+    .range-btn {
+      background: #3A3A3A;
+      border: 1px solid #505050;
+      color: #AAAAAA;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .range-btn:hover { border-color: #F5C542; color: #F5C542; }
+    .range-btn.active { background: #F5C542; border-color: #F5C542; color: #1A1A1A; font-weight: 700; }
+
     .watermark {
       position: absolute;
       top: 50%;
@@ -268,6 +284,13 @@
         <div class="reading-value" id="r-m2">&ndash;</div>
         <div class="reading-sub" id="r-m2-z">&ndash;</div>
       </div>
+    </div>
+
+    <!-- ─── RANGE TOGGLE ────────────────────────────────────────────────── -->
+    <div class="range-toggle">
+      <button class="range-btn" data-years="1">1Y</button>
+      <button class="range-btn" data-years="5">5Y</button>
+      <button class="range-btn active" data-years="all">ALL</button>
     </div>
 
     <!-- ─── MAIN CHART ──────────────────────────────────────────────────── -->
@@ -700,6 +723,23 @@
         hovermode: 'x unified',
         hoverlabel: { bgcolor: '#2D2D2D', bordercolor: '#555555', font: { family: 'JetBrains Mono, monospace', size: 11, color: '#FFFFFF' } },
       }, { responsive: true, displayModeBar: false });
+
+      /* ─── Range toggle (1Y / 5Y / ALL) — re-ranges both charts ─── */
+      document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          let x0 = dates[0];
+          if (btn.dataset.years !== 'all') {
+            const d = new Date(dates.at(-1));
+            d.setFullYear(d.getFullYear() - Number(btn.dataset.years));
+            x0 = d.toISOString().slice(0, 10);
+          }
+          const update = { 'xaxis.range': [x0, dates.at(-1)] };
+          Plotly.relayout('chart', update);
+          Plotly.relayout('chart-components', update);
+        });
+      });
 
       const tpNote    = useTp ? '' : ' — term premium unavailable, reweighted';
       const bakedNote = baked ? ` · baked ${FDDS_BAKED_ON}` : ' · live FRED';

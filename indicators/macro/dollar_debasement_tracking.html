@@ -126,6 +126,22 @@
     }
     .chart-title .dir-bad  { color: #DC2626; }
 
+    .range-toggle { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
+    .range-btn {
+      background: #F6F6F6;
+      border: 1px solid #CCCCCC;
+      color: #666666;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .range-btn:hover { border-color: #C9971C; color: #C9971C; }
+    .range-btn.active { background: #C9971C; border-color: #C9971C; color: #FFFFFF; font-weight: 700; }
+
     .mini-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -261,6 +277,13 @@
         <div class="reading-value" id="r-gold">&ndash;</div>
         <div class="reading-sub" id="r-gold-sub">&ndash;</div>
       </div>
+    </div>
+
+    <!-- ─── RANGE TOGGLE ────────────────────────────────────────────────── -->
+    <div class="range-toggle">
+      <button class="range-btn" data-years="1">1Y</button>
+      <button class="range-btn" data-years="5">5Y</button>
+      <button class="range-btn active" data-years="all">ALL</button>
     </div>
 
     <!-- ─── MAIN CHART ──────────────────────────────────────────────────── -->
@@ -624,7 +647,10 @@
       /* ── The four forces — raw data, 2x2 grid ── */
       const xRange = [dates[0], dates[dates.length - 1]];
 
+      const minis = [];   // registry so the range toggle can re-range every mini chart
+
       function miniChart(div, x, y, color, fmt, prefix, unit, extraShapes) {
+        minis.push({ div, x, y });
         Plotly.newPlot(div, [{
           x, y, mode: 'lines',
           line: { color, width: 1.6 },
@@ -657,6 +683,39 @@
 
       // Gold share of reserves, %
       miniChart('chart-gold', xMonthly, goldShare, '#DC2626', '.1f', '', '%');
+
+      /* ── Range toggle (1Y / 5Y / ALL) — re-ranges main chart + all minis ── */
+      const lastDate = dates[dates.length - 1];
+      document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          let x0 = dates[0];
+          if (btn.dataset.years !== 'all') {
+            const d = new Date(lastDate);
+            d.setFullYear(d.getFullYear() - Number(btn.dataset.years));
+            x0 = d.toISOString().slice(0, 10);
+          }
+          Plotly.relayout('chart', { 'xaxis.range': [x0, lastDate] });
+          // Minis: fit y to the visible window (Plotly autorange uses the full
+          // series, so a zoomed x-range would otherwise leave the line flat)
+          minis.forEach(m => {
+            const ys = [];
+            m.x.forEach((xv, k) => {
+              if (xv >= x0 && xv <= lastDate && m.y[k] != null) ys.push(m.y[k]);
+            });
+            const update = { 'xaxis.range': [x0, lastDate] };
+            if (ys.length) {
+              const lo = Math.min(...ys), hi = Math.max(...ys);
+              const pad = (hi - lo || Math.abs(hi) || 1) * 0.08;
+              update['yaxis.range'] = [lo - pad, hi + pad];
+            } else {
+              update['yaxis.autorange'] = true;
+            }
+            Plotly.relayout(m.div, update);
+          });
+        });
+      });
 
       setStatus(`Updated ${months[i]} · DDT ${latest.toFixed(1)} (${regimeFor(smooth)}) · baked ${DDT_BAKED_ON}`, 'info');
     }

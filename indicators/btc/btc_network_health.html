@@ -129,6 +129,7 @@
       background: #F0A030; color: #FFFFFF;
       border-color: #F0A030; font-weight: 700;
     }
+    .toggle-divider { width: 1px; height: 18px; background: #C8C0B0; margin: 0 4px; }
     #main-chart { width: 100%; height: 480px; }
 
     .watermark {
@@ -323,6 +324,11 @@
                     onclick="toggleTrace('cats')">CATEGORIES</button>
             <button class="toggle-btn" id="btn-btc"
                     onclick="toggleTrace('btc')">BTC PRICE</button>
+            <span class="toggle-divider"></span>
+            <button class="toggle-btn range-btn" onclick="setRange(1, this)">1Y</button>
+            <button class="toggle-btn range-btn" onclick="setRange(3, this)">3Y</button>
+            <button class="toggle-btn range-btn" onclick="setRange(5, this)">5Y</button>
+            <button class="toggle-btn range-btn active" onclick="setRange(null, this)">ALL</button>
           </div>
         </div>
         <div style="position:relative;">
@@ -640,6 +646,35 @@
 
     Plotly.newPlot('main-chart', traces, layout,
       { responsive: true, displayModeBar: false });
+  }
+
+  // Range toggle: 1Y / 3Y / 5Y / ALL on the x-axis
+  function setRange(years, btn) {
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const dates = D.dates;
+    const last  = dates[dates.length - 1];
+    let x0 = dates[0];
+    if (years != null) {
+      const d = new Date(last);
+      d.setFullYear(d.getFullYear() - years);
+      x0 = d.toISOString().slice(0, 10);
+    }
+    const update = { 'xaxis.range': [x0, last] };
+
+    // Refit the log BTC-price axis to the visible window (Plotly autorange
+    // always uses the full series, which would flatten a zoomed view)
+    const vis = [];
+    dates.forEach((dt, i) => {
+      if (dt >= x0 && D.btc_price[i] != null) vis.push(D.btc_price[i]);
+    });
+    if (vis.length) {
+      const lo = Math.min(...vis), hi = Math.max(...vis);
+      update['yaxis2.range'] = [Math.log10(lo / 1.15), Math.log10(hi * 1.15)];
+    }
+
+    Plotly.relayout('main-chart', update);
   }
 
   // Toggle overlay buttons
