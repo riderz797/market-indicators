@@ -265,7 +265,7 @@
   <!-- BOARD 3 -->
   <div class="panel">
     <div class="panel-title">Board 3 — Asset Allocation Cycle Position</div>
-    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) across 6 nodes: Debasement → Cyclical → Speculation → Commodities → Defensive → Fixed Income. Marker = score-weighted average position of the 3 strongest classes.</div>
+    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) across 6 nodes: Debasement → Cyclical → Speculation → Commodities → Defensive → Fixed Income. Marker = score-weighted average position of the 3 strongest classes. The last 3 weekly reads are shown — brightest = current week, fainter = 1 and 2 weeks ago.</div>
     <div class="cycle-wrapper">
       <div class="cycle-svg-container">
         <svg id="cycle-svg" viewBox="0 0 700 320" width="100%" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -307,10 +307,12 @@ const CONFIDENCE_THRESHOLD = 0.05;
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function buyOrSell(open, close) { return close > open ? 1 : -1; }
 
-function avgVolume(ticker, nWeeks) {
+// weeksBack shifts the window into the past, so a read can be recomputed
+// exactly as it stood N weeks ago (used by the Board 3 marker history)
+function avgVolume(ticker, nWeeks, weeksBack = 0) {
   const d = CAPITAL_FLOWS.data[ticker];
   if (!d || !d.volumes.length) return 0;
-  const vols = d.volumes.slice(-nWeeks);
+  const vols = d.volumes.slice(-(nWeeks + weeksBack), weeksBack ? -weeksBack : undefined);
   return vols.reduce((a, b) => a + b, 0) / vols.length || 1;
 }
 
@@ -498,7 +500,9 @@ function buildBoard2() {
 }
 
 // ── BOARD 3: CYCLE ───────────────────────────────────────────────────────────
-function computeCycleScores() {
+// weeksBack = 0 is the current read; 1 and 2 recompute the same score with the
+// data window shifted back, i.e. the read as it stood in prior weeks.
+function computeCycleScores(weeksBack = 0) {
   const WEEKS_13 = 13;
   const WEEKS_12M = 52;
   const scores = {};
@@ -507,11 +511,12 @@ function computeCycleScores() {
     let total = 0, count = 0;
     cfg.tickers.forEach(ticker => {
       const d = CAPITAL_FLOWS.data[ticker];
-      if (!d || d.volumes.length < 2) return;
-      const avg = avgVolume(ticker, WEEKS_12M) || 1;
-      const last4v = d.volumes.slice(-WEEKS_13);
-      const last4o = d.opens.slice(-WEEKS_13);
-      const last4c = d.closes.slice(-WEEKS_13);
+      if (!d || d.volumes.length < 2 + weeksBack) return;
+      const avg = avgVolume(ticker, WEEKS_12M, weeksBack) || 1;
+      const end = weeksBack ? -weeksBack : undefined;
+      const last4v = d.volumes.slice(-(WEEKS_13 + weeksBack), end);
+      const last4o = d.opens.slice(-(WEEKS_13 + weeksBack), end);
+      const last4c = d.closes.slice(-(WEEKS_13 + weeksBack), end);
       last4v.forEach((vol, i) => {
         const relVol = vol / avg;
         // Magnitude-weighted direction: open→close return, capped at ±10% and
@@ -548,7 +553,7 @@ function computeCyclePosition(scores) {
   return (idx + n) % n;
 }
 
-function buildCycleSVG(activeClass, cyclePos) {
+function buildCycleSVG(activeClass, posHistory) {
   const svg = document.getElementById("cycle-svg");
   const W = 700, H = 320;
   const cx = W / 2, cy = H / 2 - 10;
@@ -570,11 +575,6 @@ function buildCycleSVG(activeClass, cyclePos) {
   // Phase x-positions
   const phaseX = phases.map((_, i) => xStep * (i + 1));
   const phaseY = phaseX.map(waveY);
-
-  // Marker sits at the weighted top-3 spot, not snapped to a node
-  const hasMarker = cyclePos != null;
-  const markerX = hasMarker ? xStep * (cyclePos + 1) : -999;
-  const markerY = hasMarker ? waveY(markerX) : -999;
 
   let svgContent = `
     <!-- Background -->
@@ -608,14 +608,28 @@ function buildCycleSVG(activeClass, cyclePos) {
     `;
   });
 
-  // Active marker at the interpolated spot
-  if (hasMarker) {
-    svgContent += `
-      <circle cx="${markerX}" cy="${markerY}" r="10" fill="#C8960C" opacity="0.25"/>
-      <circle cx="${markerX}" cy="${markerY}" r="6"  fill="#C8960C"/>
-      <circle cx="${markerX}" cy="${markerY}" r="3"  fill="#FFFFFF"/>
-    `;
-  }
+  // Markers: the last 3 weekly reads at their weighted top-3 spots.
+  // Oldest drawn first and faintest; the current week sits on top at
+  // full opacity, so the fade direction shows how the read is moving.
+  const MARKER_OPACITY = { 0: 1, 1: 0.5, 2: 0.25 };
+  (posHistory || [])
+    .filter(h => h.pos != null)
+    .sort((a, b) => b.weeksBack - a.weeksBack)
+    .forEach(h => {
+      const mx = xStep * (h.pos + 1);
+      const my = waveY(mx);
+      const op = MARKER_OPACITY[h.weeksBack] != null ? MARKER_OPACITY[h.weeksBack] : 0.25;
+      const lbl = h.weeksBack === 0 ? "Current week"
+                : h.weeksBack === 1 ? "1 week ago" : `${h.weeksBack} weeks ago`;
+      svgContent += `
+        <g opacity="${op}">
+          <title>${lbl}</title>
+          <circle cx="${mx}" cy="${my}" r="10" fill="#C8960C" opacity="0.25"/>
+          <circle cx="${mx}" cy="${my}" r="6"  fill="#C8960C"/>
+          <circle cx="${mx}" cy="${my}" r="3"  fill="#FFFFFF"/>
+        </g>
+      `;
+    });
 
   // Axis labels
   svgContent += `
@@ -627,7 +641,7 @@ function buildCycleSVG(activeClass, cyclePos) {
   svg.innerHTML = svgContent;
 }
 
-function buildCycleSidebar(scores, activeClass) {
+function buildCycleSidebar(scores, activeClass, trail) {
   const sidebar = document.getElementById("cycle-sidebar");
   let html = "";
 
@@ -663,7 +677,8 @@ function buildCycleSidebar(scores, activeClass) {
       The strongest class is <strong>${topClass}</strong> at ${topScore >= 0 ? "+" : ""}${topScore.toFixed(2)},
       below the +${CONFIDENCE_THRESHOLD.toFixed(2)} confidence threshold. Capital is churning or
       rotating without a decisive destination — no single phase is being clearly bought.<br>
-      Marker = score-weighted spot across the 3 strongest classes: ${top3}.
+      Marker = score-weighted spot across the 3 strongest classes: ${top3}.<br>
+      Weekly trail (2 wks ago → now): ${trail}.
     `;
     return;
   }
@@ -674,7 +689,8 @@ function buildCycleSidebar(scores, activeClass) {
     <strong>Estimated Phase: ${activeCfg.phase}</strong><br>
     Capital is rotating into <strong>${activeClass}</strong> assets (13-week net flow score: ${activeScore >= 0 ? "+" : ""}${activeScore.toFixed(2)}).
     ${activeScore > 0.3 ? "Strong inflow signal." : activeScore > 0 ? "Mild inflow signal." : "Net outflow — positioning may be rotating elsewhere."}<br>
-    Marker = score-weighted spot across the 3 strongest classes: ${top3}.
+    Marker = score-weighted spot across the 3 strongest classes: ${top3}.<br>
+    Weekly trail (2 wks ago → now): ${trail}.
   `;
 }
 
@@ -699,9 +715,18 @@ function init() {
     const activeClass = topScore >= CONFIDENCE_THRESHOLD ? topClass : null;
     // The weighted top-3 spot is drawn even below the threshold — approximating
     // a position is exactly what it's for when no single class dominates.
-    const cyclePos = computeCyclePosition(scores);
-    buildCycleSVG(activeClass, cyclePos);
-    buildCycleSidebar(scores, activeClass);
+    // History: the same read recomputed as of 1 and 2 weeks ago, so the
+    // markers show which way the rotation is drifting.
+    const posHistory = [0, 1, 2].map(weeksBack => ({
+      weeksBack,
+      pos: computeCyclePosition(weeksBack === 0 ? scores : computeCycleScores(weeksBack)),
+    }));
+    const nearest = pos => CYCLE_ORDER[Math.round(pos) % CYCLE_ORDER.length];
+    const trail = posHistory.slice().sort((a, b) => b.weeksBack - a.weeksBack)
+      .map(h => h.pos == null ? "—" : nearest(h.pos))
+      .join(" → ");
+    buildCycleSVG(activeClass, posHistory);
+    buildCycleSidebar(scores, activeClass, trail);
 
     statusBar.textContent =
       `Data through ${CAPITAL_FLOWS.baked_through}  ·  Baked ${CAPITAL_FLOWS.baked_on}  ·  ${CAPITAL_FLOWS.tickers.length} tickers`;
