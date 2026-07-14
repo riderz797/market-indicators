@@ -463,6 +463,24 @@
   };
   const CAT_COLORS = ['#F0A030', '#2563eb', '#16a34a', '#f97316', '#9333ea'];
 
+  const BANDS = [
+    { y0: 0,  y1: 25,  color: 'rgba(239,68,68,0.06)',  label: 'CRITICAL', lc: 'rgba(239,68,68,0.50)' },
+    { y0: 25, y1: 50,  color: 'rgba(249,115,22,0.06)', label: 'WEAK',     lc: 'rgba(249,115,22,0.50)' },
+    { y0: 50, y1: 75,  color: 'rgba(22,163,74,0.05)',  label: 'HEALTHY',  lc: 'rgba(22,163,74,0.50)' },
+    { y0: 75, y1: 100, color: 'rgba(37,99,235,0.06)',  label: 'ROBUST',   lc: 'rgba(37,99,235,0.50)' },
+  ];
+
+  // Band labels for a given visible y-range: only bands that overlap,
+  // centered on the visible slice (rebuilt when the range toggle re-fits y)
+  function bandAnnotations(lo, hi) {
+    return BANDS.filter(b => b.y1 > lo && b.y0 < hi).map(b => ({
+      xref: 'paper', yref: 'y', x: 0.004,
+      y: (Math.max(b.y0, lo) + Math.min(b.y1, hi)) / 2,
+      text: b.label, showarrow: false,
+      font: { size: 8, color: b.lc }, xanchor: 'left',
+    }));
+  }
+
   let D = null;       // BNHI_DATA once loaded
   let CHART_TRACES;   // Plotly trace visibility state
   let WEIGHTS_OPEN = false;
@@ -550,12 +568,7 @@
     const cats = Object.keys(D.categories_config);
 
     // Band background shapes
-    const bandShapes = [
-      { y0: 0,  y1: 25,  color: 'rgba(239,68,68,0.06)',   label: 'CRITICAL' },
-      { y0: 25, y1: 50,  color: 'rgba(249,115,22,0.06)',  label: 'WEAK' },
-      { y0: 50, y1: 75,  color: 'rgba(22,163,74,0.05)',   label: 'HEALTHY' },
-      { y0: 75, y1: 100, color: 'rgba(37,99,235,0.06)',   label: 'ROBUST' },
-    ].map(b => ({
+    const bandShapes = BANDS.map(b => ({
       type: 'rect', xref: 'paper', yref: 'y',
       x0: 0, x1: 1, y0: b.y0, y1: b.y1,
       fillcolor: b.color, line: { width: 0 }, layer: 'below',
@@ -627,16 +640,7 @@
         x: 0.01, y: 0.99, orientation: 'h',
       },
       shapes: [...bandShapes, ...bandLines],
-      annotations: [
-        { xref:'paper', yref:'y', x:0.004, y:12.5, text:'CRITICAL', showarrow:false,
-          font:{size:8, color:'rgba(239,68,68,0.50)'}, xanchor:'left' },
-        { xref:'paper', yref:'y', x:0.004, y:37.5, text:'WEAK', showarrow:false,
-          font:{size:8, color:'rgba(249,115,22,0.50)'}, xanchor:'left' },
-        { xref:'paper', yref:'y', x:0.004, y:62.5, text:'HEALTHY', showarrow:false,
-          font:{size:8, color:'rgba(22,163,74,0.50)'}, xanchor:'left' },
-        { xref:'paper', yref:'y', x:0.004, y:87.5, text:'ROBUST', showarrow:false,
-          font:{size:8, color:'rgba(37,99,235,0.50)'}, xanchor:'left' },
-      ],
+      annotations: bandAnnotations(0, 100),
       hovermode: 'x unified',
       hoverlabel: {
         bgcolor: '#FFFFFF', bordercolor: '#D8D0C0',
@@ -649,29 +653,62 @@
   }
 
   // Range toggle: 1Y / 3Y / 5Y / ALL on the x-axis
+  let CURRENT_YEARS = null;   // null = ALL
+
   function setRange(years, btn) {
     document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    CURRENT_YEARS = years;
+    applyRange();
+  }
 
+  function applyRange() {
     const dates = D.dates;
     const last  = dates[dates.length - 1];
     let x0 = dates[0];
-    if (years != null) {
+    if (CURRENT_YEARS != null) {
       const d = new Date(last);
-      d.setFullYear(d.getFullYear() - years);
+      d.setFullYear(d.getFullYear() - CURRENT_YEARS);
       x0 = d.toISOString().slice(0, 10);
     }
     const update = { 'xaxis.range': [x0, last] };
 
+    // Left axis: fit to the visible portion of whichever score traces are on
+    // (ALL restores the fixed 0–100 view with the 25/50/75 tick marks)
+    if (CURRENT_YEARS == null) {
+      update['yaxis.range']    = [0, 100];
+      update['yaxis.tickvals'] = [0, 25, 50, 75, 100];
+      update['yaxis.ticktext'] = ['0', '25', '50', '75', '100'];
+      update['annotations']    = bandAnnotations(0, 100);
+    } else {
+      const gd = document.getElementById('main-chart');
+      let lo = Infinity, hi = -Infinity;
+      gd.data.forEach(t => {
+        if (t.yaxis === 'y2' || t.visible !== true) return;
+        for (let k = 0; k < t.x.length; k++) {
+          const v = t.y[k];
+          if (t.x[k] >= x0 && v != null) { if (v < lo) lo = v; if (v > hi) hi = v; }
+        }
+      });
+      if (lo <= hi) {
+        const pad = Math.max(2, (hi - lo) * 0.12);
+        lo = Math.max(0, lo - pad); hi = Math.min(100, hi + pad);
+        update['yaxis.range']    = [lo, hi];
+        update['yaxis.tickvals'] = null;   // auto ticks while zoomed
+        update['yaxis.ticktext'] = null;
+        update['annotations']    = bandAnnotations(lo, hi);
+      }
+    }
+
     // Refit the log BTC-price axis to the visible window (Plotly autorange
     // always uses the full series, which would flatten a zoomed view)
-    const vis = [];
+    let plo = Infinity, phi = -Infinity;
     dates.forEach((dt, i) => {
-      if (dt >= x0 && D.btc_price[i] != null) vis.push(D.btc_price[i]);
+      const v = D.btc_price[i];
+      if (dt >= x0 && v != null) { if (v < plo) plo = v; if (v > phi) phi = v; }
     });
-    if (vis.length) {
-      const lo = Math.min(...vis), hi = Math.max(...vis);
-      update['yaxis2.range'] = [Math.log10(lo / 1.15), Math.log10(hi * 1.15)];
+    if (plo <= phi) {
+      update['yaxis2.range'] = [Math.log10(plo / 1.15), Math.log10(phi * 1.15)];
     }
 
     Plotly.relayout('main-chart', update);
@@ -690,6 +727,9 @@
 
     const btn = document.getElementById('btn-' + which);
     btn.classList.toggle('active', !allOn);
+
+    // Re-fit the y-axes to whatever is visible now at the current range
+    applyRange();
   }
 
   // ── Metrics grid ──────────────────────────────────────────────────────────

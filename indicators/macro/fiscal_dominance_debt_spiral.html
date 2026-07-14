@@ -664,13 +664,17 @@
         })),
       ];
 
-      const annotations = ZONES.map(z => ({
-        xref: 'paper', x: 1, xanchor: 'right',
-        y: (z.y0 + z.y1) / 2, yanchor: 'middle',
-        text: z.label, showarrow: false,
-        font: { family: 'JetBrains Mono, monospace', size: 9, color: z.lc },
-        opacity: 0.7,
-      }));
+      // Zone labels for a given visible y-range: only zones that overlap,
+      // centered on the visible slice (rebuilt when the range toggle re-fits y)
+      const zoneAnnotations = (lo, hi) => ZONES
+        .filter(z => z.y1 > lo && z.y0 < hi)
+        .map(z => ({
+          xref: 'paper', x: 1, xanchor: 'right',
+          y: (Math.max(z.y0, lo) + Math.min(z.y1, hi)) / 2, yanchor: 'middle',
+          text: z.label, showarrow: false,
+          font: { family: 'JetBrains Mono, monospace', size: 9, color: z.lc },
+          opacity: 0.7,
+        }));
 
       Plotly.newPlot('chart', [
         {
@@ -689,7 +693,7 @@
         margin: { l: 50, r: 130, t: 24, b: 40 },
         xaxis: { ...axisStyle },
         yaxis: { ...axisStyle, range: [0, 100], title: { text: 'FDDS (0–100)', font: { size: 10 } } },
-        shapes, annotations,
+        shapes, annotations: zoneAnnotations(0, 100),
         legend: { orientation: 'h', x: 0, y: 1.06, font: { size: 10 } },
         hovermode: 'x unified',
         hoverlabel: { bgcolor: '#2D2D2D', bordercolor: '#555555', font: { family: 'JetBrains Mono, monospace', size: 11, color: '#FFFFFF' } },
@@ -724,20 +728,55 @@
         hoverlabel: { bgcolor: '#2D2D2D', bordercolor: '#555555', font: { family: 'JetBrains Mono, monospace', size: 11, color: '#FFFFFF' } },
       }, { responsive: true, displayModeBar: false });
 
-      /* ─── Range toggle (1Y / 5Y / ALL) — re-ranges both charts ─── */
+      /* ─── Range toggle (1Y / 5Y / ALL) — re-ranges x and re-fits y ─── */
       document.querySelectorAll('.range-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
+          const all = btn.dataset.years === 'all';
           let x0 = dates[0];
-          if (btn.dataset.years !== 'all') {
+          if (!all) {
             const d = new Date(dates.at(-1));
             d.setFullYear(d.getFullYear() - Number(btn.dataset.years));
             x0 = d.toISOString().slice(0, 10);
           }
-          const update = { 'xaxis.range': [x0, dates.at(-1)] };
-          Plotly.relayout('chart', update);
-          Plotly.relayout('chart-components', update);
+          const xr = [x0, dates.at(-1)];
+
+          // Main chart: fit y to the visible FDDS values (ALL restores 0–100)
+          const mainUpdate = { 'xaxis.range': xr };
+          if (all) {
+            mainUpdate['yaxis.range'] = [0, 100];
+            mainUpdate['annotations'] = zoneAnnotations(0, 100);
+          } else {
+            let lo = Infinity, hi = -Infinity;
+            values.forEach((v, k) => {
+              if (dates[k] >= x0) { if (v < lo) lo = v; if (v > hi) hi = v; }
+            });
+            if (lo <= hi) {
+              const pad = Math.max(2, (hi - lo) * 0.15);
+              lo = Math.max(0, lo - pad); hi = Math.min(100, hi + pad);
+              mainUpdate['yaxis.range'] = [lo, hi];
+              mainUpdate['annotations'] = zoneAnnotations(lo, hi);
+            }
+          }
+          Plotly.relayout('chart', mainUpdate);
+
+          // Component chart: fit y across all component series (ALL restores ±3.3)
+          const compUpdate = { 'xaxis.range': xr };
+          if (all) {
+            compUpdate['yaxis.range'] = [-3.3, 3.3];
+          } else {
+            let lo = Infinity, hi = -Infinity;
+            compTraces.forEach(t => t.x.forEach((xv, k) => {
+              const v = t.y[k];
+              if (xv >= x0 && v != null) { if (v < lo) lo = v; if (v > hi) hi = v; }
+            }));
+            if (lo <= hi) {
+              const pad = Math.max(0.2, (hi - lo) * 0.15);
+              compUpdate['yaxis.range'] = [Math.max(-3.3, lo - pad), Math.min(3.3, hi + pad)];
+            }
+          }
+          Plotly.relayout('chart-components', compUpdate);
         });
       });
 
