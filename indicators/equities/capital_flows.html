@@ -533,24 +533,20 @@ function computeCycleScores(weeksBack = 0) {
   return scores;
 }
 
-// Marker spot: score-weighted circular mean of the 3 highest-scoring classes'
-// positions on the cycle (weights clipped at 0 so outflows don't pull the
-// marker). Returns a fractional index into CYCLE_ORDER, or null if the top 3
-// are all net outflows.
+// Marker spot: score-weighted average of the 3 highest-scoring classes'
+// dot positions along the curve — the marker sits between the fixed dots,
+// pulled proportionally toward the stronger classes (weights clipped at 0
+// so outflows don't pull). Returns a fractional index into CYCLE_ORDER,
+// or null if the top 3 are all net outflows.
 function computeCyclePosition(scores) {
-  const n = CYCLE_ORDER.length;
   const top3 = CYCLE_ORDER.slice().sort((a, b) => scores[b] - scores[a]).slice(0, 3);
-  let sinSum = 0, cosSum = 0, wSum = 0;
+  let posSum = 0, wSum = 0;
   top3.forEach(cls => {
     const w = Math.max(0, scores[cls]);
-    const th = 2 * Math.PI * CYCLE_ORDER.indexOf(cls) / n;
-    sinSum += w * Math.sin(th);
-    cosSum += w * Math.cos(th);
+    posSum += w * CYCLE_ORDER.indexOf(cls);
     wSum   += w;
   });
-  if (wSum <= 0) return null;
-  const idx = Math.atan2(sinSum, cosSum) * n / (2 * Math.PI);
-  return (idx + n) % n;
+  return wSum > 0 ? posSum / wSum : null;
 }
 
 function buildCycleSVG(activeClass, posHistory) {
