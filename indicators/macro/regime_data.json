@@ -1,26 +1,26 @@
 {
   "as_of": "2026-06-01",
-  "updated_utc": "2026-07-13T12:11:37Z",
+  "updated_utc": "2026-07-20T11:50:17Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -1.0
+    "score": -0.48
   },
   "inflation": {
     "dir": "Rising",
-    "score": 2.8
+    "score": 2.51
   },
   "market_regime": "REFLATION",
   "market_regime_raw": "REFLATION",
   "shares": {
     "GOLDILOCKS": 27,
-    "REFLATION": 37,
+    "REFLATION": 31,
     "INFLATION": 24,
-    "DEFLATION": 12
+    "DEFLATION": 18
   },
-  "signal_strength": 37,
-  "risk_on_prob": 64,
+  "signal_strength": 31,
+  "risk_on_prob": 58,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
@@ -41,9 +41,9 @@
         "score": -2.27
       },
       "Industrial Production": {
-        "yoy": 1.67,
-        "accel6m": -0.09,
-        "score": 0.41
+        "yoy": 1.14,
+        "accel6m": -0.02,
+        "score": 0.29
       },
       "Real Mfg & Trade Sales": {
         "yoy": 1.28,
@@ -51,9 +51,9 @@
         "score": -0.39
       },
       "Real Retail Sales": {
-        "yoy": 1.38,
-        "accel6m": 0.66,
-        "score": -0.04
+        "yoy": 3.7,
+        "accel6m": 3.49,
+        "score": 2.67
       }
     },
     "inflation": {
@@ -63,9 +63,9 @@
         "score": 3.0
       },
       "Core CPI": {
-        "yoy": 2.96,
-        "accel6m": 0.06,
-        "score": 2.61
+        "yoy": 2.81,
+        "accel6m": -0.03,
+        "score": 2.02
       }
     },
     "markets": [
@@ -127,10 +127,10 @@
       },
       {
         "name": "Base Metals",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
@@ -190,10 +190,10 @@
       },
       {
         "name": "Cyclicals / Defensives",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
