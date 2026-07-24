@@ -6,6 +6,13 @@ on:
   push:
     branches: ["main"]
 
+  # Republish on a schedule so automated data commits reach the live site.
+  # Pushes made by the data workflows use the default GITHUB_TOKEN, which by
+  # design does NOT trigger the `push` event above — so without this the site
+  # only ever deploys on a manual push. Every 6 hours keeps it <=6h fresh.
+  schedule:
+    - cron: '0 */6 * * *'   # 00:00, 06:00, 12:00, 18:00 UTC
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
