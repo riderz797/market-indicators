@@ -192,7 +192,7 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
 <div class="container">
   <a class="back" href="../../index.html">&larr; Back to dashboard</a>
   <h1>SPC Portfolio Theory</h1>
-  <p class="subtitle">Enter your portfolio and age profile. The tool sets a two-sided quarterly tolerance band from your years to retirement, screens the mix against a downside-risk floor, suggests weight fixes if it fails, and gives per-bucket rebalancing triggers.</p>
+  <p class="subtitle">Enter what you actually hold, plus your age profile. The tool sets a two-sided quarterly tolerance band from your years to retirement, screens your holdings against a downside-risk floor, derives the target allocation for you, and gives per-bucket rebalancing triggers.</p>
 
   <!-- ===== Inputs ===== -->
   <div class="grid2">
@@ -217,12 +217,12 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
   </div>
 
   <div class="card">
-    <h2>Portfolio buckets <span class="tip" tabindex="0" data-tip="Target weight is your intended allocation (must sum to 100). Actual % is what you hold today — it drives the TRIM / TOP UP flags and the Actual donut view. Average return and volatility are quarterly, computed only from loaded or pasted price history — they cannot be typed in.">?</span></h2>
+    <h2>Portfolio buckets <span class="tip" tabindex="0" data-tip="Actual % is what you hold today (must sum to 100) — it is the only weight you enter. The tool derives the target allocation from it. Average return and volatility are quarterly, computed only from loaded or pasted price history — they cannot be typed in.">?</span></h2>
     <div style="overflow-x:auto">
       <table id="bucketTable">
         <thead><tr>
-          <th>Bucket</th><th>Target %</th><th>Avg qtr return</th><th>Qtr volatility</th>
-          <th id="thActual">Actual %</th><th>Data</th><th></th>
+          <th>Bucket</th><th>Actual %</th><th>Avg qtr return</th><th>Qtr volatility</th>
+          <th>Data</th><th></th>
         </tr></thead>
         <tbody id="bucketRows"></tbody>
       </table>
@@ -281,8 +281,8 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
       <h2 style="margin-bottom:0">Allocation</h2>
       <div class="seg-toggle">
-        <button id="tgTarget" class="active">Target</button>
-        <button id="tgActual">Actual</button>
+        <button id="tgActual" class="active">Actual</button>
+        <button id="tgTarget">Recommended</button>
       </div>
     </div>
     <div class="donut-wrap" style="margin-top:16px">
@@ -294,17 +294,17 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
 
   <!-- ===== Risk & return map ===== -->
   <div class="card" id="riskMapCard" style="display:none">
-    <h2>Risk &amp; return map <span class="tip" tabindex="0" data-tip="Each bucket plotted by quarterly volatility (across) and average quarterly return (up); dot size is its target weight. The dashed line is where CPL exactly equals the floor — a mix must sit above it to pass. The gold star is your blended portfolio; the outlined star is the suggested fix.">?</span></h2>
+    <h2>Risk &amp; return map <span class="tip" tabindex="0" data-tip="Each bucket plotted by quarterly volatility (across) and average quarterly return (up); dot size is how much of it you hold. The dashed line is where CPL exactly equals the floor — a mix must sit above it to pass. The gold star is your portfolio as held; the outlined star is the recommended target.">?</span></h2>
     <svg id="riskMap" viewBox="0 0 720 280" style="width:100%;height:auto" role="img" aria-label="Bucket risk and return scatter"></svg>
   </div>
 
   <!-- ===== 4. Per-bucket table ===== -->
   <div class="card">
-    <h2>Bucket detail &amp; rebalancing bands <span class="tip" tabindex="0" data-tip="No-trade band per the 5/25 rule: trigger = min(5 percentage points, 25% of the target weight). Drift above the band → trim; below → top up. Bucket CPL is each bucket judged alone against the same loss floor.">?</span></h2>
+    <h2>Bucket detail &amp; rebalancing bands <span class="tip" tabindex="0" data-tip="No-trade band per the 5/25 rule around the tool's target: trigger = min(5 percentage points, 25% of the target weight). Held above the band → trim; below → top up. Bucket CPL is each bucket judged alone against the same loss floor.">?</span></h2>
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Bucket</th><th>Target %</th><th>Avg qtr return</th><th>Qtr volatility</th>
+          <th>Bucket</th><th>Actual %</th><th>Target %</th><th>Avg qtr return</th><th>Qtr volatility</th>
           <th>Bucket CPL</th><th>Rebalance band</th><th>Status</th>
         </tr></thead>
         <tbody id="detailRows"></tbody>
@@ -312,9 +312,9 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
     </div>
   </div>
 
-  <!-- ===== 5. Suggested adjustment ===== -->
+  <!-- ===== 5. Target allocation ===== -->
   <div class="card hide" id="fixerCard">
-    <h2>Suggested adjustment <span class="tip" tabindex="0" data-tip="Nearest allocation on a 5-percentage-point grid that passes the CPL floor, minimizing total drift from your targets. A suggestion — never applied automatically.">?</span></h2>
+    <h2>Target allocation <span class="tip" tabindex="0" data-tip="Set by the tool, not by you: the highest-expected-return allocation on a 5-percentage-point grid whose CPL still clears the floor, inside your per-bucket limits (Advanced). Ties break toward more margin over the floor, then toward less trading. A suggestion — never applied automatically.">?</span></h2>
     <div id="fixerBody"></div>
   </div>
 
@@ -404,7 +404,7 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
       </div>
 
       <div class="adv-section">
-        <h3>Per-bucket weight limits (for the fixer)</h3>
+        <h3>Per-bucket weight limits <span class="tip" tabindex="0" data-tip="Bounds the tool's target search. Since the target maximizes expected return subject to the loss floor, these caps are what stop it from concentrating in the single highest-return bucket.">?</span></h3>
         <div style="overflow-x:auto"><table id="limitsTable">
           <thead><tr><th>Bucket</th><th>Min %</th><th>Max %</th></tr></thead>
           <tbody id="limitRows"></tbody>
@@ -442,14 +442,14 @@ const canon = name => String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
 let nextId = 1;
 function mkBucket(name) {
   const key = canon(name);
-  return { id: nextId++, name, target: 0, mu: 0, sigma: 0, actual: 0, min: 0, max: 100,
+  return { id: nextId++, name, mu: 0, sigma: 0, actual: 0, min: 0, max: 100,
            qKeys: null, qRets: null, dataInfo: '', muFromData: false };
 }
 const state = {
   buckets: ['Bitcoin', 'Stocks', 'Real Estate', 'Gold', 'Cash', 'Tactical'].map(mkBucket),
   manualCorr: {},          // 'idA|idB' -> value (edited cells)
   useEmpCorr: true,
-  view: 'target',
+  view: 'actual',
   btPeriod: 'max',
   loading: false
 };
@@ -701,19 +701,18 @@ function computeModel() {
   const agesOk = age > 0 && ret > age;
 
   const bks = includedBuckets();
-  const targetW = bks.map(b => b.target);
-  const sumAll = state.buckets.reduce((s, b) => s + b.target, 0);
+  const actualW = bks.map(b => b.actual);
   const sumActual = state.buckets.reduce((s, b) => s + b.actual, 0);
 
-  const m = { agesOk, floor, dist, nw, bks, sumAll, sumActual };
+  const m = { agesOk, floor, dist, nw, bks, sumActual };
   if (!agesOk) return m;
 
   const Y = ret - age;
   const h = Math.min(Y, hCap) / hCap;
   m.g = 1 - Math.pow(1 - h, p);
-  // LRFD factors
+  // LRFD factors — demand grows with what you actually hold in the volatile buckets
   const wBT = state.buckets.filter(b => ['bitcoin', 'tactical'].includes(canon(b.name)))
-                           .reduce((s, b) => s + b.target, 0) / 100;
+                           .reduce((s, b) => s + b.actual, 0) / 100;
   m.gammaD = Math.min(3, Math.max(1.5, 1.5 + 1.5 * wBT));
   m.phi = spend > 0 && nw > 0 ? Math.min(1, Math.max(0.5, (nw / spend) / 10)) : 1;
   m.LmaxEff = m.phi * Lmax / m.gammaD;
@@ -721,9 +720,9 @@ function computeModel() {
   m.USL = +m.LmaxEff * m.g;
   m.Y = Y;
 
-  if (bks.length && Math.abs(sumAll - 100) < 0.5) {
+  if (bks.length && Math.abs(sumActual - 100) < 0.5) {
     m.corrM = buildCorrMatrix(bks);
-    const mo = portfolioMoments(targetW, bks, m.corrM); // CPL screen always on target weights
+    const mo = portfolioMoments(actualW, bks, m.corrM); // CPL screen runs on what you hold
     m.muP = mo.mu; m.sigmaP = mo.sigma;
     if (mo.sigma > 0) {
       m.CPL = (mo.mu - m.LSL) / (3 * mo.sigma);
@@ -735,38 +734,53 @@ function computeModel() {
       m.Cp = (m.USL - m.LSL) / (6 * mo.sigma);
       m.Cpk = m.Cp * (1 - m.k);
     }
+    m.target = runOptimizer(m);
   }
   return m;
 }
+// tool-set target weight per bucket id (only buckets with return history get one)
+function targetMap(m) {
+  const map = new Map();
+  if (m.target && m.target.w) m.bks.forEach((b, i) => map.set(b.id, m.target.w[i]));
+  return map;
+}
 
-/* ================= fixer ================= */
-function runFixer(m) {
+/* ================= target optimizer ================= */
+// Highest expected return on a 5-pt grid subject to CPL >= floor and per-bucket limits.
+// If nothing clears the floor, returns the highest-CPL mix instead, flagged infeasible.
+function runOptimizer(m) {
   const bks = m.bks;
-  const targets = bks.map(b => b.target);
+  const held = bks.map(b => b.actual);
   const mins = bks.map(b => Math.ceil((b.min || 0) / 5));
   const maxs = bks.map(b => Math.floor((b.max == null ? 100 : b.max) / 5));
   const UNITS = 20; // 100% in 5-pt steps
   let varIdx = bks.map((_, i) => i);
-  if (bks.length > 6) { // vary only the 4 highest-sigma buckets, hold the rest at target
+  if (bks.length > 6) { // vary only the 4 highest-sigma buckets, hold the rest as-is
     const order = bks.map((b, i) => i).sort((a, c) => bks[c].sigma - bks[a].sigma);
     varIdx = order.slice(0, 4).sort((a, c) => a - c);
   }
-  const units = bks.map((_, i) => varIdx.includes(i) ? 0 : Math.round(targets[i] / 5));
+  const units = bks.map((_, i) => varIdx.includes(i) ? 0 : Math.round(held[i] / 5));
   const budget = UNITS - units.reduce((s, u, i) => s + (varIdx.includes(i) ? 0 : u), 0);
   if (budget < 0) return null;
 
-  let best = null, evals = 0;
+  let best = null, safest = null, evals = 0;
   function evalCombo() {
     evals++;
     const w = units.map(u => u * 5);
     const mo = portfolioMoments(w, bks, m.corrM);
     if (mo.sigma <= 0) return;
     const cpl = (mo.mu - m.LSL) / (3 * mo.sigma);
+    const drift = w.reduce((s, x, i) => s + Math.abs(x - held[i]), 0);
+    const cand = { w: w.slice(), drift, cpl, mu: mo.mu, sigma: mo.sigma };
+    if (!safest || cpl > safest.cpl + 1e-9) safest = cand;
     if (cpl < m.floor) return;
-    const drift = w.reduce((s, x, i) => s + Math.abs(x - targets[i]), 0);
-    if (!best || drift < best.drift - 1e-9 || (Math.abs(drift - best.drift) < 1e-9 && cpl > best.cpl)) {
-      best = { w: w.slice(), drift, cpl, mu: mo.mu, sigma: mo.sigma };
-    }
+    // maximize mean return; ties → more margin over the floor, then less trading
+    const better = !best
+      || cand.mu > best.mu + 1e-9
+      || (Math.abs(cand.mu - best.mu) < 1e-9
+          && (cand.cpl > best.cpl + 1e-9
+              || (Math.abs(cand.cpl - best.cpl) < 1e-9 && cand.drift < best.drift - 1e-9)));
+    if (better) best = cand;
   }
   (function rec(pos, remaining) {
     if (evals > 400000) return;
@@ -781,7 +795,9 @@ function runFixer(m) {
       rec(pos + 1, remaining - u);
     }
   })(0, budget);
-  return best;
+  if (best) { best.feasible = true; return best; }
+  if (safest) { safest.feasible = false; return safest; }
+  return null;
 }
 
 /* ================= backtest / simulation ================= */
@@ -790,10 +806,9 @@ function periodQuarters() {
   return p === 'max' ? Infinity : (+p) * 4;
 }
 function runBacktest(m) {
-  const bks = m.bks.filter(b => (state.view === 'actual' ? b.actual : b.target) > 0 || b.target > 0);
-  const withW = m.bks.filter(b => b.target > 0);
+  const withW = m.bks.filter(b => b.actual > 0);
   const allData = withW.length > 0 && withW.every(b => b.qKeys);
-  if (!allData || Math.abs(m.sumAll - 100) >= 0.5) return simMode(m);
+  if (!allData || Math.abs(m.sumActual - 100) >= 0.5) return simMode(m);
 
   // align on common quarters
   const maps = withW.map(b => new Map(b.qKeys.map((k, i) => [k, b.qRets[i]])));
@@ -803,7 +818,7 @@ function runBacktest(m) {
   if (common.length > nWant) common = common.slice(common.length - nWant);
   if (common.length < 4) return simMode(m);
 
-  const w = withW.map(b => b.target / 100);
+  const w = withW.map(b => b.actual / 100);
   const rets = common.map(k => withW.reduce((s, b, i) => s + w[i] * maps[i].get(k), 0));
   const n = rets.length;
   let cum = 1, peak = 1, maxDD = 0;
@@ -811,7 +826,7 @@ function runBacktest(m) {
   const mu = mean(rets), s = sd(rets);
   const out = {
     sim: false,
-    label: `${qLabel(common[0])} – ${qLabel(common[common.length - 1])} · ${n} quarters · quarterly rebalanced to target`,
+    label: `${qLabel(common[0])} – ${qLabel(common[common.length - 1])} · ${n} quarters · your current mix, rebalanced quarterly`,
     cagr: (Math.pow(cum, 4 / n) - 1) * 100,
     vol: s * 2,
     maxDD: maxDD * 100,
@@ -875,10 +890,10 @@ function missingSteps(m) {
   const steps = [];
   const age = readNum('inAge'), ret = readNum('inRet');
   if (!(age > 0 && ret > age)) steps.push('enter your current and retirement age (Age profile card, top left)');
-  if (Math.abs(m.sumAll - 100) >= 0.5) steps.push('fill the Target % column in Portfolio buckets so it sums to 100 (now ' + m.sumAll.toFixed(0) + '%)');
+  if (Math.abs(m.sumActual - 100) >= 0.5) steps.push('fill the Actual % column in Portfolio buckets so it sums to 100 (now ' + m.sumActual.toFixed(0) + '%)');
   if (state.buckets.every(b => !(b.sigma > 0))) steps.push('click \u201CLoad market data\u201D (Data card, top right) to pull return history');
   else {
-    const noData = state.buckets.filter(b => b.target > 0 && !(b.sigma > 0));
+    const noData = state.buckets.filter(b => b.actual > 0 && !(b.sigma > 0));
     if (noData.length) steps.push('load or paste history for ' + noData.map(b => b.name).join(', ') + ' (Advanced \u2192 paste/upload)');
   }
   return steps;
@@ -1039,23 +1054,25 @@ function renderRiskMap(m) {
   let out = `<polygon points="${bpts.map(pt => pt[0].toFixed(1) + ',' + pt[1].toFixed(1)).join(' ')} ${W - R},${H - B} ${L},${H - B}" fill="rgba(192,57,43,0.06)"/>`;
   out += `<path d="${pathOf(bpts)}" fill="none" stroke="${CH.fail}" stroke-width="1.2" stroke-dasharray="6 4"/>`;
   if (y0 < 0 && y1 > 0) out += chLine(L, Y(0), W - R, Y(0), CH.grid, 1);
+  const tgt = targetMap(m);
   const labels = [];
   bks.forEach(b => {
     const i = state.buckets.indexOf(b);
-    const r = 4 + Math.sqrt(Math.max(b.target, 0)) * 1.4;
+    const r = 4 + Math.sqrt(Math.max(b.actual, 0)) * 1.4;
     const cx = X(b.sigma), cy = Y(b.mu);
-    out += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${bucketColor(b, i)}" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>${esc(b.name)}: avg ${fmtPct(b.mu)} / volatility ${b.sigma.toFixed(1)}% / target ${b.target}%</title></circle>`;
+    const tw = tgt.get(b.id);
+    out += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${bucketColor(b, i)}" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>${esc(b.name)}: avg ${fmtPct(b.mu)} / volatility ${b.sigma.toFixed(1)}% / held ${b.actual}%${tw == null ? '' : ' / target ' + tw + '%'}</title></circle>`;
     let lx = cx + r + 4, ly = cy + 3.5;
     while (labels.some(q => Math.abs(q.x - lx) < 64 && Math.abs(q.y - ly) < 12)) ly -= 12;
     labels.push({ x: lx, y: ly });
     out += chText(lx, ly, esc(b.name), 'start', CH.ink, 10.5);
   });
-  if (m.fixerBest) {
-    out += starPath(X(m.fixerBest.sigma), Y(m.fixerBest.mu), 9, 'none', CH.darkgold);
-    out += chText(X(m.fixerBest.sigma), Y(m.fixerBest.mu) - 13, 'suggested', 'middle', CH.axis, 10.5);
+  if (m.target) {
+    out += starPath(X(m.target.sigma), Y(m.target.mu), 9, 'none', CH.darkgold);
+    out += chText(X(m.target.sigma), Y(m.target.mu) - 13, 'target', 'middle', CH.axis, 10.5);
   }
   out += starPath(X(m.sigmaP), Y(m.muP), 10, CH.gold, CH.darkgold);
-  out += chText(X(m.sigmaP), Y(m.muP) - 14, 'portfolio', 'middle', CH.darkgold, 11);
+  out += chText(X(m.sigmaP), Y(m.muP) - 14, 'as held', 'middle', CH.darkgold, 11);
   const lblSg = sgMax * 0.55;
   const lblY = Y(m.LSL + 3 * m.floor * lblSg);
   if (lblY > T + 14 && lblY < H - B) out += chText(X(lblSg), lblY - 7, 'pass line (CPL = floor)', 'middle', CH.fail, 10.5);
@@ -1064,20 +1081,18 @@ function renderRiskMap(m) {
   svg.innerHTML = out;
 }
 
-function bulletCell(b, lo, hi, anyActual) {
-  if (!(b.target > 0)) return '—';
+function bulletCell(b, tw, lo, hi) {
+  if (!(tw > 0) && !(b.actual > 0)) return '—';
   const W = 160, H = 18;
   const max = Math.max(hi, b.actual || 0) * 1.2 || 1;
   const S = v => (Math.max(v, 0) / max) * (W - 8) + 4;
   let out = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="vertical-align:middle">`;
   out += `<line x1="4" y1="${H / 2}" x2="${W - 4}" y2="${H / 2}" stroke="#F0EBE1" stroke-width="2"/>`;
   out += `<rect x="${S(lo).toFixed(1)}" y="4" width="${(S(hi) - S(lo)).toFixed(1)}" height="${H - 8}" rx="2" fill="#E7DFD0"/>`;
-  out += `<line x1="${S(b.target).toFixed(1)}" y1="2" x2="${S(b.target).toFixed(1)}" y2="${H - 2}" stroke="#6B6154" stroke-width="2"/>`;
-  if (anyActual) {
-    const col = b.actual > hi ? '#C0392B' : b.actual < lo ? '#B8860B' : '#3E7A4E';
-    out += `<circle cx="${S(b.actual).toFixed(1)}" cy="${H / 2}" r="4.5" fill="${col}" stroke="#fff" stroke-width="1.2"/>`;
-  }
-  out += `<title>no-trade band ${lo.toFixed(1)}% – ${hi.toFixed(1)}% (target ${b.target}%${anyActual ? ', actual ' + b.actual + '%' : ''})</title></svg>`;
+  out += `<line x1="${S(tw).toFixed(1)}" y1="2" x2="${S(tw).toFixed(1)}" y2="${H - 2}" stroke="#6B6154" stroke-width="2"/>`;
+  const col = b.actual > hi ? '#C0392B' : b.actual < lo ? '#B8860B' : '#3E7A4E';
+  out += `<circle cx="${S(b.actual).toFixed(1)}" cy="${H / 2}" r="4.5" fill="${col}" stroke="#fff" stroke-width="1.2"/>`;
+  out += `<title>no-trade band ${lo.toFixed(1)}% – ${hi.toFixed(1)}% (target ${tw}%, held ${b.actual}%)</title></svg>`;
   return out;
 }
 
@@ -1089,10 +1104,9 @@ function renderBucketInputs() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="bucket-name"><span class="swatch" style="background:${bucketColor(b, idx)}"></span><input type="text" data-f="name" data-id="${b.id}" value="${esc(b.name)}" style="width:110px;display:inline-block"></td>
-      <td><input type="number" data-f="target" data-id="${b.id}" value="${b.target}" step="5" min="0" max="100" style="width:72px"></td>
+      <td><input type="number" data-f="actual" data-id="${b.id}" value="${b.actual}" step="1" min="0" max="100" style="width:72px"></td>
       <td class="num">${b.qKeys ? fmtPct(b.mu) : '<span style="color:var(--muted)">—</span>'}</td>
       <td class="num">${b.qKeys ? b.sigma.toFixed(2) + '%' : '<span style="color:var(--muted)">—</span>'}</td>
-      <td><input type="number" data-f="actual" data-id="${b.id}" value="${b.actual}" step="1" min="0" max="100" style="width:72px"></td>
       <td style="font-size:11.5px; color:${b.qKeys ? 'var(--pass)' : 'var(--muted)'}; max-width:170px">${b.qKeys ? b.dataInfo : 'no data'}</td>
       <td><button class="rm-btn" data-rm="${b.id}" title="Remove bucket">&times;</button></td>`;
     tb.appendChild(tr);
@@ -1132,7 +1146,8 @@ function renderCorr() {
 function renderDonut(m) {
   const svg = el('donut');
   const useActual = state.view === 'actual';
-  const rows = state.buckets.map((b, i) => ({ b, i, w: useActual ? b.actual : b.target }))
+  const tgt = targetMap(m);
+  const rows = state.buckets.map((b, i) => ({ b, i, w: useActual ? b.actual : (tgt.get(b.id) || 0) }))
                             .filter(r => r.w > 0);
   const total = rows.reduce((s, r) => s + r.w, 0);
   let html = '';
@@ -1154,39 +1169,44 @@ function renderDonut(m) {
   const nw = readNum('inNW');
   const center = nw > 0 && total > 0 ? fmtMoney(nw * total / 100) : total.toFixed(0) + '%';
   html += `<text x="${cx}" y="${cy - 2}" text-anchor="middle" class="donut-center-label">${center}</text>`;
-  html += `<text x="${cx}" y="${cy + 18}" text-anchor="middle" class="donut-center-sub">${useActual ? 'actual' : 'target'}</text>`;
+  html += `<text x="${cx}" y="${cy + 18}" text-anchor="middle" class="donut-center-sub">${useActual ? 'as held' : 'target'}</text>`;
   svg.innerHTML = html;
 
   el('donutLegend').innerHTML = rows.length ? rows.map(row => `
     <div class="row"><span class="swatch" style="background:${bucketColor(row.b, row.i)}"></span>
       <span class="name">${esc(row.b.name)}</span><span class="val">${row.w.toFixed(0)}%</span></div>`).join('')
-    : '<div class="note">Enter target weights to see the allocation.</div>';
-  el('donutNote').textContent = useActual && !(m.sumActual > 0)
+    : `<div class="note">${useActual ? 'Enter your holdings in the Actual % column above.' : 'The target appears once your holdings sum to 100% and return history is loaded.'}</div>`;
+  el('donutNote').textContent = !useActual
+    ? (m.target ? 'Set by the tool from your loss floor and per-bucket limits — you do not enter it.' : '')
+    : !(m.sumActual > 0)
     ? 'Enter your current holdings in the Actual % column of Portfolio buckets above.'
-    : useActual && Math.abs(m.sumActual - 100) >= 0.5
-    ? `Actual weights sum to ${m.sumActual.toFixed(0)}%.` : '';
+    : Math.abs(m.sumActual - 100) >= 0.5
+    ? `Holdings sum to ${m.sumActual.toFixed(0)}%.` : '';
 }
 
 function renderDetail(m) {
-  const anyActual = state.buckets.some(b => b.actual > 0);
+  const tgt = targetMap(m);
   el('detailRows').innerHTML = state.buckets.map((b, i) => {
-    const trig = Math.min(5, 0.25 * b.target);
-    const lo = b.target - trig, hi = b.target + trig;
+    const tw = tgt.get(b.id);
+    const has = tw != null;
+    const trig = has ? Math.min(5, 0.25 * tw) : 0;
+    const lo = tw - trig, hi = tw + trig;
     const cpl = (m.LSL != null && b.sigma > 0) ? (b.mu - m.LSL) / (3 * b.sigma) : null;
     let st = '<span style="color:var(--muted)">—</span>';
-    if (anyActual && (b.target > 0 || b.actual > 0)) {
+    if (has && (tw > 0 || b.actual > 0)) {
       if (b.actual > hi) st = '<span style="color:var(--fail);font-weight:600">TRIM</span>';
       else if (b.actual < lo) st = '<span style="color:var(--header);font-weight:600">TOP UP</span>';
       else st = '<span style="color:var(--pass)">in band</span>';
     }
-    const unset = b.sigma <= 0 && (b.target > 0 || b.actual > 0);
+    const unset = b.sigma <= 0 && b.actual > 0;
     return `<tr${unset ? ' style="opacity:0.55"' : ''}>
-      <td><span class="swatch" style="background:${bucketColor(b, i)}"></span>${esc(b.name)}${unset ? ' <span style="color:var(--fail);font-size:11px">(unset — excluded)</span>' : ''}</td>
-      <td class="num">${b.target.toFixed(0)}%</td>
+      <td><span class="swatch" style="background:${bucketColor(b, i)}"></span>${esc(b.name)}${unset ? ' <span style="color:var(--fail);font-size:11px">(no data — excluded)</span>' : ''}</td>
+      <td class="num">${b.actual.toFixed(0)}%</td>
+      <td class="num" style="font-weight:600">${has ? tw.toFixed(0) + '%' : '—'}</td>
       <td class="num">${b.sigma > 0 ? fmtPct(b.mu) : '—'}</td>
       <td class="num">${b.sigma > 0 ? b.sigma.toFixed(2) + '%' : '—'}</td>
       <td class="num">${cpl == null ? '—' : cpl.toFixed(2)}</td>
-      <td>${bulletCell(b, lo, hi, anyActual)}</td>
+      <td>${has ? bulletCell(b, tw, lo, hi) : '—'}</td>
       <td>${st}</td></tr>`;
   }).join('');
 }
@@ -1195,12 +1215,12 @@ function renderAll() {
   const m = computeModel();
 
   // warnings
-  const sumBad = Math.abs(m.sumAll - 100) >= 0.5;
-  el('sumChip').textContent = 'sum ' + m.sumAll.toFixed(0) + '%';
+  const sumBad = Math.abs(m.sumActual - 100) >= 0.5;
+  el('sumChip').textContent = 'sum ' + m.sumActual.toFixed(0) + '%';
   el('sumChip').className = 'chip ' + (sumBad ? 'bad' : 'ok');
-  const unsetWeighted = state.buckets.filter(b => b.sigma <= 0 && b.target > 0);
+  const unsetWeighted = state.buckets.filter(b => b.sigma <= 0 && b.actual > 0);
   let bw = [];
-  if (sumBad && m.sumAll > 0) bw.push('Target weights must sum to 100% — currently ' + m.sumAll.toFixed(0) + '%.');
+  if (sumBad && m.sumActual > 0) bw.push('Your holdings must sum to 100% — currently ' + m.sumActual.toFixed(0) + '%.');
   if (unsetWeighted.length) bw.push('No return history for: ' + unsetWeighted.map(b => esc(b.name)).join(', ') + ' — load or paste data; these buckets are excluded from the screen.');
   el('bucketWarn').classList.toggle('hide', !bw.length);
   el('bucketWarn').innerHTML = bw.join('<br>');
@@ -1233,8 +1253,8 @@ function renderAll() {
     el('vShort').textContent = fmtProb(m.shortfall);
     el('vCVaR').textContent = fmtPct(m.cvar, 1);
     el('verdictNote').textContent = m.pass
-      ? `Portfolio average ${fmtPct(m.muP)} / volatility ${m.sigmaP.toFixed(2)}% per quarter clears the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor.`
-      : `Portfolio average ${fmtPct(m.muP)} / volatility ${m.sigmaP.toFixed(2)}% per quarter does not clear the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor — see the suggested adjustment below.`;
+      ? `Your holdings average ${fmtPct(m.muP)} / volatility ${m.sigmaP.toFixed(2)}% per quarter, clearing the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor.`
+      : `Your holdings average ${fmtPct(m.muP)} / volatility ${m.sigmaP.toFixed(2)}% per quarter, which does not clear the ${m.floor.toFixed(2)} floor against a ${fmtPct(m.LSL, 1)} loss floor — see the target allocation below.`;
   } else {
     stamp.textContent = '—';
     stamp.className = 'stamp na';
@@ -1249,26 +1269,24 @@ function renderAll() {
   const bt = (m.agesOk || m.muP != null) ? runBacktest(m) : { none: true };
   renderCapCurve(m, bt);
 
-  // fixer
+  // tool-set target allocation
   const fc = el('fixerCard');
-  if (m.CPL != null && !m.pass) {
-    const best = runFixer(m);
-    m.fixerBest = best;
+  const best = m.target;
+  if (best) {
     fc.classList.remove('hide');
-    if (best) {
-      const bks = m.bks;
-      el('fixerBody').innerHTML = `
-        <div style="overflow-x:auto"><table>
-          <thead><tr><th>Bucket</th><th>Target %</th><th>Suggested %</th><th>Drift</th></tr></thead>
-          <tbody>${bks.map((b, i) => `<tr>
-            <td>${esc(b.name)}</td><td class="num">${b.target.toFixed(0)}%</td>
-            <td class="num" style="font-weight:600">${best.w[i].toFixed(0)}%</td>
-            <td class="num" style="color:${best.w[i] === b.target ? 'var(--muted)' : 'var(--header)'}">${fmtPct(best.w[i] - b.target, 0)}</td></tr>`).join('')}
-          </tbody></table></div>
-        <p class="note">Resulting CPL ${best.cpl.toFixed(2)} (average ${fmtPct(best.mu)}, volatility ${best.sigma.toFixed(2)}%), total drift ${best.drift.toFixed(0)} points on a 5-point grid. A suggestion — apply it yourself if it makes sense.</p>`;
-    } else {
-      el('fixerBody').innerHTML = '<p class="note">No allocation on the 5-point grid passes the floor within your per-bucket limits — the band may be too tight for these assumptions (check Advanced limits, or the loss floor).</p>';
-    }
+    const bks = m.bks;
+    const moves = bks.filter((b, i) => Math.abs(best.w[i] - b.actual) > 1e-9).length;
+    el('fixerBody').innerHTML = `
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Bucket</th><th>Actual %</th><th>Target %</th><th>Change</th></tr></thead>
+        <tbody>${bks.map((b, i) => `<tr>
+          <td>${esc(b.name)}</td><td class="num">${b.actual.toFixed(0)}%</td>
+          <td class="num" style="font-weight:600">${best.w[i].toFixed(0)}%</td>
+          <td class="num" style="color:${best.w[i] === b.actual ? 'var(--muted)' : 'var(--header)'}">${best.w[i] === b.actual ? '—' : fmtPct(best.w[i] - b.actual, 0)}</td></tr>`).join('')}
+        </tbody></table></div>
+      <p class="note">${best.feasible
+        ? `Highest expected return on the 5-point grid that still clears the ${m.floor.toFixed(2)} floor: CPL ${best.cpl.toFixed(2)}, average ${fmtPct(best.mu)}, volatility ${best.sigma.toFixed(2)}% per quarter. ${moves ? `Getting there means moving ${best.drift.toFixed(0)} points across ${moves} bucket${moves > 1 ? 's' : ''}.` : 'You are already there — no trades needed.'} A suggestion — apply it yourself if it makes sense.`
+        : `No allocation on the 5-point grid clears the ${m.floor.toFixed(2)} floor within your per-bucket limits. Shown above is the safest mix available (CPL ${best.cpl.toFixed(2)}, average ${fmtPct(best.mu)}, volatility ${best.sigma.toFixed(2)}%) — the band may be too tight for these assumptions; check the Advanced limits or the loss floor.`}</p>`;
   } else fc.classList.add('hide');
 
   // backtest
