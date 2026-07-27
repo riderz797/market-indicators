@@ -1,6 +1,6 @@
 {
   "as_of": "2026-06-01",
-  "updated_utc": "2026-07-20T11:50:17Z",
+  "updated_utc": "2026-07-27T12:30:01Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
@@ -14,12 +14,12 @@
   "market_regime": "REFLATION",
   "market_regime_raw": "REFLATION",
   "shares": {
-    "GOLDILOCKS": 27,
-    "REFLATION": 31,
-    "INFLATION": 24,
-    "DEFLATION": 18
+    "GOLDILOCKS": 24,
+    "REFLATION": 34,
+    "INFLATION": 27,
+    "DEFLATION": 15
   },
-  "signal_strength": 31,
+  "signal_strength": 34,
   "risk_on_prob": 58,
   "n_markets": 17,
   "persistence": {
@@ -143,10 +143,10 @@
       },
       {
         "name": "Crude Oil",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
