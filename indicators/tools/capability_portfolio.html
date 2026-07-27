@@ -120,6 +120,7 @@ button.ghost:hover { border-color: var(--accent); color: var(--header); }
 /* header band */
 .band { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; text-align: center; }
 @media (max-width: 640px) { .band { grid-template-columns: 1fr; } }
+.band.fund { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .band .cell { padding: 10px 6px; }
 .band .big { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .band .lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
@@ -192,16 +193,18 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
 <div class="container">
   <a class="back" href="../../index.html">&larr; Back to dashboard</a>
   <h1>SPC Portfolio Theory</h1>
-  <p class="subtitle">Enter what you actually hold, plus your age profile. The tool sets a two-sided quarterly tolerance band from your years to retirement, screens your holdings against a downside-risk floor, derives the target allocation for you, and gives per-bucket rebalancing triggers.</p>
+  <p class="subtitle">Enter what you actually hold, your age profile, and the amount you're aiming for at retirement. The tool works out the return you need to get there, sets a downside-risk floor from your years to retirement, and finds the <em>least-risk</em> allocation that still funds the goal — the sweet spot between the return you need and the volatility you can afford. It then gives per-bucket rebalancing triggers.</p>
 
   <!-- ===== Inputs ===== -->
   <div class="grid2">
     <div class="card">
-      <h2>Age profile <span class="tip" tabindex="0" data-tip="Years to retirement set how wide your quarterly tolerance band is: wide and flat when young, tapering as retirement approaches.">?</span></h2>
+      <h2>Age &amp; goal <span class="tip" tabindex="0" data-tip="Years to retirement set how wide your quarterly tolerance band is: wide and flat when young, tapering as retirement approaches. Net worth, target, and annual contribution together set the return you need to hit the goal.">?</span></h2>
       <div class="inputs-row">
         <div class="field"><label for="inAge">Current age</label><input id="inAge" type="number" min="0" step="1" value="0"></div>
         <div class="field"><label for="inRet">Retirement age</label><input id="inRet" type="number" min="0" step="1" value="0"></div>
         <div class="field"><label for="inNW">Net worth ($)</label><input id="inNW" type="number" min="0" step="1000" value="0"></div>
+        <div class="field"><label for="inTarget">Target at retirement ($) <span class="tip" tabindex="0" data-tip="The amount you want to have when you retire. With net worth and annual contribution, this sets the return you need — leave at 0 to skip the goal and just maximize return within the safety floor.">?</span></label><input id="inTarget" type="number" min="0" step="1000" value="0"></div>
+        <div class="field"><label for="inContrib">Annual contribution ($/yr) <span class="tip" tabindex="0" data-tip="How much you add to the portfolio each year between now and retirement. Modeled as an end-of-year deposit. Leave at 0 if you won't be adding.">?</span></label><input id="inContrib" type="number" min="0" step="1000" value="0"></div>
       </div>
       <div id="ageWarn" class="warn hide"></div>
     </div>
@@ -276,6 +279,34 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
     <div class="note" id="verdictNote"></div>
   </div>
 
+  <!-- ===== 2b. Funding ===== -->
+  <div class="card hide" id="fundCard">
+    <h2>Goal funding <span class="tip" tabindex="0" data-tip="Required return is the annual growth rate that turns your net worth plus contributions into the target by retirement. Your holdings' expected return is a forward estimate (average quarterly return minus the volatility drag, annualized) — not past performance. Meeting the required return is the demand side; clearing the loss floor is the safety side.">?</span></h2>
+    <div class="band fund">
+      <div class="cell">
+        <div class="lbl">Return needed <span class="tip" tabindex="0" data-tip="Annual return (compound) to grow net worth plus contributions to the target over your horizon.">?</span></div>
+        <div class="big" id="fundReq" style="color:var(--header)">&mdash;</div>
+        <div class="note">per year</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">Your holdings' expected return <span class="tip" tabindex="0" data-tip="Forward estimate for what you hold today: average quarterly return minus half its variance (the drag from volatility), annualized. Above the return needed → on track; below → short.">?</span></div>
+        <div class="big" id="fundGot" style="color:var(--header)">&mdash;</div>
+        <div class="note" id="fundGap">per year</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">Projected — as held <span class="tip" tabindex="0" data-tip="Where your current holdings, growing at their expected return with your contributions, land by retirement — against the target.">?</span></div>
+        <div class="big" id="fundProj">&mdash;</div>
+        <div class="note" id="fundProjNote">vs target &mdash;</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">Projected — recommended <span class="tip" tabindex="0" data-tip="Where you'd land if you reallocated to the recommended target allocation now and held it, growing at its expected return with your contributions, to retirement.">?</span></div>
+        <div class="big" id="fundProjRec">&mdash;</div>
+        <div class="note" id="fundProjRecNote">vs target &mdash;</div>
+      </div>
+    </div>
+    <div class="note" id="fundNote"></div>
+  </div>
+
   <!-- ===== 3. Donut ===== -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
@@ -296,6 +327,7 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
   <div class="card" id="riskMapCard" style="display:none">
     <h2>Risk &amp; return map <span class="tip" tabindex="0" data-tip="Each bucket plotted by quarterly volatility (across) and average quarterly return (up); dot size is how much of it you hold. The dashed line is where CPL exactly equals the floor — a mix must sit above it to pass. The gold star is your portfolio as held; the outlined star is the recommended target.">?</span></h2>
     <svg id="riskMap" viewBox="0 0 720 280" style="width:100%;height:auto" role="img" aria-label="Bucket risk and return scatter"></svg>
+    <div id="riskMapLegend" style="display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:12px; font-size:12px"></div>
   </div>
 
   <!-- ===== 4. Per-bucket table ===== -->
@@ -314,7 +346,7 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
 
   <!-- ===== 5. Target allocation ===== -->
   <div class="card hide" id="fixerCard">
-    <h2>Target allocation <span class="tip" tabindex="0" data-tip="Set by the tool, not by you: the highest-expected-return allocation on a 5-percentage-point grid whose CPL still clears the floor, inside your per-bucket limits (Advanced). Ties break toward more margin over the floor, then toward less trading. A suggestion — never applied automatically.">?</span></h2>
+    <h2>Target allocation <span class="tip" tabindex="0" data-tip="Set by the tool, not by you. With a goal: the least-volatility allocation on a 5-point grid that both clears the CPL floor and earns the return you need — inside your per-bucket limits (Advanced). If none does both, it shows the safest goal-funding mix (flagged as over the risk floor) or, if the goal is unreachable, the closest it can get. With no goal it maximizes return subject to the floor. A suggestion — never applied automatically.">?</span></h2>
     <div id="fixerBody"></div>
   </div>
 
@@ -322,9 +354,14 @@ footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--mut
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
       <h2 style="margin-bottom:0">Backtest</h2>
-      <div class="seg-toggle" id="btPeriods">
-        <button data-p="1">1Y</button><button data-p="3">3Y</button><button data-p="5">5Y</button>
-        <button data-p="10">10Y</button><button data-p="max" class="active">Max</button>
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <div class="seg-toggle" id="btView">
+          <button data-v="held">Held</button><button data-v="rec">Recommended</button><button data-v="both" class="active">Both</button>
+        </div>
+        <div class="seg-toggle" id="btPeriods">
+          <button data-p="1">1Y</button><button data-p="3">3Y</button><button data-p="5">5Y</button>
+          <button data-p="10">10Y</button><button data-p="max" class="active">Max</button>
+        </div>
       </div>
     </div>
     <div style="margin-top:14px">
@@ -451,6 +488,7 @@ const state = {
   useEmpCorr: true,
   view: 'actual',
   btPeriod: 'max',
+  btView: 'both',          // backtest chart: held | rec | both
   loading: false
 };
 function bucketColor(b, idx) {
@@ -692,9 +730,38 @@ function portfolioMoments(weightsPct, bks, C) { // weights aligned with bks, in 
   return { mu, sigma: Math.sqrt(Math.max(varr, 0)) };
 }
 
+/* ================= goal / required return ================= */
+// Terminal wealth of PV growing at annual rate r for Y years, plus an
+// end-of-year contribution PMT (ordinary annuity).
+function projectWealth(r, PV, PMT, Y) {
+  if (Math.abs(r) < 1e-9) return PV + PMT * Y;
+  const g = Math.pow(1 + r, Y);
+  return PV * g + PMT * (g - 1) / r;
+}
+// Annual return needed to reach `target` from PV plus contributions over Y years.
+// Returns { r, reachable }; reachable=false when even a very high return falls short.
+function solveRequiredReturn(PV, PMT, target, Y) {
+  if (!(target > 0) || !(Y > 0)) return { r: null, reachable: true };
+  let lo = -0.95, hi = 3.0;                       // -95%/yr … 300%/yr
+  if (projectWealth(lo, PV, PMT, Y) >= target) return { r: lo, reachable: true };
+  if (projectWealth(hi, PV, PMT, Y) < target) return { r: hi, reachable: false };
+  for (let i = 0; i < 100; i++) {
+    const mid = (lo + hi) / 2;
+    if (projectWealth(mid, PV, PMT, Y) < target) lo = mid; else hi = mid;
+  }
+  return { r: (lo + hi) / 2, reachable: true };
+}
+// Forward expected compound annual return from quarterly arithmetic mean & sd (%),
+// including the variance drag that separates geometric from arithmetic growth.
+function expectedCAGR(muQpct, sigmaQpct) {
+  const gq = muQpct / 100 - 0.5 * Math.pow(sigmaQpct / 100, 2);
+  return Math.pow(Math.max(1 + gq, 1e-6), 4) - 1;
+}
+
 function computeModel() {
   const age = readNum('inAge'), ret = readNum('inRet');
   const nw = readNum('inNW'), spend = readNum('setSpend');
+  const target = readNum('inTarget'), contrib = readNum('inContrib');
   const Lmax = readNum('setLmax') || 25, p = readNum('setP') || 2, hCap = readNum('setHCap') || 40;
   const floor = parseFloat(el('setFloor').value);
   const dist = el('setDist').value;
@@ -720,6 +787,15 @@ function computeModel() {
   m.USL = +m.LmaxEff * m.g;
   m.Y = Y;
 
+  // goal: the return demanded to reach `target` from net worth + contributions
+  m.hasGoal = target > 0;
+  if (m.hasGoal) {
+    const req = solveRequiredReturn(nw, contrib, target, Y);
+    m.target$ = target; m.contrib = contrib;
+    m.reqReturn = req.r;            // annual, decimal
+    m.reqReachable = req.reachable; // false → unreachable even at the search ceiling
+  }
+
   if (bks.length && Math.abs(sumActual - 100) < 0.5) {
     m.corrM = buildCorrMatrix(bks);
     const mo = portfolioMoments(actualW, bks, m.corrM); // CPL screen runs on what you hold
@@ -734,6 +810,12 @@ function computeModel() {
       m.Cp = (m.USL - m.LSL) / (6 * mo.sigma);
       m.Cpk = m.Cp * (1 - m.k);
     }
+    // as-held forward expected return and where it lands by retirement
+    m.pCAGR = expectedCAGR(mo.mu, mo.sigma);
+    if (m.hasGoal) {
+      m.pProj = projectWealth(m.pCAGR, nw, contrib, Y);
+      m.pFunded = m.pProj >= m.target$ - 1e-6;
+    }
     m.target = runOptimizer(m);
   }
   return m;
@@ -746,8 +828,13 @@ function targetMap(m) {
 }
 
 /* ================= target optimizer ================= */
-// Highest expected return on a 5-pt grid subject to CPL >= floor and per-bucket limits.
-// If nothing clears the floor, returns the highest-CPL mix instead, flagged infeasible.
+// Searches the 5-pt grid (within per-bucket limits) and picks a target by mode:
+//   goal set     → 'sweet'     : least-volatility mix that clears the floor AND funds the goal.
+//                → 'over-risk' : if none is both safe and funding, the safest mix that still
+//                                funds — it breaches the age floor (flagged).
+//                → 'short'     : if nothing funds at all, the mix that gets closest to the goal.
+//   no goal      → 'max-return': highest-return mix that clears the floor (legacy behavior),
+//                → 'no-safe'   : or the highest-CPL mix if none clears the floor.
 function runOptimizer(m) {
   const bks = m.bks;
   const held = bks.map(b => b.actual);
@@ -763,7 +850,8 @@ function runOptimizer(m) {
   const budget = UNITS - units.reduce((s, u, i) => s + (varIdx.includes(i) ? 0 : u), 0);
   if (budget < 0) return null;
 
-  let best = null, safest = null, evals = 0;
+  const goal = m.hasGoal;
+  let sweet = null, funderSafest = null, maxReturnSafe = null, maxCagr = null, safest = null, evals = 0;
   function evalCombo() {
     evals++;
     const w = units.map(u => u * 5);
@@ -771,16 +859,22 @@ function runOptimizer(m) {
     if (mo.sigma <= 0) return;
     const cpl = (mo.mu - m.LSL) / (3 * mo.sigma);
     const drift = w.reduce((s, x, i) => s + Math.abs(x - held[i]), 0);
-    const cand = { w: w.slice(), drift, cpl, mu: mo.mu, sigma: mo.sigma };
+    const cagr = expectedCAGR(mo.mu, mo.sigma);
+    const proj = goal ? projectWealth(cagr, m.nw, m.contrib, m.Y) : null;
+    const funds = goal ? proj >= m.target$ - 1e-6 : false;
+    const cand = { w: w.slice(), drift, cpl, mu: mo.mu, sigma: mo.sigma, cagr, proj, funds };
+    const safe = cpl >= m.floor;
+    // trackers
     if (!safest || cpl > safest.cpl + 1e-9) safest = cand;
-    if (cpl < m.floor) return;
-    // maximize mean return; ties → more margin over the floor, then less trading
-    const better = !best
-      || cand.mu > best.mu + 1e-9
-      || (Math.abs(cand.mu - best.mu) < 1e-9
-          && (cand.cpl > best.cpl + 1e-9
-              || (Math.abs(cand.cpl - best.cpl) < 1e-9 && cand.drift < best.drift - 1e-9)));
-    if (better) best = cand;
+    if (!maxCagr || cand.cagr > maxCagr.cagr + 1e-12
+        || (Math.abs(cand.cagr - maxCagr.cagr) < 1e-12 && cand.drift < maxCagr.drift - 1e-9)) maxCagr = cand;
+    if (safe && (!maxReturnSafe || cand.mu > maxReturnSafe.mu + 1e-9
+        || (Math.abs(cand.mu - maxReturnSafe.mu) < 1e-9 && cand.drift < maxReturnSafe.drift - 1e-9))) maxReturnSafe = cand;
+    if (funds && (!funderSafest || cand.cpl > funderSafest.cpl + 1e-9
+        || (Math.abs(cand.cpl - funderSafest.cpl) < 1e-9 && cand.drift < funderSafest.drift - 1e-9))) funderSafest = cand;
+    if (safe && funds && (!sweet || cand.sigma < sweet.sigma - 1e-9
+        || (Math.abs(cand.sigma - sweet.sigma) < 1e-9 && (cand.cpl > sweet.cpl + 1e-9
+            || (Math.abs(cand.cpl - sweet.cpl) < 1e-9 && cand.drift < sweet.drift - 1e-9))))) sweet = cand;
   }
   (function rec(pos, remaining) {
     if (evals > 400000) return;
@@ -795,9 +889,14 @@ function runOptimizer(m) {
       rec(pos + 1, remaining - u);
     }
   })(0, budget);
-  if (best) { best.feasible = true; return best; }
-  if (safest) { safest.feasible = false; return safest; }
-  return null;
+
+  const tag = (c, mode, feasible) => { if (c) { c.mode = mode; c.feasible = feasible; } return c; };
+  if (!goal) {
+    return maxReturnSafe ? tag(maxReturnSafe, 'max-return', true) : tag(safest, 'no-safe', false);
+  }
+  if (sweet)        return tag(sweet, 'sweet', true);
+  if (funderSafest) return tag(funderSafest, 'over-risk', false);   // funds but breaches floor
+  return tag(maxCagr || safest, 'short', false);                    // can't fund; closest effort
 }
 
 /* ================= backtest / simulation ================= */
@@ -805,40 +904,54 @@ function periodQuarters() {
   const p = state.btPeriod;
   return p === 'max' ? Infinity : (+p) * 4;
 }
+// summary stats for one weighted quarterly-return series
+function seriesStats(rets, m) {
+  const n = rets.length;
+  let cum = 1, peak = 1, maxDD = 0;
+  for (const r of rets) { cum *= 1 + r / 100; peak = Math.max(peak, cum); maxDD = Math.min(maxDD, cum / peak - 1); }
+  const mu = mean(rets), s = sd(rets);
+  const o = { rets, n, cagr: (Math.pow(cum, 4 / n) - 1) * 100, vol: s * 2, maxDD: maxDD * 100, latest: rets[n - 1] };
+  if (m.LSL != null && s > 0) {
+    o.empCPL = (mu - m.LSL) / (3 * s);
+    o.empShort = rets.filter(r => r < m.LSL).length / n;
+    o.beyondUSL = rets.filter(r => r > m.USL).length;
+    o.latestBreach = rets[n - 1] > m.USL;
+  }
+  return o;
+}
 function runBacktest(m) {
-  const withW = m.bks.filter(b => b.actual > 0);
-  const allData = withW.length > 0 && withW.every(b => b.qKeys);
+  const actBk = m.bks.filter(b => b.actual > 0);
+  const allData = actBk.length > 0 && actBk.every(b => b.qKeys);
   if (!allData || Math.abs(m.sumActual - 100) >= 0.5) return simMode(m);
 
-  // align on common quarters
-  const maps = withW.map(b => new Map(b.qKeys.map((k, i) => [k, b.qRets[i]])));
-  let common = withW[0].qKeys.filter(k => maps.every(mp => mp.has(k)));
+  // recommended-weighted buckets (may differ from what's held)
+  const recIdx = m.target ? m.bks.map((b, i) => i).filter(i => m.target.w[i] > 0) : [];
+  const recBk = recIdx.map(i => m.bks[i]);
+  const recOk = recBk.length > 0 && recBk.every(b => b.qKeys);
+
+  // shared timeline: quarters present for every bucket used by either mix
+  const involved = m.bks.filter((b, i) => b.actual > 0 || (m.target && m.target.w[i] > 0));
+  const maps = new Map(involved.map(b => [b.id, new Map(b.qKeys.map((k, i) => [k, b.qRets[i]]))]));
+  let common = involved[0].qKeys.filter(k => involved.every(b => maps.get(b.id).has(k)));
   common.sort((a, b) => a - b);
   const nWant = periodQuarters();
   if (common.length > nWant) common = common.slice(common.length - nWant);
   if (common.length < 4) return simMode(m);
 
-  const w = withW.map(b => b.actual / 100);
-  const rets = common.map(k => withW.reduce((s, b, i) => s + w[i] * maps[i].get(k), 0));
-  const n = rets.length;
-  let cum = 1, peak = 1, maxDD = 0;
-  for (const r of rets) { cum *= 1 + r / 100; peak = Math.max(peak, cum); maxDD = Math.min(maxDD, cum / peak - 1); }
-  const mu = mean(rets), s = sd(rets);
-  const out = {
-    sim: false,
-    label: `${qLabel(common[0])} – ${qLabel(common[common.length - 1])} · ${n} quarters · your current mix, rebalanced quarterly`,
-    cagr: (Math.pow(cum, 4 / n) - 1) * 100,
-    vol: s * 2,
-    maxDD: maxDD * 100,
-    latest: rets[n - 1]
-  };
-  out.rets = rets;
-  out.qKeys = common;
-  if (m.LSL != null && s > 0) {
-    out.empCPL = (mu - m.LSL) / (3 * s);
-    out.empShort = rets.filter(r => r < m.LSL).length / n;
-    out.beyondUSL = rets.filter(r => r > m.USL).length;
-    out.latestBreach = rets[n - 1] > m.USL;
+  // held mix
+  const wa = actBk.map(b => b.actual / 100), aMaps = actBk.map(b => maps.get(b.id));
+  const retsA = common.map(k => actBk.reduce((s, b, i) => s + wa[i] * aMaps[i].get(k), 0));
+  const out = Object.assign({
+    sim: false, qKeys: common,
+    label: `${qLabel(common[0])} – ${qLabel(common[common.length - 1])} · ${common.length} quarters · rebalanced quarterly`
+  }, seriesStats(retsA, m));
+
+  // recommended mix over the same quarters, for comparison
+  if (recOk) {
+    const wr = recIdx.map(i => m.target.w[i] / 100), rMaps = recBk.map(b => maps.get(b.id));
+    const retsR = common.map(k => recBk.reduce((s, b, i) => s + wr[i] * rMaps[i].get(k), 0));
+    out.rec = seriesStats(retsR, m);
+    out.recSame = m.target.drift < 1e-9; // recommended == held → lines coincide
   }
   return out;
 }
@@ -924,12 +1037,20 @@ function renderControlChart(m, bt) {
   if (!bt || bt.none || bt.sim || !bt.rets || bt.rets.length < 4 || m.LSL == null) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
   const W = 720, H = 250, L = 16, R = 16, T = 16, B = 30;
-  const rets = bt.rets, keys = bt.qKeys, n = rets.length;
-  let lo = Math.min(m.LSL, Math.min.apply(null, rets)), hi = Math.max(m.USL, Math.max.apply(null, rets));
+  const keys = bt.qKeys, n = bt.rets.length;
+  const REC = '#3E6B8C', HELD = '#C9BFAF';      // recommended / held line colors
+  const view = state.btView || 'both';
+  const hasRec = bt.rec && !bt.recSame;
+  // primary = the breach-monitored series; secondary = a plain reference line
+  let primRets = bt.rets, primLabel = 'held', primLine = HELD, primDot = '#8A7F6E', secRets = null;
+  if (view === 'rec' && hasRec) { primRets = bt.rec.rets; primLabel = 'recommended'; primLine = REC; primDot = REC; }
+  else if (view === 'both' && hasRec) { secRets = bt.rec.rets; }
+  const allv = secRets ? primRets.concat(secRets) : primRets;
+  let lo = Math.min(m.LSL, Math.min.apply(null, allv)), hi = Math.max(m.USL, Math.max.apply(null, allv));
   const pad = (hi - lo) * 0.1 || 1; lo -= pad; hi += pad;
   const X = i => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1));
   const Y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
-  const mu = mean(rets);
+  const mu = mean(primRets);
   let out = `<rect x="${L}" y="${Y(m.USL).toFixed(1)}" width="${W - L - R}" height="${(Y(m.LSL) - Y(m.USL)).toFixed(1)}" fill="rgba(240,160,48,0.07)"/>`;
   if (lo < 0 && hi > 0) out += chLine(L, Y(0), W - R, Y(0), CH.grid, 1);
   out += chLine(L, Y(m.LSL), W - R, Y(m.LSL), CH.fail, 1.6);
@@ -937,14 +1058,33 @@ function renderControlChart(m, bt) {
   out += chLine(L, Y(mu), W - R, Y(mu), CH.gold, 1.4, '5 4');
   out += chText(W - R, Y(m.LSL) + 13, 'loss floor ' + fmtPct(m.LSL, 1), 'end', CH.fail);
   out += chText(W - R, Y(m.USL) - 5, 'trigger ' + fmtPct(m.USL, 1), 'end', CH.pass);
-  out += chText(L + 4, Y(mu) - 5, 'avg ' + fmtPct(mu, 1), 'start', CH.darkgold);
+  out += chText(L + 4, Y(mu) - 5, primLabel + ' avg ' + fmtPct(mu, 1), 'start', CH.darkgold);
+  // secondary reference line (recommended), drawn under the primary
+  if (secRets) {
+    let dr = '';
+    for (let i = 0; i < n; i++) dr += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(secRets[i]).toFixed(1);
+    out += `<path d="${dr}" fill="none" stroke="${REC}" stroke-width="1.4" opacity="0.9"/>`;
+    for (let i = 0; i < n; i++) {
+      out += `<circle cx="${X(i).toFixed(1)}" cy="${Y(secRets[i]).toFixed(1)}" r="2.2" fill="${REC}" stroke="#fff" stroke-width="0.8"><title>recommended · ${qLabel(keys[i])}: ${fmtPct(secRets[i], 1)}</title></circle>`;
+    }
+  }
+  // primary series with breach-colored markers
   let d = '';
-  for (let i = 0; i < n; i++) d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(rets[i]).toFixed(1);
-  out += `<path d="${d}" fill="none" stroke="#C9BFAF" stroke-width="1.1"/>`;
+  for (let i = 0; i < n; i++) d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(primRets[i]).toFixed(1);
+  out += `<path d="${d}" fill="none" stroke="${primLine}" stroke-width="1.2"/>`;
   for (let i = 0; i < n; i++) {
-    const r = rets[i];
+    const r = primRets[i];
     const breach = r < m.LSL ? CH.fail : r > m.USL ? CH.pass : null;
-    out += `<circle cx="${X(i).toFixed(1)}" cy="${Y(r).toFixed(1)}" r="${breach ? 4 : 2.6}" fill="${breach || '#8A7F6E'}" stroke="#fff" stroke-width="1"><title>${qLabel(keys[i])}: ${fmtPct(r, 1)}${r < m.LSL ? ' — below the floor' : r > m.USL ? ' — profit-taking trigger' : ''}</title></circle>`;
+    out += `<circle cx="${X(i).toFixed(1)}" cy="${Y(r).toFixed(1)}" r="${breach ? 4 : 2.6}" fill="${breach || primDot}" stroke="#fff" stroke-width="1"><title>${primLabel} · ${qLabel(keys[i])}: ${fmtPct(r, 1)}${r < m.LSL ? ' — below the floor' : r > m.USL ? ' — profit-taking trigger' : ''}</title></circle>`;
+  }
+  // legend
+  const leg = secRets
+    ? [['held', HELD], ['recommended', REC]]
+    : [[primLabel, primLine]];
+  let lx = L + 2;
+  for (const [txt, col] of leg) {
+    out += chLine(lx, T + 3, lx + 16, T + 3, col, 2) + chText(lx + 20, T + 6, txt, 'start', CH.ink, 10.5);
+    lx += 34 + txt.length * 6.2;
   }
   const step = Math.max(1, Math.ceil(n / 8));
   for (let i = 0; i < n; i += step) out += chText(X(i), H - 10, qLabel(keys[i]), 'middle');
@@ -993,10 +1133,15 @@ function renderCapCurve(m, bt) {
   out += chLine(X(m.LSL), T, X(m.LSL), Y(0), CH.fail, 1.6);
   out += chLine(X(m.USL), T, X(m.USL), Y(0), CH.pass, 1.6);
   out += chLine(X(m.muP), T, X(m.muP), Y(0), CH.gold, 1.2, '5 4');
-  out += chText(X(m.LSL), H - 8, 'floor ' + fmtPct(m.LSL, 1), 'middle', CH.fail);
-  out += chText(X(m.USL), H - 8, 'trigger ' + fmtPct(m.USL, 1), 'middle', CH.pass);
-  out += chText(X(m.muP), T + 10, 'avg ' + fmtPct(m.muP, 1), X(m.muP) > W / 2 ? 'end' : 'start', CH.darkgold);
-  out += chText(Math.max(X(m.LSL) - 6, 60), T + 26, 'shortfall ' + fmtProb(m.shortfall), 'end', CH.fail);
+  // floor / trigger labels: anchor away from each other so they never collide when the
+  // two lines sit close together (floor text grows left, trigger text grows right)
+  const floorX = Math.max(X(m.LSL) - 4, L + 2);
+  const trigX = Math.min(X(m.USL) + 4, W - R - 2);
+  out += chText(floorX, H - 9, 'floor ' + fmtPct(m.LSL, 1), 'end', CH.fail);
+  out += chText(trigX, H - 9, 'trigger ' + fmtPct(m.USL, 1), 'start', CH.pass);
+  // avg + shortfall: separate rows near the top, each anchored away from the panel edges
+  out += chText(X(m.muP), T + 11, 'avg ' + fmtPct(m.muP, 1), X(m.muP) > W / 2 ? 'end' : 'start', CH.darkgold);
+  out += chText(Math.max(X(m.LSL) - 4, L + 2), T + 27, 'shortfall ' + fmtProb(m.shortfall), 'end', CH.fail);
   svg.innerHTML = out;
 }
 
@@ -1055,24 +1200,66 @@ function renderRiskMap(m) {
   out += `<path d="${pathOf(bpts)}" fill="none" stroke="${CH.fail}" stroke-width="1.2" stroke-dasharray="6 4"/>`;
   if (y0 < 0 && y1 > 0) out += chLine(L, Y(0), W - R, Y(0), CH.grid, 1);
   const tgt = targetMap(m);
-  const labels = [];
+  // draw dots, collecting each as an obstacle the labels must dodge
+  const obstacles = [];
   bks.forEach(b => {
     const i = state.buckets.indexOf(b);
     const r = 4 + Math.sqrt(Math.max(b.actual, 0)) * 1.4;
     const cx = X(b.sigma), cy = Y(b.mu);
     const tw = tgt.get(b.id);
     out += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${bucketColor(b, i)}" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>${esc(b.name)}: avg ${fmtPct(b.mu)} / volatility ${b.sigma.toFixed(1)}% / held ${b.actual}%${tw == null ? '' : ' / target ' + tw + '%'}</title></circle>`;
-    let lx = cx + r + 4, ly = cy + 3.5;
-    while (labels.some(q => Math.abs(q.x - lx) < 64 && Math.abs(q.y - ly) < 12)) ly -= 12;
-    labels.push({ x: lx, y: ly });
-    out += chText(lx, ly, esc(b.name), 'start', CH.ink, 10.5);
+    obstacles.push({ cx, cy, r });
   });
-  if (m.target) {
-    out += starPath(X(m.target.sigma), Y(m.target.mu), 9, 'none', CH.darkgold);
-    out += chText(X(m.target.sigma), Y(m.target.mu) - 13, 'target', 'middle', CH.axis, 10.5);
+  // star markers (drawn now, labeled by the placer below)
+  const heldMk = { cx: X(m.sigmaP), cy: Y(m.muP), r: 10 };
+  const tgtMk = m.target ? { cx: X(m.target.sigma), cy: Y(m.target.mu), r: 9 } : null;
+  obstacles.push(heldMk); if (tgtMk) obstacles.push(tgtMk);
+  if (tgtMk) out += starPath(tgtMk.cx, tgtMk.cy, 9, 'none', CH.darkgold);
+  out += starPath(heldMk.cx, heldMk.cy, 10, CH.gold, CH.darkgold);
+
+  // collision-aware label placer: try positions around the marker, skip any that hit
+  // another label, a dot, or the panel edge; draw a short leader when pushed out
+  const placedBoxes = [], CHARW = 5.9, LH = 11;
+  function place(cx, cy, r, text, color, size) {
+    const w = text.length * (size / 10.5) * CHARW;
+    const cands = [];
+    for (const dy of [0, -LH, LH, -2 * LH, 2 * LH]) {
+      cands.push([cx + r + 5, cy + 3.5 + dy, 'start']);
+      cands.push([cx - r - 5, cy + 3.5 + dy, 'end']);
+    }
+    cands.push([cx, cy - r - 5, 'middle'], [cx, cy + r + LH, 'middle'],
+               [cx, cy - r - 5 - LH, 'middle'], [cx, cy + r + LH + LH, 'middle']);
+    for (const [bx, by, anchor] of cands) {
+      let x0 = bx; if (anchor === 'middle') x0 = bx - w / 2; else if (anchor === 'end') x0 = bx - w;
+      const box = { x0, y0: by - LH + 2, x1: x0 + w, y1: by + 3 };
+      if (box.x0 < L - 2 || box.x1 > W - 2 || box.y0 < T - 6 || box.y1 > H - B + 2) continue;
+      if (placedBoxes.some(p => !(box.x1 < p.x0 || box.x0 > p.x1 || box.y1 < p.y0 || box.y0 > p.y1))) continue;
+      if (obstacles.some(dt => { const nx = Math.max(box.x0, Math.min(dt.cx, box.x1)), ny = Math.max(box.y0, Math.min(dt.cy, box.y1)); return Math.hypot(dt.cx - nx, dt.cy - ny) < dt.r + 2; })) continue;
+      placedBoxes.push(box);
+      // leader line if the label sits clear of the marker
+      const lxEnd = anchor === 'start' ? box.x0 : anchor === 'end' ? box.x1 : bx;
+      if (Math.hypot(lxEnd - cx, by - 3 - cy) > r + 9) out += chLine(cx, cy, lxEnd, by - 3, '#D8CFBF', 0.8);
+      out += chText(bx, by, esc(text), anchor, color, size);
+      return;
+    }
+    out += chText(cx + r + 5, cy + 3.5, esc(text), 'start', color, size); // fallback
   }
-  out += starPath(X(m.sigmaP), Y(m.muP), 10, CH.gold, CH.darkgold);
-  out += chText(X(m.sigmaP), Y(m.muP) - 14, 'as held', 'middle', CH.darkgold, 11);
+  place(heldMk.cx, heldMk.cy, heldMk.r, 'as held', CH.darkgold, 11);
+  if (tgtMk) place(tgtMk.cx, tgtMk.cy, tgtMk.r, 'target', CH.axis, 10.5);
+  bks.map(b => ({ b, r: 4 + Math.sqrt(Math.max(b.actual, 0)) * 1.4 }))
+     .sort((a, c) => c.r - a.r)
+     .forEach(({ b, r }) => place(X(b.sigma), Y(b.mu), r, b.name, CH.ink, 10.5));
+
+  // legend under the chart (color → bucket, with its coordinates)
+  el('riskMapLegend').innerHTML = bks.map(b => {
+    const i = state.buckets.indexOf(b);
+    return `<span style="display:inline-flex; align-items:center; white-space:nowrap">
+      <span class="swatch" style="background:${bucketColor(b, i)}"></span>${esc(b.name)}
+      <span style="color:var(--muted); margin-left:6px">${fmtPct(b.mu)} · vol ${b.sigma.toFixed(1)}%</span></span>`;
+  }).join('') +
+    `<span style="display:inline-flex; align-items:center; white-space:nowrap; color:var(--muted)">
+      <span style="display:inline-block;width:11px;text-align:center;margin-right:7px;color:${CH.gold}">★</span>as held${tgtMk ? ' &nbsp; <span style="display:inline-block;width:11px;text-align:center;margin-right:5px;color:' + CH.darkgold + '">☆</span>target' : ''}</span>`;
+
   const lblSg = sgMax * 0.55;
   const lblY = Y(m.LSL + 3 * m.floor * lblSg);
   if (lblY > T + 14 && lblY < H - B) out += chText(X(lblSg), lblY - 7, 'pass line (CPL = floor)', 'middle', CH.fail, 10.5);
@@ -1263,6 +1450,52 @@ function renderAll() {
     el('verdictNote').textContent = 'To run the screen: ' + missingSteps(m).join('; ') + '.';
   }
 
+  // funding card
+  const fundC = el('fundCard');
+  if (m.hasGoal && m.agesOk) {
+    fundC.classList.remove('hide');
+    el('fundReq').textContent = m.reqReachable ? fmtPct(m.reqReturn * 100, 1) : '>300%';
+    el('fundReq').style.color = m.reqReachable ? 'var(--header)' : 'var(--fail)';
+    if (m.pCAGR != null) {
+      const gap = (m.pCAGR - (m.reqReturn || 0)) * 100;
+      el('fundGot').textContent = fmtPct(m.pCAGR * 100, 1);
+      el('fundGot').style.color = m.pFunded ? 'var(--pass)' : 'var(--fail)';
+      el('fundGap').textContent = m.pFunded ? `on track — ${gap >= 0 ? '+' : ''}${gap.toFixed(1)} pts over` : `${Math.abs(gap).toFixed(1)} pts short`;
+    } else {
+      el('fundGot').textContent = '—'; el('fundGot').style.color = '';
+      el('fundGap').textContent = 'enter holdings to 100%';
+    }
+    if (m.pProj != null) {
+      const d = m.pProj - m.target$;
+      el('fundProj').textContent = fmtMoney(m.pProj);
+      el('fundProj').style.color = m.pFunded ? 'var(--pass)' : 'var(--fail)';
+      el('fundProjNote').textContent = `${d >= 0 ? '+' : '−'}${fmtMoney(Math.abs(d))} vs ${fmtMoney(m.target$)} target`;
+    } else {
+      el('fundProj').textContent = '—'; el('fundProj').style.color = '';
+      el('fundProjNote').textContent = `target ${fmtMoney(m.target$)}`;
+    }
+    // projected if reallocated to the recommended target mix
+    const tProj = (m.target && m.target.proj != null) ? m.target.proj : null;
+    if (tProj != null) {
+      const dr = tProj - m.target$, rFunded = tProj >= m.target$ - 1e-6;
+      el('fundProjRec').textContent = fmtMoney(tProj);
+      el('fundProjRec').style.color = rFunded ? 'var(--pass)' : 'var(--fail)';
+      const vsHeld = (m.pProj != null) ? ` · ${tProj >= m.pProj ? '+' : '−'}${fmtMoney(Math.abs(tProj - m.pProj))} vs as-held` : '';
+      el('fundProjRecNote').textContent = `${dr >= 0 ? '+' : '−'}${fmtMoney(Math.abs(dr))} vs target${vsHeld}`;
+    } else {
+      el('fundProjRec').textContent = '—'; el('fundProjRec').style.color = '';
+      el('fundProjRecNote').textContent = `target ${fmtMoney(m.target$)}`;
+    }
+    el('fundNote').textContent = !m.reqReachable
+      ? `Even a 300%/yr return wouldn't reach ${fmtMoney(m.target$)} in ${m.Y} year${m.Y === 1 ? '' : 's'} from ${fmtMoney(m.nw)} plus ${fmtMoney(m.contrib)}/yr — the target needs more time, more saving, or a lower number.`
+      : m.reqReturn <= 1e-6 ? `Net worth plus contributions reach the target on their own — no market return required. The tool will de-risk toward the least-volatile safe mix.`
+      : m.pProj == null ? 'Enter your holdings so they sum to 100% to see whether your mix funds the goal.'
+      : m.pFunded ? `Your current mix is on track — growing at its expected ${fmtPct(m.pCAGR * 100, 1)}/yr it reaches the target with room to spare.`
+      : `Your current mix falls short of the target. The target allocation below is the least-risk way to close the gap — or flags when the goal outruns your safety floor.`;
+  } else {
+    fundC.classList.add('hide');
+  }
+
   renderDonut(m);
   renderDetail(m);
 
@@ -1276,6 +1509,30 @@ function renderAll() {
     fc.classList.remove('hide');
     const bks = m.bks;
     const moves = bks.filter((b, i) => Math.abs(best.w[i] - b.actual) > 1e-9).length;
+    const movesTxt = moves ? `Getting there means moving ${best.drift.toFixed(0)} points across ${moves} bucket${moves > 1 ? 's' : ''}.` : 'You already hold this mix — no trades needed.';
+    const stats = `CPL ${best.cpl.toFixed(2)}, average ${fmtPct(best.mu)}, volatility ${best.sigma.toFixed(2)}% per quarter (≈ ${fmtPct(best.cagr * 100, 1)}/yr expected)`;
+    const projTxt = (m.hasGoal && best.proj != null)
+      ? ` Projected to reach ${fmtMoney(best.proj)} by retirement, ${best.proj >= m.target$ - 1e-6 ? 'at or above' : 'short of'} the ${fmtMoney(m.target$)} target.` : '';
+    const reqPct = (m.reqReturn != null) ? fmtPct(m.reqReturn * 100, 1) : '—';
+    let msg;
+    switch (best.mode) {
+      case 'sweet':
+        msg = (m.reqReturn <= 1e-6)
+          ? `Your goal is already funded by net worth and contributions, so the tool de-risks to the least-volatile mix that still clears the ${m.floor.toFixed(2)} floor. ${stats}.${projTxt} ${movesTxt}`
+          : `The sweet spot: the least-risk allocation that both clears the ${m.floor.toFixed(2)} loss floor and earns the ${reqPct}/yr you need to hit the goal. ${stats}.${projTxt} ${movesTxt}`;
+        break;
+      case 'over-risk':
+        msg = `⚠ No allocation both clears the ${m.floor.toFixed(2)} floor and funds your goal, so reaching the target means taking more downside risk than your age profile recommends. This is the safest mix that still funds it — its CPL is only ${best.cpl.toFixed(2)}, below the ${m.floor.toFixed(2)} floor. ${stats}.${projTxt} ${movesTxt}`;
+        break;
+      case 'short':
+        msg = `⚠ The ${fmtMoney(m.target$)} goal isn't reachable within these return assumptions and per-bucket limits. Shown is the closest the grid gets: ${stats}.${projTxt} Levers: save more, retire later, lower the target, or widen the Advanced limits.`;
+        break;
+      case 'max-return':
+        msg = `No goal set, so this is the highest-return allocation that still clears the ${m.floor.toFixed(2)} floor. ${stats}. ${movesTxt} Enter a target at retirement above to switch to the least-risk mix that funds it.`;
+        break;
+      default: // no-safe
+        msg = `No allocation on the grid clears the ${m.floor.toFixed(2)} floor within your per-bucket limits. Shown is the safest available: ${stats} — the band may be too tight; check the Advanced limits or the loss floor.`;
+    }
     el('fixerBody').innerHTML = `
       <div style="overflow-x:auto"><table>
         <thead><tr><th>Bucket</th><th>Actual %</th><th>Target %</th><th>Change</th></tr></thead>
@@ -1284,9 +1541,7 @@ function renderAll() {
           <td class="num" style="font-weight:600">${best.w[i].toFixed(0)}%</td>
           <td class="num" style="color:${best.w[i] === b.actual ? 'var(--muted)' : 'var(--header)'}">${best.w[i] === b.actual ? '—' : fmtPct(best.w[i] - b.actual, 0)}</td></tr>`).join('')}
         </tbody></table></div>
-      <p class="note">${best.feasible
-        ? `Highest expected return on the 5-point grid that still clears the ${m.floor.toFixed(2)} floor: CPL ${best.cpl.toFixed(2)}, average ${fmtPct(best.mu)}, volatility ${best.sigma.toFixed(2)}% per quarter. ${moves ? `Getting there means moving ${best.drift.toFixed(0)} points across ${moves} bucket${moves > 1 ? 's' : ''}.` : 'You are already there — no trades needed.'} A suggestion — apply it yourself if it makes sense.`
-        : `No allocation on the 5-point grid clears the ${m.floor.toFixed(2)} floor within your per-bucket limits. Shown above is the safest mix available (CPL ${best.cpl.toFixed(2)}, average ${fmtPct(best.mu)}, volatility ${best.sigma.toFixed(2)}%) — the band may be too tight for these assumptions; check the Advanced limits or the loss floor.`}</p>`;
+      <p class="note">${msg} A suggestion — apply it yourself if it makes sense.</p>`;
   } else fc.classList.add('hide');
 
   // backtest
@@ -1299,18 +1554,32 @@ function renderAll() {
   } else {
     banner.className = 'bt-banner ' + (bt.sim ? 'sim' : 'hist');
     banner.textContent = bt.sim ? 'Monte Carlo of assumptions — not historical' : 'Historical backtest';
+    const R = (!bt.sim && bt.rec && !bt.recSame) ? bt.rec : null;
+    // headline series follows the toggle; the other appears as a sub-line
+    let big = bt, sub = null, subLbl = 'rec';
+    if (R) {
+      if (state.btView === 'rec') { big = R; sub = bt; subLbl = 'held'; }
+      else if (state.btView === 'both') { sub = R; subLbl = 'rec'; }
+    }
+    const sv = (o, f) => (o && o[f.k] != null) ? f.fmt(o[f.k]) : null;
+    const fCagr = { k: 'cagr', fmt: v => fmtPct(v, 1) }, fVol = { k: 'vol', fmt: v => v.toFixed(1) + '%' };
+    const fDD = { k: 'maxDD', fmt: v => fmtPct(v, 1) }, fCPL = { k: 'empCPL', fmt: v => v.toFixed(2) };
+    const fSF = { k: 'empShort', fmt: v => (v * 100).toFixed(2) + '%' };
     const cells = [
-      ['CAGR' + (bt.sim ? ' (median)' : ''), fmtPct(bt.cagr, 1)],
-      ['Ann. volatility', bt.vol != null ? bt.vol.toFixed(1) + '%' : '—'],
-      ['Max drawdown' + (bt.sim ? ' (median)' : ''), fmtPct(bt.maxDD, 1)],
-      ['Empirical CPL', bt.empCPL != null ? bt.empCPL.toFixed(2) : '—'],
-      ['Shortfall freq', bt.empShort != null ? (bt.empShort * 100).toFixed(2) + '%' : '—']
+      ['CAGR' + (bt.sim ? ' (median)' : ''), sv(big, fCagr) || '—', sv(sub, fCagr)],
+      ['Ann. volatility', sv(big, fVol) || '—', sv(sub, fVol)],
+      ['Max drawdown' + (bt.sim ? ' (median)' : ''), sv(big, fDD) || '—', sv(sub, fDD)],
+      ['Empirical CPL', sv(big, fCPL) || '—', sv(sub, fCPL)],
+      ['Shortfall freq', sv(big, fSF) || '—', sv(sub, fSF)]
     ];
-    el('btStats').innerHTML = cells.map(c => `<div class="stat"><div class="v">${c[1]}</div><div class="k">${c[0]}</div></div>`).join('');
-    let note = bt.label + '.';
+    const subColor = subLbl === 'rec' ? '#3E6B8C' : '#8A7F6E';
+    el('btStats').innerHTML = cells.map(c => `<div class="stat"><div class="v">${c[1]}</div><div class="k">${c[0]}</div>${c[2] != null ? `<div class="k" style="color:${subColor}; text-transform:none; letter-spacing:0; margin-top:3px">${subLbl} ${c[2]}</div>` : ''}</div>`).join('');
+    let note = bt.label + (bt.sim ? '' : ` · showing ${state.btView === 'rec' ? 'recommended' : state.btView === 'both' ? 'held vs recommended' : 'held'} mix`) + '.';
     if (!bt.sim && m.shortfall != null) note += ` Parametric shortfall said ${fmtProb(m.shortfall)}; history shows ${(bt.empShort * 100).toFixed(2)}% of quarters below the floor.`;
-    if (!bt.sim && bt.beyondUSL > 0) note += ` ${bt.beyondUSL} quarter${bt.beyondUSL > 1 ? 's' : ''} exceeded the profit-taking trigger.`;
-    if (!bt.sim && bt.latestBreach) note += ' The most recent quarter breached the trigger — profit-taking / rebalance now.';
+    if (R) note += ` Over the same window the recommended mix would have returned ${fmtPct(R.cagr, 1)}/yr at ${R.vol.toFixed(1)}% volatility (vs ${fmtPct(bt.cagr, 1)} / ${bt.vol.toFixed(1)}% held), with empirical CPL ${R.empCPL != null ? R.empCPL.toFixed(2) : '—'} vs ${bt.empCPL != null ? bt.empCPL.toFixed(2) : '—'} and ${R.empShort != null ? (R.empShort * 100).toFixed(2) : '—'}% of quarters below the floor.`;
+    else if (!bt.sim && bt.rec && bt.recSame) note += ' The recommended mix matches your current holdings, so its backtest is identical.';
+    if (!bt.sim && bt.beyondUSL > 0) note += ` ${bt.beyondUSL} held quarter${bt.beyondUSL > 1 ? 's' : ''} exceeded the profit-taking trigger.`;
+    if (!bt.sim && bt.latestBreach) note += ' The most recent held quarter breached the trigger — profit-taking / rebalance now.';
     el('btNote').textContent = note;
   }
 
@@ -1366,7 +1635,7 @@ document.addEventListener('input', e => {
     recompute();
     return;
   }
-  if (['inAge', 'inRet', 'inNW', 'setFloor', 'setLmax', 'setP', 'setHCap', 'setDist', 'setSpend',
+  if (['inAge', 'inRet', 'inNW', 'inTarget', 'inContrib', 'setFloor', 'setLmax', 'setP', 'setHCap', 'setDist', 'setSpend',
        'ghOwner', 'ghRepo', 'ghBranch', 'ghPath', 'ghDateCol', 'ghPriceCol'].includes(t.id)) recompute();
 });
 document.addEventListener('change', e => {
@@ -1398,6 +1667,13 @@ el('btPeriods').addEventListener('click', e => {
   if (!p) return;
   state.btPeriod = p;
   el('btPeriods').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.p === p));
+  recompute();
+});
+el('btView').addEventListener('click', e => {
+  const v = e.target.dataset && e.target.dataset.v;
+  if (!v) return;
+  state.btView = v;
+  el('btView').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   recompute();
 });
 el('btnPasteLoad').addEventListener('click', () => {
