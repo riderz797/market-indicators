@@ -1,11 +1,11 @@
 {
   "as_of": "2026-06-01",
-  "updated_utc": "2026-07-27T12:30:01Z",
+  "updated_utc": "2026-08-03T12:31:14Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -0.48
+    "score": -0.17
   },
   "inflation": {
     "dir": "Rising",
@@ -14,12 +14,12 @@
   "market_regime": "REFLATION",
   "market_regime_raw": "REFLATION",
   "shares": {
-    "GOLDILOCKS": 24,
-    "REFLATION": 34,
-    "INFLATION": 27,
-    "DEFLATION": 15
+    "GOLDILOCKS": 27,
+    "REFLATION": 31,
+    "INFLATION": 24,
+    "DEFLATION": 18
   },
-  "signal_strength": 34,
+  "signal_strength": 31,
   "risk_on_prob": 58,
   "n_markets": 17,
   "persistence": {
@@ -36,9 +36,9 @@
         "score": -2.72
       },
       "Real Income ex-Transfers": {
-        "yoy": -0.43,
-        "accel6m": -1.01,
-        "score": -2.27
+        "yoy": 0.14,
+        "accel6m": -0.14,
+        "score": -1.65
       },
       "Industrial Production": {
         "yoy": 1.14,
@@ -46,9 +46,9 @@
         "score": 0.29
       },
       "Real Mfg & Trade Sales": {
-        "yoy": 1.28,
-        "accel6m": -0.57,
-        "score": -0.39
+        "yoy": 2.32,
+        "accel6m": 1.06,
+        "score": 0.58
       },
       "Real Retail Sales": {
         "yoy": 3.7,
@@ -58,8 +58,8 @@
     },
     "inflation": {
       "Core PCE": {
-        "yoy": 3.41,
-        "accel6m": 0.58,
+        "yoy": 3.29,
+        "accel6m": 0.32,
         "score": 3.0
       },
       "Core CPI": {
@@ -127,6 +127,14 @@
       },
       {
         "name": "Base Metals",
+        "mom": "up",
+        "confirms": [
+          "REFLATION",
+          "INFLATION"
+        ]
+      },
+      {
+        "name": "Agriculture",
         "mom": "down",
         "confirms": [
           "GOLDILOCKS",
@@ -134,19 +142,11 @@
         ]
       },
       {
-        "name": "Agriculture",
-        "mom": "up",
-        "confirms": [
-          "REFLATION",
-          "INFLATION"
-        ]
-      },
-      {
         "name": "Crude Oil",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
