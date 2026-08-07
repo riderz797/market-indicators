@@ -2,22 +2,36 @@
 fetch_daily_move.py
 Bakes data for the Daily Move in Historical Distribution indicator.
 
-For each of five assets, fetches the full daily price history, computes
+For each of eight assets, fetches the full daily price history, computes
 every daily move, bins them into a histogram, and injects the binned
 distribution plus summary stats into daily_move_distribution.html.
 The page only renders — all math lives here.
 
-Sources (all free, no registration):
+Sources (all free, no registration beyond the shared FRED key):
   1. Yahoo ^GSPC    — S&P 500 daily closes since Dec 1927, % change
   2. LBMA gold PM   — gold fix USD/oz since 1968; trimmed to Aug 1971
                       (the end of the fixed $35 gold window), % change.
                       The fix publishes with a ~1-day lag, so the CURRENT
                       move comes from COMEX futures (Yahoo GC=F) whenever
                       futures have a fresher date than the fix.
-  3. Yahoo ^TNX     — CBOE 10-year Treasury yield since 1962,
-                      move measured in basis points (1 bp = 0.01%)
+  3. FRED DCOILBRENTEU — Brent crude spot USD/bbl since May 1987, % change.
+                      Spot publishes a few days behind, so the CURRENT move
+                      comes from Brent futures (Yahoo BZ=F) when fresher —
+                      the same arrangement gold uses.
   4. Yahoo DX-Y.NYB — ICE US Dollar Index since 1971, % change
   5. Yahoo BTC-USD  — Bitcoin since Sep 2014, % change
+  6. Yahoo ^TNX     — CBOE 10-year Treasury yield since 1962,
+                      move measured in basis points (1 bp = 0.01%)
+  7. FRED T10Y2Y    — 10-year minus 2-year Treasury spread since Jun 1976,
+                      move measured in basis points
+  8. MOVE index     — ICE BofA bond-market volatility, % change. Merged from
+                      two feeds: Yahoo ^MOVE reaches back to Nov 2002 but
+                      forward-fills holidays and has stopped publishing daily
+                      bars entirely; Barchart $MOVE is current but only spans
+                      the last 5000 sessions. Barchart wins where they overlap
+                      (spot-checked against Yahoo's stale prints), Yahoo
+                      supplies the pre-2006 history, and either source alone
+                      is enough to bake.
 
 Run:  python fetch_daily_move.py
 Requires: requests  (pip install requests)
@@ -29,8 +43,14 @@ import math
 import os
 import random
 import re
+import sys
 import time
+import urllib.parse
 from datetime import datetime, timedelta, timezone
+
+# Asset names carry typographic characters (the spread's U+2212 minus), which a
+# default Windows console encodes as cp1252 and dies on. CI already runs UTF-8.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # ── CONFIG ─────────────────────────────────────────────────────────────────────
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -39,13 +59,19 @@ HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
 
+# Same public key the other indicator scripts in this repo use.
+FRED_API_KEY = "824b29c5afa52f3fc7c6e7dc4925aebb"
+
 N_BINS      = 90    # histogram bins across mean ± 4.5 sd (bin width = sd/10)
 BIN_SPAN_SD = 4.5
 MAX_GAP_DAYS = 7    # don't compute a "daily" move across a longer gap
 
 # Sanity floors: refuse to bake if a source comes back suspiciously short
 # (protects against silent API degradation shrinking the distribution).
-MIN_MOVES = {"spx": 20000, "gold": 11000, "ust10y": 13000, "dxy": 11000, "btc": 3500}
+# MOVE's floor sits below the ~5000 sessions Barchart alone returns, so losing
+# either of its two feeds degrades the history rather than failing the bake.
+MIN_MOVES = {"spx": 20000, "gold": 11000, "brent": 9000, "dxy": 11000,
+             "btc": 3500, "ust10y": 13000, "t10y2y": 11500, "move": 4500}
 
 
 # ── FETCHERS ───────────────────────────────────────────────────────────────────
@@ -130,6 +156,71 @@ def fetch_lbma_gold():
     return out
 
 
+def fetch_fred(series_id):
+    """A daily FRED series -> [(date_str, value)], missing prints ('.') dropped."""
+    r = requests.get("https://api.stlouisfed.org/fred/series/observations",
+                     params={"series_id":         series_id,
+                             "api_key":           FRED_API_KEY,
+                             "file_type":         "json",
+                             "observation_start": "1900-01-01",
+                             "sort_order":        "asc"},
+                     headers=HEADERS, timeout=120)
+    r.raise_for_status()
+    return [(o["date"], float(o["value"])) for o in r.json()["observations"]
+            if o["value"] not in (".", "")]
+
+
+def fetch_barchart_move():
+    """Barchart's end-of-day $MOVE series -> [(date_str, close)].
+
+    Barchart gates its data proxy behind an XSRF cookie handed out by the quote
+    page, so load that first and echo the token back. Capped at 5000 sessions
+    on their side, which currently reaches back to May 2006."""
+    s = requests.Session()
+    s.headers.update(HEADERS)
+    quote_page = "https://www.barchart.com/stocks/quotes/%24MOVE/interactive-chart"
+    s.get(quote_page, timeout=60)
+    token = urllib.parse.unquote(s.cookies.get("XSRF-TOKEN", ""))
+    if not token:
+        raise RuntimeError("Barchart handed back no XSRF-TOKEN cookie")
+    r = s.get("https://www.barchart.com/proxies/timeseries/queryeod.ashx",
+              params={"symbol": "$MOVE", "data": "daily",
+                      "maxrecords": "10000", "order": "asc"},
+              headers={"x-xsrf-token": token, "Referer": quote_page},
+              timeout=120)
+    r.raise_for_status()
+    out = []
+    for line in r.text.strip().splitlines():
+        parts = line.split(",")                # symbol,date,open,high,low,close,volume
+        if len(parts) >= 6 and parts[5]:
+            out.append((parts[1], float(parts[5])))
+    out.sort()
+    return out
+
+
+def fetch_move():
+    """MOVE index daily closes -> [(date_str, close)], merged across two feeds.
+
+    Yahoo carries the deeper history but forward-fills bond-market holidays
+    (2023-06-20 repeats 06-16 across Juneteenth) and its daily bars have been
+    null since mid-2026; Barchart is accurate and current but shallower. So
+    Barchart wins every date the two share, and Yahoo backfills the rest.
+    Tolerates either feed being down — whatever survives still gets baked."""
+    merged, sources = {}, []
+    for label, fetch in (("Yahoo ^MOVE", lambda: fetch_yahoo("^MOVE")),
+                         ("Barchart $MOVE", fetch_barchart_move)):
+        try:
+            series = fetch()                   # later source overwrites earlier
+            merged.update(dict(series))
+            sources.append(f"{label} ({len(series)})")
+        except Exception as e:
+            print(f"  WARNING: {label} unavailable ({type(e).__name__}: {e})")
+    if not merged:
+        raise RuntimeError("Both MOVE feeds failed")
+    print(f"  MOVE sources: {', '.join(sources)}")
+    return sorted(merged.items())
+
+
 # ── MOVE MATH ──────────────────────────────────────────────────────────────────
 def day_gap(d1, d2):
     return (datetime.strptime(d2, "%Y-%m-%d") - datetime.strptime(d1, "%Y-%m-%d")).days
@@ -149,6 +240,52 @@ def compute_moves(series, kind, max_abs):
     return moves
 
 
+def quantum(vals):
+    """The smallest step every value is a multiple of — i.e. the precision the
+    source publishes at. Series quoted at full float precision bottom out at the
+    1e-6 floor, which is the 'no meaningful quantization' answer."""
+    g = 0
+    for v in vals:
+        g = math.gcd(g, int(round(abs(v) * 1e6)))
+        if g == 1:
+            break
+    return g / 1e6
+
+
+def histogram(vals, mean, sd):
+    """Bin the moves across mean ± BIN_SPAN_SD·sd -> (bin_lo, bin_w, counts,
+    below, above).
+
+    Normally that is N_BINS equal bins. But a source quantized coarser than one
+    bin needs wider ones: FRED publishes the 10y-2y spread to two decimals, so
+    every move is a whole number of basis points, and bins narrower than 1 bp
+    are structurally unfillable — over half of them would come back empty and
+    comb the chart into a picket fence. In that case widen the bins to the data's
+    own step and centre them on it, so each bin holds exactly one real value."""
+    lo = mean - BIN_SPAN_SD * sd
+    hi = mean + BIN_SPAN_SD * sd
+    w = (hi - lo) / N_BINS
+    q = quantum(vals)
+    if q > w:
+        w = q
+        lo = math.floor((lo + q / 2) / w) * w - q / 2   # grid points at bin centres
+        n = int(math.ceil((hi - lo) / w))
+    else:
+        n = N_BINS
+
+    counts, below, above = [0] * n, 0, 0
+    for v in vals:
+        if v < lo:
+            below += 1
+            continue
+        i = int((v - lo) / w)
+        if i >= n:
+            above += 1
+        else:
+            counts[i] += 1
+    return lo, w, counts, below, above
+
+
 def build_asset(spec, series, cur_override=None):
     moves = compute_moves(series, spec["kind"], spec["max_abs"])
     n = len(moves)
@@ -166,18 +303,7 @@ def build_asset(spec, series, cur_override=None):
     rec_min = min(moves, key=lambda t: t[1])
     rec_max = max(moves, key=lambda t: t[1])
 
-    # histogram: N_BINS bins across mean ± BIN_SPAN_SD * sd
-    bin_lo = mean - BIN_SPAN_SD * sd
-    bin_w = 2 * BIN_SPAN_SD * sd / N_BINS
-    counts, below, above = [0] * N_BINS, 0, 0
-    for v in vals:
-        i = int((v - bin_lo) / bin_w)
-        if v < bin_lo:
-            below += 1
-        elif i >= N_BINS:
-            above += 1
-        else:
-            counts[i] += 1
+    bin_lo, bin_w, counts, below, above = histogram(vals, mean, sd)
 
     # stats for the current move
     z = (cur_v - mean) / sd
@@ -203,6 +329,11 @@ def build_asset(spec, series, cur_override=None):
 
 
 # ── MAIN ───────────────────────────────────────────────────────────────────────
+# Order here is the order the boards appear on the page: risk assets, then
+# commodities and the dollar, then the rates block (level, curve, volatility).
+# max_abs is a bad-tick guard, so each is set clear of that series' genuine
+# extremes — Brent really did move ±50% in April 2020, and the 10y-2y spread
+# really did swing ±55 bp under Volcker.
 SPECS = [
     {"id": "spx",    "name": "S&P 500",  "kind": "pct", "max_abs": 30,
      "sub": "% change vs prior close", "fetch": lambda: fetch_yahoo("^GSPC")},
@@ -210,12 +341,21 @@ SPECS = [
      "sub": "% change vs prior close",
      "fetch": lambda: [(d, v) for d, v in fetch_lbma_gold() if d >= "1971-08-16"],
      "live":  lambda: fetch_yahoo("GC=F")},
-    {"id": "ust10y", "name": "US 10YR Yield", "kind": "bp", "max_abs": 150,
-     "sub": "basis-point change vs prior close", "fetch": lambda: fetch_yahoo_tnx()},
+    {"id": "brent",  "name": "Oil (Brent Crude)", "kind": "pct", "max_abs": 60,
+     "sub": "% change vs prior close",
+     "fetch": lambda: fetch_fred("DCOILBRENTEU"),
+     "live":  lambda: fetch_yahoo("BZ=F")},
     {"id": "dxy",    "name": "DXY (US Dollar Index)", "kind": "pct", "max_abs": 30,
      "sub": "% change vs prior close", "fetch": lambda: fetch_yahoo("DX-Y.NYB")},
     {"id": "btc",    "name": "Bitcoin",  "kind": "pct", "max_abs": 60,
      "sub": "% change vs prior close", "fetch": lambda: fetch_yahoo("BTC-USD")},
+    {"id": "ust10y", "name": "US 10YR Yield", "kind": "bp", "max_abs": 150,
+     "sub": "basis-point change vs prior close", "fetch": lambda: fetch_yahoo_tnx()},
+    {"id": "t10y2y", "name": "US 10YR − 2YR Spread", "kind": "bp", "max_abs": 100,
+     "sub": "basis-point change vs prior close",
+     "fetch": lambda: fetch_fred("T10Y2Y")},
+    {"id": "move",   "name": "MOVE Index (Bond Volatility)", "kind": "pct", "max_abs": 80,
+     "sub": "% change vs prior close", "fetch": fetch_move},
 ]
 
 
@@ -241,7 +381,7 @@ for spec in SPECS:
             cur_override = live_moves[-1]
     a = build_asset(spec, series, cur_override)
     assets.append(a)
-    print(f"  {a['name']:22s}: {a['n']:6d} moves since {a['start']}, "
+    print(f"  {a['name']:30s}: {a['n']:6d} moves since {a['start']}, "
           f"last {a['cur']['d']} = {a['cur']['v']:+.2f}{a['unit']} "
           f"(z {a['z']:+.2f}, {a['pctile']:.1f} pctile, 1-in-{a['oneIn']})")
 
@@ -256,7 +396,11 @@ baked_block = (
 )
 
 pattern = r"(// @@BAKED_DATA_START@@)[\s\S]*?(// @@BAKED_DATA_END@@)"
-new_html, count = re.subn(pattern, r"\g<1>\n" + baked_block + "\n    \\2", html)
+# Replace via a function, not a template string: the baked JSON contains
+# backslash escapes (− in the spread's name) that re would otherwise try
+# to interpret as replacement-group syntax and reject.
+new_html, count = re.subn(
+    pattern, lambda m: m.group(1) + "\n" + baked_block + "\n    " + m.group(2), html)
 
 if count == 0:
     print("ERROR: Could not find @@BAKED_DATA_START@@ / @@BAKED_DATA_END@@ markers.")

@@ -233,13 +233,17 @@
         <div class="meta-card-label">DATA &amp; METHOD</div>
         <div class="data-row"><span class="sid">S&amp;P 500</span><span>Daily closes since Dec 1927 (Yahoo ^GSPC) &mdash; percent change</span></div>
         <div class="data-row"><span class="sid">GOLD</span><span>History: LBMA PM fix since Aug 1971, the end of the fixed gold window. Today's move: COMEX futures (GC=F) when fresher than the fix, which publishes a day behind &mdash; percent change</span></div>
-        <div class="data-row"><span class="sid">US 10YR</span><span>10-year Treasury yield since 1962 (CBOE ^TNX) &mdash; change in basis points</span></div>
+        <div class="data-row"><span class="sid">BRENT CRUDE</span><span>History: Europe Brent spot since May 1987 (US Energy Information Administration, via FRED). Today's move: Brent futures (BZ=F) when fresher than the spot print, which publishes a few days behind &mdash; percent change</span></div>
         <div class="data-row"><span class="sid">DXY</span><span>US Dollar Index since 1971 (ICE, via Yahoo) &mdash; percent change</span></div>
         <div class="data-row"><span class="sid">BITCOIN</span><span>Daily closes since Sep 2014 (Yahoo BTC-USD) &mdash; percent change</span></div>
+        <div class="data-row"><span class="sid">US 10YR</span><span>10-year Treasury yield since 1962 (CBOE ^TNX) &mdash; change in basis points</span></div>
+        <div class="data-row"><span class="sid">10YR &minus; 2YR</span><span>10-year minus 2-year Treasury spread since Jun 1976 (US Treasury constant maturities, via FRED) &mdash; change in basis points. Baked daily, not live: FRED publishes a day behind</span></div>
+        <div class="data-row"><span class="sid">MOVE INDEX</span><span>ICE Bank of America bond-market volatility since Nov 2002, stitched from Yahoo (deep history) and Barchart (current, and correct across bond-market holidays where Yahoo repeats the prior close) &mdash; percent change. Baked daily, not live</span></div>
         <p style="margin-top:12px;font-size:10px;color:#888;">
           Moves are computed between consecutive available closes (gaps over 7 calendar days are skipped).
-          The latest move is fetched live from Yahoo Finance each time you open this page; the historical
-          distribution is baked by <span style="color:#C9971C;">fetch_daily_move.py</span>, refreshed daily
+          Where a live feed exists, the latest move is fetched from Yahoo Finance each time you open this
+          page; the historical distribution &mdash; and the latest move for the two baked-only boards &mdash;
+          is built by <span style="color:#C9971C;">fetch_daily_move.py</span>, refreshed daily
           at 22:30 UTC by GitHub Actions.
         </p>
       </div>
@@ -296,11 +300,17 @@
       '<text x="100" y="128" text-anchor="middle" font-size="84" font-family="\'Segoe UI\', system-ui, sans-serif" font-weight="500" fill="black">A</text></svg>';
 
     // @@BAKED_DATA_START@@
-    const DMHD_ASSETS   = [{"id": "spx", "name": "S&P 500", "unit": "%", "subLabel": "% change vs prior close", "start": "1928-01-03", "n": 24762, "mean": 0.03101, "sd": 1.18682, "binLo": -5.309694, "binW": 0.118682, "counts": [7, 4, 4, 8, 4, 14, 6, 8, 15, 11, 10, 12, 16, 17, 13, 29, 27, 29, 38, 46, 39, 40, 45, 58, 60, 69, 86, 99, 100, 157, 168, 218, 240, 270, 307, 421, 475, 574, 678, 828, 934, 1107, 1381, 1600, 1774, 1679, 1733, 1357, 1308, 1093, 880, 765, 612, 516, 452, 319, 303, 259, 207, 157, 126, 120, 89, 79, 61, 59, 56, 49, 33, 32, 23, 24, 25, 20, 16, 14, 8, 13, 14, 5, 9, 10, 8, 8, 12, 6, 9, 6, 2, 1], "below": 73, "above": 66, "recMin": {"v": -20.47, "d": "1987-10-19"}, "recMax": {"v": 12.53, "d": "1929-10-30"}, "cur": {"v": 1.79, "d": "2026-08-04"}, "z": 1.48, "pctile": 95.9, "oneIn": 11.7}, {"id": "gold", "name": "Gold", "unit": "%", "subLabel": "% change vs prior close", "start": "1971-08-18", "n": 13799, "mean": 0.04074, "sd": 1.24529, "binLo": -5.563085, "binW": 0.124529, "counts": [3, 5, 4, 2, 6, 1, 8, 2, 7, 5, 5, 6, 8, 12, 7, 13, 11, 13, 19, 23, 19, 20, 31, 32, 45, 51, 54, 75, 66, 76, 87, 101, 156, 172, 195, 225, 295, 311, 384, 484, 598, 646, 789, 919, 1058, 938, 845, 736, 564, 538, 464, 392, 365, 268, 211, 192, 170, 153, 117, 105, 76, 67, 59, 50, 47, 41, 31, 28, 30, 27, 15, 20, 16, 11, 12, 13, 10, 10, 8, 8, 8, 2, 5, 9, 5, 0, 4, 4, 1, 1], "below": 33, "above": 41, "recMin": {"v": -13.24, "d": "1980-01-22"}, "recMax": {"v": 13.32, "d": "1980-01-03"}, "cur": {"v": 1.39, "d": "2026-08-04"}, "z": 1.08, "pctile": 91.1, "oneIn": 6.0}, {"id": "ust10y", "name": "US 10YR Yield", "unit": "bp", "subLabel": "basis-point change vs prior close", "start": "1962-01-03", "n": 16133, "mean": 0.00351, "sd": 6.47586, "binLo": -29.137877, "binW": 0.647586, "counts": [2, 3, 0, 8, 5, 0, 12, 5, 1, 13, 2, 13, 10, 3, 18, 19, 5, 23, 33, 11, 33, 43, 13, 63, 46, 21, 69, 36, 118, 126, 75, 152, 247, 101, 293, 349, 238, 496, 634, 301, 760, 927, 432, 1227, 1758, 339, 1247, 415, 953, 767, 304, 615, 463, 218, 324, 275, 115, 227, 163, 82, 117, 123, 38, 96, 29, 62, 43, 17, 51, 39, 14, 30, 26, 5, 18, 17, 3, 23, 14, 2, 12, 0, 5, 7, 1, 2, 12, 0, 5, 2], "below": 38, "above": 31, "recMin": {"v": -75.0, "d": "1987-10-20"}, "recMax": {"v": 65.0, "d": "1980-02-19"}, "cur": {"v": -5.9, "d": "2026-08-04"}, "z": -0.91, "pctile": 12.3, "oneIn": 4.0}, {"id": "dxy", "name": "DXY (US Dollar Index)", "unit": "%", "subLabel": "% change vs prior close", "start": "1971-01-05", "n": 14113, "mean": -0.00011, "sd": 0.4941, "binLo": -2.223559, "binW": 0.04941, "counts": [3, 0, 2, 3, 2, 6, 2, 2, 8, 8, 1, 8, 11, 8, 13, 17, 9, 17, 13, 18, 38, 42, 50, 63, 43, 78, 70, 91, 97, 122, 136, 141, 203, 183, 264, 266, 326, 362, 371, 449, 506, 629, 636, 741, 808, 1094, 739, 646, 589, 544, 481, 411, 348, 319, 292, 267, 209, 154, 174, 137, 125, 93, 98, 67, 52, 70, 47, 39, 27, 29, 30, 16, 21, 13, 14, 9, 9, 11, 9, 5, 8, 5, 5, 2, 1, 0, 4, 2, 0, 2], "below": 15, "above": 15, "recMin": {"v": -4.82, "d": "1973-02-13"}, "recMax": {"v": 4.35, "d": "1978-11-01"}, "cur": {"v": -0.08, "d": "2026-08-04"}, "z": -0.16, "pctile": 39.9, "oneIn": 1.2}, {"id": "btc", "name": "Bitcoin", "unit": "%", "subLabel": "% change vs prior close", "start": "2014-09-18", "n": 4339, "mean": 0.17472, "sd": 3.47242, "binLo": -15.451164, "binW": 0.347242, "counts": [1, 0, 0, 4, 1, 1, 2, 1, 1, 1, 0, 4, 5, 2, 6, 11, 8, 2, 1, 9, 5, 6, 11, 9, 13, 21, 24, 31, 17, 29, 29, 28, 37, 51, 56, 77, 72, 106, 119, 138, 161, 186, 265, 315, 356, 340, 242, 234, 204, 150, 124, 109, 106, 68, 69, 52, 52, 58, 43, 35, 25, 18, 14, 21, 13, 14, 14, 10, 9, 6, 4, 7, 8, 13, 6, 5, 4, 4, 5, 2, 2, 4, 1, 1, 0, 0, 1, 1, 2, 2], "below": 8, "above": 7, "recMin": {"v": -37.17, "d": "2020-03-12"}, "recMax": {"v": 25.25, "d": "2017-12-07"}, "cur": {"v": 1.01, "d": "2026-08-04"}, "z": 0.24, "pctile": 67.3, "oneIn": 1.6}];
-    const DMHD_BAKED_ON = "2026-08-04"; // injected by fetch_daily_move.py
+    const DMHD_ASSETS   = [{"id": "spx", "name": "S&P 500", "unit": "%", "subLabel": "% change vs prior close", "start": "1928-01-03", "n": 24765, "mean": 0.03101, "sd": 1.18676, "binLo": -5.30939, "binW": 0.118676, "counts": [7, 4, 4, 8, 4, 14, 6, 8, 15, 11, 10, 12, 16, 17, 13, 29, 27, 29, 38, 46, 39, 40, 45, 58, 61, 68, 86, 99, 101, 156, 168, 218, 240, 270, 307, 421, 475, 574, 678, 828, 934, 1108, 1380, 1602, 1774, 1678, 1734, 1357, 1309, 1093, 879, 766, 611, 517, 449, 322, 303, 258, 208, 157, 126, 120, 89, 79, 61, 59, 56, 49, 33, 32, 23, 24, 25, 20, 16, 14, 8, 13, 14, 5, 9, 10, 8, 8, 12, 6, 9, 6, 2, 1], "below": 73, "above": 66, "recMin": {"v": -20.47, "d": "1987-10-19"}, "recMax": {"v": 12.53, "d": "1929-10-30"}, "cur": {"v": 0.46, "d": "2026-08-07"}, "z": 0.36, "pctile": 71.5, "oneIn": 1.9}, {"id": "gold", "name": "Gold", "unit": "%", "subLabel": "% change vs prior close", "start": "1971-08-18", "n": 13801, "mean": 0.04105, "sd": 1.24552, "binLo": -5.563768, "binW": 0.124552, "counts": [3, 5, 4, 2, 6, 1, 8, 2, 7, 5, 5, 5, 9, 12, 7, 13, 11, 13, 19, 23, 19, 20, 31, 32, 44, 52, 54, 75, 66, 76, 87, 101, 156, 172, 195, 225, 296, 310, 384, 486, 597, 647, 789, 922, 1056, 939, 843, 739, 560, 539, 463, 394, 363, 267, 211, 194, 170, 152, 117, 105, 77, 67, 60, 50, 46, 40, 31, 28, 31, 27, 15, 20, 16, 11, 12, 13, 10, 10, 8, 8, 8, 2, 5, 10, 4, 0, 4, 4, 1, 1], "below": 33, "above": 41, "recMin": {"v": -13.24, "d": "1980-01-22"}, "recMax": {"v": 13.32, "d": "1980-01-03"}, "cur": {"v": 3.84, "d": "2026-08-07"}, "z": 3.05, "pctile": 99.1, "oneIn": 59.7}, {"id": "brent", "name": "Oil (Brent Crude)", "unit": "%", "subLabel": "% change vs prior close", "start": "1987-05-21", "n": 9946, "mean": 0.04793, "sd": 2.5251, "binLo": -11.315044, "binW": 0.25251, "counts": [1, 1, 1, 1, 0, 2, 1, 5, 2, 2, 3, 5, 6, 2, 5, 5, 7, 11, 11, 5, 10, 16, 16, 16, 23, 46, 32, 42, 64, 80, 85, 91, 126, 124, 148, 175, 241, 286, 294, 345, 421, 491, 497, 548, 673, 610, 567, 479, 508, 439, 367, 324, 286, 212, 192, 164, 116, 106, 89, 92, 55, 54, 38, 29, 29, 29, 20, 11, 12, 14, 12, 13, 8, 11, 11, 7, 4, 5, 5, 2, 3, 3, 2, 2, 1, 5, 2, 2, 0, 1], "below": 20, "above": 19, "recMin": {"v": -47.47, "d": "2020-04-21"}, "recMax": {"v": 50.99, "d": "2020-04-22"}, "cur": {"v": 0.13, "d": "2026-08-07"}, "z": 0.03, "pctile": 52.0, "oneIn": 1.1}, {"id": "dxy", "name": "DXY (US Dollar Index)", "unit": "%", "subLabel": "% change vs prior close", "start": "1971-01-05", "n": 14116, "mean": -0.00013, "sd": 0.49406, "binLo": -2.22342, "binW": 0.049406, "counts": [3, 0, 2, 3, 2, 6, 2, 2, 8, 8, 1, 8, 11, 8, 13, 17, 9, 17, 13, 19, 37, 42, 50, 63, 43, 78, 70, 91, 97, 122, 136, 141, 204, 182, 264, 266, 326, 363, 371, 449, 507, 629, 636, 741, 808, 1094, 739, 646, 589, 544, 482, 411, 348, 319, 291, 268, 209, 154, 174, 137, 125, 93, 98, 67, 52, 70, 47, 39, 27, 29, 30, 16, 21, 13, 14, 9, 9, 11, 9, 5, 8, 5, 5, 2, 1, 0, 4, 2, 0, 2], "below": 15, "above": 15, "recMin": {"v": -4.82, "d": "1973-02-13"}, "recMax": {"v": 4.35, "d": "1978-11-01"}, "cur": {"v": -0.35, "d": "2026-08-07"}, "z": -0.71, "pctile": 19.0, "oneIn": 2.6}, {"id": "btc", "name": "Bitcoin", "unit": "%", "subLabel": "% change vs prior close", "start": "2014-09-18", "n": 4342, "mean": 0.17497, "sd": 3.47129, "binLo": -15.445842, "binW": 0.347129, "counts": [1, 0, 0, 4, 1, 1, 2, 1, 1, 1, 0, 4, 5, 2, 7, 10, 8, 2, 1, 9, 5, 6, 11, 9, 14, 20, 24, 31, 17, 29, 29, 28, 37, 51, 56, 77, 73, 105, 119, 138, 163, 184, 266, 315, 356, 340, 243, 234, 205, 150, 124, 109, 106, 67, 70, 52, 52, 58, 43, 35, 25, 18, 14, 21, 13, 14, 14, 10, 9, 6, 4, 7, 8, 11, 8, 5, 4, 4, 5, 2, 2, 4, 1, 1, 0, 0, 1, 1, 2, 2], "below": 8, "above": 7, "recMin": {"v": -37.17, "d": "2020-03-12"}, "recMax": {"v": 25.25, "d": "2017-12-07"}, "cur": {"v": 1.33, "d": "2026-08-07"}, "z": 0.33, "pctile": 71.9, "oneIn": 1.9}, {"id": "ust10y", "name": "US 10YR Yield", "unit": "bp", "subLabel": "basis-point change vs prior close", "start": "1962-01-03", "n": 16136, "mean": 0.0036, "sd": 6.47544, "binLo": -29.135889, "binW": 0.647544, "counts": [2, 3, 0, 8, 5, 0, 12, 5, 1, 13, 2, 13, 10, 3, 18, 19, 5, 23, 33, 11, 33, 43, 13, 63, 46, 22, 68, 36, 118, 126, 75, 152, 247, 101, 293, 349, 238, 496, 634, 301, 761, 927, 432, 1228, 1758, 339, 1247, 415, 953, 767, 304, 615, 463, 219, 324, 275, 115, 227, 163, 82, 117, 123, 38, 96, 29, 62, 43, 17, 51, 39, 14, 30, 26, 5, 18, 17, 3, 23, 14, 2, 12, 0, 5, 7, 1, 2, 12, 0, 5, 2], "below": 38, "above": 31, "recMin": {"v": -75.0, "d": "1987-10-20"}, "recMax": {"v": 65.0, "d": "1980-02-19"}, "cur": {"v": -2.9, "d": "2026-08-07"}, "z": -0.45, "pctile": 26.2, "oneIn": 1.9}, {"id": "t10y2y", "name": "US 10YR \u2212 2YR Spread", "unit": "bp", "subLabel": "basis-point change vs prior close", "start": "1976-06-02", "n": 12541, "mean": -0.00191, "sd": 4.60231, "binLo": -21.5, "binW": 1.0, "counts": [2, 6, 2, 4, 8, 5, 12, 23, 29, 33, 38, 51, 81, 123, 162, 268, 398, 603, 916, 1262, 1511, 1685, 1411, 1169, 815, 571, 414, 252, 165, 128, 95, 81, 33, 22, 24, 20, 13, 8, 8, 9, 6, 4, 5], "below": 28, "above": 38, "recMin": {"v": -52.0, "d": "1980-02-29"}, "recMax": {"v": 55.0, "d": "1981-01-05"}, "cur": {"v": -1.0, "d": "2026-08-06"}, "z": -0.22, "pctile": 37.3, "oneIn": 1.2}, {"id": "move", "name": "MOVE Index (Bond Volatility)", "unit": "%", "subLabel": "% change vs prior close", "start": "2002-11-13", "n": 5871, "mean": 0.08753, "sd": 4.42734, "binLo": -19.835512, "binW": 0.442734, "counts": [1, 0, 0, 0, 2, 0, 2, 2, 1, 2, 0, 0, 3, 0, 2, 5, 1, 6, 5, 8, 7, 8, 13, 9, 25, 26, 18, 26, 28, 31, 50, 81, 76, 81, 110, 144, 155, 167, 196, 286, 315, 307, 319, 362, 376, 314, 243, 262, 209, 190, 160, 168, 115, 129, 106, 93, 74, 59, 60, 47, 60, 51, 31, 34, 23, 26, 10, 14, 18, 17, 9, 11, 8, 8, 7, 4, 3, 3, 5, 0, 1, 3, 3, 3, 3, 1, 2, 1, 2, 2], "below": 4, "above": 19, "recMin": {"v": -25.84, "d": "2020-11-04"}, "recMax": {"v": 45.06, "d": "2020-10-06"}, "cur": {"v": 3.45, "d": "2026-08-06"}, "z": 0.76, "pctile": 83.2, "oneIn": 3.1}];
+    const DMHD_BAKED_ON = "2026-08-07"; // injected by fetch_daily_move.py
     // @@BAKED_DATA_END@@
 
     /* ─── BOARD RENDER ───────────────────────────────────────────────────── */
+    // The lead board runs full width. The rest tile two-up, so when that would
+    // strand a lone card on the last row the final board goes full width too.
+    function isWide(i, n) {
+      return i === 0 || (i === n - 1 && (n - 1) % 2 === 1);
+    }
+
     function boardInner(a, wide) {
       const cls = a.cur.v > 0 ? 't-up' : (a.cur.v < 0 ? 't-down' : 't-flat');
       return (wide ? '<div class="watermark">' + WATERMARK_SVG + '</div>' : '') +
@@ -410,9 +420,15 @@
     // Yahoo blocks direct cross-origin calls) so the gold "TODAY" line reflects
     // the freshest move. z stays exact (mean/sd are baked); the percentile and
     // 1-in odds are read off the baked histogram.
+    // Assets absent from this map have no browser-reachable live feed and stay
+    // on their baked values: the 10y-2y spread comes from FRED (which needs an
+    // API key and publishes a day behind anyway), and the MOVE index is stitched
+    // from a source that requires a server-side token handshake. Both are
+    // refreshed by the daily bake instead.
     const LIVE = {
       spx:    { symbol: '^GSPC',    kind: 'pct', maxAbs: 30 },
       gold:   { symbol: 'GC=F',     kind: 'pct', maxAbs: 30 },   // futures lead the LBMA fix
+      brent:  { symbol: 'BZ=F',     kind: 'pct', maxAbs: 60 },   // futures lead the spot print
       ust10y: { symbol: '^TNX',     kind: 'bp',  maxAbs: 150, tnx: true },
       dxy:    { symbol: 'DX-Y.NYB', kind: 'pct', maxAbs: 30 },
       btc:    { symbol: 'BTC-USD',  kind: 'pct', maxAbs: 60 },
@@ -490,10 +506,11 @@
       return { z: Math.round(z * 100) / 100, pctile: Math.round(pctile * 10) / 10, oneIn: oneIn };
     }
 
-    // 'updated' = fresher move pulled · 'current' = fetch ok, baked already current · 'failed'
+    // 'updated' = fresher move pulled · 'current' = fetch ok, baked already
+    // current · 'failed' = fetch broke · 'baked' = no live feed by design
     async function refreshAsset(a, wide) {
       const cfg = LIVE[a.id];
-      if (!cfg) return 'failed';
+      if (!cfg) return 'baked';
       const result = await fetchYahooChart(cfg.symbol);
       if (!result) return 'failed';
       const mv = latestMove(result, cfg.kind, cfg.tnx);
@@ -508,12 +525,15 @@
     }
 
     async function refreshLive() {
-      const res = await Promise.allSettled(DMHD_ASSETS.map((a, i) => refreshAsset(a, i === 0)));
+      const n = DMHD_ASSETS.length;
+      const res = await Promise.allSettled(
+        DMHD_ASSETS.map((a, i) => refreshAsset(a, isWide(i, n))));
       const out = res.map(r => r.status === 'fulfilled' ? r.value : 'failed');
-      const updated = out.filter(s => s === 'updated').length;
-      const live    = out.filter(s => s !== 'failed').length;   // fetch succeeded
-      const latest  = DMHD_ASSETS.map(a => a.cur.d).sort().pop();
-      if (live === 0) {
+      const updated   = out.filter(s => s === 'updated').length;
+      const attempted = out.filter(s => s !== 'baked').length;   // has a live feed
+      const live      = out.filter(s => s === 'updated' || s === 'current').length;
+      const latest    = DMHD_ASSETS.map(a => a.cur.d).sort().pop();
+      if (attempted > 0 && live === 0) {
         setStatus('Showing baked data through ' + latest + ' · live unavailable · baked ' + DMHD_BAKED_ON, '');
       } else if (updated > 0) {
         setStatus('Live · data through ' + latest, '');
@@ -526,7 +546,8 @@
     function main() {
       if (!DMHD_ASSETS) throw new Error('No baked data — run fetch_daily_move.py');
 
-      DMHD_ASSETS.forEach((a, i) => buildBoard(a, i === 0));
+      const n = DMHD_ASSETS.length;
+      DMHD_ASSETS.forEach((a, i) => buildBoard(a, isWide(i, n)));
       DMHD_ASSETS.forEach(a => plotBoard(a));
 
       const latest = DMHD_ASSETS.map(a => a.cur.d).sort().pop();
