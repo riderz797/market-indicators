@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cross-Asset Yearly Seasonality &#8212; Acumen</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #121212;
+      color: #FFFFFF;
+      font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+      min-height: 100vh;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      color: #CCCCCC;
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      position: fixed;
+      top: 12px;
+      left: 16px;
+      z-index: 100;
+      border: 1px solid #555555;
+      border-radius: 6px;
+      background: #3A3A3A;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .back-link:hover { color: #F5C542; border-color: #F5C542; }
+
+    .page { max-width: 1400px; margin: 0 auto; padding: 60px 24px 48px; }
+
+    .header { margin-bottom: 20px; padding-top: 12px; }
+    .header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      background: #3A3A3A;
+      color: #F5C542;
+      border: 1px solid #F5C542;
+      border-radius: 4px;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      font-weight: 700;
+      vertical-align: middle;
+      margin-left: 12px;
+    }
+
+    h1 { font-size: 22px; font-weight: 700; color: #FFFFFF; letter-spacing: 0.3px; }
+
+    .subtitle {
+      font-size: 11px;
+      color: #C0C0C0;
+      letter-spacing: 0.3px;
+      margin-top: 6px;
+      line-height: 1.6;
+      max-width: 900px;
+    }
+
+    #status-bar { font-size: 11px; color: #C0C0C0; text-align: right; letter-spacing: 0.5px; }
+
+    /* Asset selector */
+    .asset-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding: 12px 16px;
+      background: #1E1E1E;
+      border: 1px solid #444;
+      border-radius: 8px;
+    }
+    .asset-btn {
+      padding: 8px 18px;
+      border-radius: 20px;
+      border: 1px solid #444;
+      background: transparent;
+      color: #AAAAAA;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .asset-btn:hover { border-color: #888; color: #FFFFFF; }
+    .asset-btn.active {
+      border-color: #F5C542;
+      background: rgba(245,197,66,0.14);
+      color: #FFFFFF;
+      font-weight: 700;
+    }
+
+    /* Controls */
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      background: #1E1E1E;
+      border: 1px solid #444;
+      border-radius: 8px;
+    }
+    .controls-label {
+      font-size: 10px;
+      color: #888;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    #year-search {
+      background: #2D2D2D;
+      border: 1px solid #555;
+      border-radius: 6px;
+      color: #FFFFFF;
+      padding: 8px 14px;
+      font-size: 12px;
+      width: 260px;
+      font-family: inherit;
+    }
+    #year-search:focus { border-color: #F5C542; outline: none; }
+    #year-search::placeholder { color: #666; }
+
+    .controls-sep { width: 1px; height: 28px; background: #444; }
+
+    .avg-btn {
+      padding: 7px 16px;
+      border-radius: 20px;
+      border: 1px solid #444;
+      background: transparent;
+      color: #AAAAAA;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .avg-btn:hover { border-color: #888; color: #FFFFFF; }
+    .avg-btn.active { border-color: #F5C542; background: rgba(245,197,66,0.10); color: #FFFFFF; }
+
+    .cycle-toggle {
+      display: inline-flex;
+      border: 1px solid #555;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .cycle-toggle-btn {
+      padding: 7px 14px;
+      border: none;
+      background: transparent;
+      color: #AAAAAA;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .cycle-toggle-btn + .cycle-toggle-btn { border-left: 1px solid #555; }
+    .cycle-toggle-btn.active { background: rgba(245,197,66,0.15); color: #FFFFFF; }
+    .cycle-toggle-btn:hover { color: #FFFFFF; }
+
+    .hidden { display: none !important; }
+
+    /* Pattern callout */
+    .pattern-callout {
+      background: #1E1E1E;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .pattern-callout.visible { display: block; }
+    .pattern-callout h3 {
+      font-size: 11px;
+      color: #F5C542;
+      margin-bottom: 10px;
+      letter-spacing: 1.5px;
+      font-weight: 700;
+    }
+    .pattern-callout .meta { font-size: 10px; color: #777; margin-bottom: 12px; }
+    .matches-row { display: flex; flex-wrap: wrap; gap: 16px; }
+    .match-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 6px 12px;
+      background: #242424;
+      border: 1px solid #444;
+      border-radius: 6px;
+    }
+    .match-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .match-year { color: #FFFFFF; font-weight: 700; }
+    .match-corr { color: #F5C542; font-weight: 700; }
+    .match-cycle { color: #777; font-size: 10px; }
+
+    /* Chart */
+    .chart-container {
+      position: relative;
+      background: #1E1E1E;
+      border: 1px solid #444;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      min-height: 620px;
+    }
+    #chart { height: 620px; }
+
+    .chart-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #888;
+      letter-spacing: 1px;
+      background: rgba(30,30,30,0.85);
+      z-index: 3;
+    }
+    .chart-overlay.hidden { display: none; }
+
+    .watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.06;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Info cards */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 700px) { .meta-grid { grid-template-columns: 1fr; } }
+    .meta-card {
+      background: #1E1E1E;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+    .meta-card h3 {
+      font-size: 11px;
+      color: #F5C542;
+      letter-spacing: 1.5px;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+    .meta-card p, .meta-card li { font-size: 11px; color: #AAAAAA; line-height: 1.7; }
+    .meta-card ul { list-style: none; padding: 0; }
+    .meta-card li::before { content: "\2022"; color: #F5C542; margin-right: 8px; }
+    .cycle-key-block + .cycle-key-block { margin-top: 14px; }
+    .cycle-key-title {
+      font-size: 10px; color: #888; margin-bottom: 8px; letter-spacing: 1px;
+    }
+    .cycle-key-note { margin-top: 8px; font-size: 10px; color: #666; }
+
+    /* Data status badge */
+    .data-status {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(30, 30, 30, 0.95);
+      border: 1px solid #444;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #AAAAAA;
+      letter-spacing: 0.3px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
+    .status-dot.live { background: #81C784; }
+    .status-dot.fetching { background: #F5C542; animation: pulse 1.2s ease-in-out infinite; }
+    .status-dot.error { background: #EF5350; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .footer-note {
+      font-size: 10px;
+      color: #555;
+      letter-spacing: 0.5px;
+      text-align: center;
+      padding: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-link">&#8592; Dashboard</a>
+
+  <div class="page">
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <h1><span id="asset-title">Yearly Seasonality</span><span class="badge" id="asset-badge">MACRO</span></h1>
+          <p class="subtitle" id="asset-subtitle">
+            Year-over-year overlay: each line is one calendar year, aligned by day of year and
+            rebased to its percent change from January 1st.
+          </p>
+        </div>
+        <div id="status-bar"></div>
+      </div>
+    </div>
+
+    <!-- Asset selector (built by JS) -->
+    <div class="asset-bar" id="asset-bar">
+      <span class="controls-label">Asset</span>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-bar">
+      <span class="controls-label">Years</span>
+      <input type="text" id="year-search" placeholder="Filter: 2020, 2017, 2018-2022 &#8230;">
+      <button class="avg-btn" id="show-all-btn">Show All Years</button>
+      <div class="controls-sep"></div>
+      <span class="controls-label">Averages</span>
+      <button class="avg-btn active" id="avg-all-btn">All Time Avg</button>
+      <div class="controls-sep" id="cycle-sep"></div>
+      <span class="controls-label" id="cycle-label">Cycle</span>
+      <div class="cycle-toggle" id="cycle-toggle"></div>
+      <button class="avg-btn" id="cyc-btn-1"></button>
+      <button class="avg-btn" id="cyc-btn-2"></button>
+      <button class="avg-btn" id="cyc-btn-3"></button>
+      <button class="avg-btn" id="cyc-btn-4"></button>
+    </div>
+
+    <!-- Pattern Recognition -->
+    <div class="pattern-callout" id="pattern-callout">
+      <h3>PATTERN RECOGNITION</h3>
+      <div class="meta" id="pattern-meta"></div>
+      <div class="matches-row" id="pattern-matches"></div>
+      <button class="avg-btn" id="show-matches-btn" style="margin-top:12px;">Show on Chart</button>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-container">
+      <div id="chart"></div>
+      <div class="chart-overlay" id="chart-overlay">Loading&#8230;</div>
+      <div class="watermark">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 220 200" width="220" height="200">
+          <polygon points="50,0 150,0 200,87 150,174 50,174 0,87"
+            fill="none" stroke="white" stroke-width="10" stroke-linejoin="round"/>
+          <text x="100" y="128" text-anchor="middle"
+            font-size="84" font-family="'Segoe UI', system-ui, sans-serif"
+            font-weight="500" fill="white">A</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Info cards -->
+    <div class="meta-grid">
+      <div class="meta-card">
+        <h3>HOW TO READ</h3>
+        <ul id="how-to-read"></ul>
+      </div>
+      <div class="meta-card">
+        <h3>CYCLE KEY</h3>
+        <div id="cycle-key-content"></div>
+      </div>
+    </div>
+
+    <div class="meta-card" style="margin-bottom:20px;">
+      <h3>DATA</h3>
+      <p id="source-note"></p>
+    </div>
+
+    <div class="footer-note">
+      Acumen Research &#8212; Cross-Asset Yearly Seasonality
+    </div>
+  </div>
+
+  <div class="data-status">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="data-status-text">Loading&#8230;</span>
+  </div>
+
+  <script>
+    // ================================================================
+    // ASSET REGISTRY
+    // Data lives in data/seasonality/<id>.json, baked by bake_seasonality.py
+    // and fetched only when that asset is selected — the S&P file alone is
+    // ~310 KB, so loading all five up front would be most of a megabyte.
+    // ================================================================
+    const ASSETS = [
+      { id: 'spx',      label: 'S&P 500' },
+      { id: 'btc',      label: 'Bitcoin' },
+      { id: 'gold',     label: 'Gold' },
+      { id: 'brent',    label: 'Oil (Brent)' },
+      { id: 'cshiller', label: 'Housing (Case-Shiller)' },
+    ];
+    const DATA_PATH = id => '../../data/seasonality/' + id + '.json';
+
+    const CURRENT_YEAR = new Date().getFullYear();
+    const MATCH_COLORS = ['#EF5350', '#42A5F5', '#66BB6A', '#FFA726', '#AB47BC'];
+    const CYC_KEYS = ['yr1', 'yr2', 'yr3', 'yr4'];
+
+    // ================================================================
+    // STATE — everything below is rebuilt when the asset changes
+    // ================================================================
+    const cache = {};            // id -> parsed payload
+    let asset = null;            // active payload
+    let cycleIdx = 0;            // index into asset.cycles
+    let yearPct = {};            // year -> [pct change from period start]
+    let yearX = {};              // year -> [x positions]
+    let yearDates = {};          // year -> [MM-DD]
+    let visibleYears = new Set();
+    let searchedYears = new Set();
+    let avgToggles = { all: true, yr1: false, yr2: false, yr3: false, yr4: false };
+    let topMatches = [];
+    let showMatches = false;
+    let showAllYears = false;
+
+    const $ = id => document.getElementById(id);
+
+    // ================================================================
+    // HELPERS
+    // ================================================================
+    function toPctChange(closes) {
+      const base = closes[0];
+      if (!base) return closes.map(() => 0);
+      return closes.map(c => ((c - base) / base) * 100);
+    }
+
+    // Daily assets are aligned by trading day of year, so a year's x positions
+    // are just 1..n. Monthly ones are aligned by calendar month, read off the
+    // date itself so a missing print leaves a gap instead of shifting the rest.
+    function xPositions(dates, mode) {
+      if (mode === 'monthly') return dates.map(md => parseInt(md.slice(0, 2), 10));
+      return dates.map((_, i) => i + 1);
+    }
+
+    function cycleOf(year) {
+      const c = asset.cycles[cycleIdx];
+      return (((year - c.anchor) % 4) + 4) % 4;
+    }
+
+    function cycleLabelOf(year) {
+      // Strip the leading "1 " / "2 " ordinal used on the buttons.
+      return asset.cycles[cycleIdx].names[cycleOf(year)].replace(/^\d\s+/, '');
+    }
+
+    function yearColor(year) {
+      const hue = ((year - asset.colorBase) * 137.508) % 360;
+      return `hsl(${hue}, 52%, 55%)`;
+    }
+
+    function fmtDate(md) {
+      if (!md) return '';
+      const m = parseInt(md.slice(0, 2), 10) - 1;
+      const d = parseInt(md.slice(3, 5), 10);
+      return asset.monthLabels[m] + (asset.mode === 'monthly' ? '' : ' ' + d);
+    }
+
+    // Averages are weighted so thin or unrepresentative early history does not
+    // carry the same load as the modern record. Rules are [throughYear, weight]
+    // with a trailing null meaning "everything after".
+    function eraWeight(year) {
+      const y = parseInt(year, 10);
+      for (const [through, w] of asset.eraWeights) {
+        if (through === null || y <= through) return w;
+      }
+      return 1;
+    }
+
+    // Average across years at each x position. Built as a map so monthly assets
+    // (whose x values are calendar months, not array indices) line up correctly.
+    //
+    // Positions supported by fewer than MIN_AVG_SUPPORT of the contributing
+    // years are dropped. Calendars are ragged — a year holds 250-253 trading
+    // days — so without this the tail is averaged over the handful of long
+    // years that reach day 253 and whips around wildly at the right edge.
+    const MIN_AVG_SUPPORT = 0.5;
+    function computeAverage(yearKeys) {
+      const sums = new Map();
+      for (const y of yearKeys) {
+        const pct = yearPct[y], xs = yearX[y];
+        if (!pct) continue;
+        const w = eraWeight(y);
+        for (let i = 0; i < pct.length; i++) {
+          const x = xs[i];
+          const e = sums.get(x) || { s: 0, w: 0, n: 0 };
+          e.s += pct[i] * w;
+          e.w += w;
+          e.n += 1;
+          sums.set(x, e);
+        }
+      }
+      let maxN = 0;
+      for (const e of sums.values()) if (e.n > maxN) maxN = e.n;
+      const xs = [...sums.keys()]
+        .filter(x => sums.get(x).n >= maxN * MIN_AVG_SUPPORT)
+        .sort((a, b) => a - b);
+      return { x: xs, y: xs.map(x => sums.get(x).s / sums.get(x).w) };
+    }
+
+    function pearson(x, y) {
+      const n = Math.min(x.length, y.length);
+      if (n < 10) return 0;
+      let mx = 0, my = 0;
+      for (let i = 0; i < n; i++) { mx += x[i]; my += y[i]; }
+      mx /= n; my /= n;
+      let num = 0, dx = 0, dy = 0;
+      for (let i = 0; i < n; i++) {
+        const xi = x[i] - mx, yi = y[i] - my;
+        num += xi * yi; dx += xi * xi; dy += yi * yi;
+      }
+      dx = Math.sqrt(dx); dy = Math.sqrt(dy);
+      return (dx === 0 || dy === 0) ? 0 : num / (dx * dy);
+    }
+
+    function toDailyReturns(pct) {
+      const dr = [0];
+      for (let i = 1; i < pct.length; i++) dr.push(pct[i] - pct[i - 1]);
+      return dr;
+    }
+
+    // Scaled by the asset's typical annual swing so "close" means the same
+    // thing whether the series moves 15% a year or 60%.
+    function euclideanSimilarity(x, y) {
+      const n = Math.min(x.length, y.length);
+      if (n < 2) return 0;
+      let sumSq = 0;
+      for (let i = 0; i < n; i++) { const d = x[i] - y[i]; sumSq += d * d; }
+      return 1 / (1 + Math.sqrt(sumSq / n) / asset.rmseScale);
+    }
+
+    // ================================================================
+    // PATTERN RECOGNITION (daily assets only — 12 monthly points is too
+    // few for the correlation to mean anything)
+    // ================================================================
+    function runPatternRecognition() {
+      topMatches = [];
+      if (asset.mode !== 'daily' || !asset.rmseScale) return;
+      const curPct = yearPct[String(CURRENT_YEAR)];
+      if (!curPct || curPct.length < 10) return;
+
+      const curLen = curPct.length;
+      const curDaily = toDailyReturns(curPct);
+      const candidates = [];
+
+      for (const [yr, pct] of Object.entries(yearPct)) {
+        if (parseInt(yr, 10) === CURRENT_YEAR) continue;
+        if (pct.length < curLen) continue;
+        const histSlice = pct.slice(0, curLen);
+        const rDaily = pearson(curDaily, toDailyReturns(histSlice));
+        const eSim = euclideanSimilarity(curPct, histSlice);
+        const rCum = pearson(curPct, histSlice);
+        const composite = 0.40 * ((rDaily + 1) / 2) + 0.35 * eSim + 0.25 * ((rCum + 1) / 2);
+        candidates.push({ year: yr, composite, rDaily, eSim, rCum });
+      }
+      candidates.sort((a, b) => b.composite - a.composite);
+      topMatches = candidates.slice(0, 5);
+    }
+
+    function updatePatternCallout() {
+      const el = $('pattern-callout');
+      if (topMatches.length === 0) { el.classList.remove('visible'); return; }
+      el.classList.add('visible');
+
+      const days = (yearPct[String(CURRENT_YEAR)] || []).length;
+      $('pattern-meta').textContent =
+        `${CURRENT_YEAR} most closely resembles these years (based on ${days} days). ` +
+        `Composite score blends daily-return correlation (40%), path proximity (35%), ` +
+        `and cumulative-return correlation (25%).`;
+
+      $('pattern-matches').innerHTML = topMatches.map((m, i) => `
+        <div class="match-item">
+          <span class="match-dot" style="background:${MATCH_COLORS[i]}"></span>
+          <span class="match-year">${m.year}</span>
+          <span class="match-corr">${Math.round(m.composite * 100)}%</span>
+          <span style="color:#888;font-size:10px;">D:${m.rDaily.toFixed(2)} P:${(m.eSim * 100).toFixed(0)}% T:${m.rCum.toFixed(2)}</span>
+          <span class="match-cycle">${cycleLabelOf(parseInt(m.year, 10))}</span>
+        </div>`).join('');
+    }
+
+    // ================================================================
+    // CHART
+    // ================================================================
+    const baseLayout = {
+      paper_bgcolor: '#1E1E1E',
+      plot_bgcolor: '#1E1E1E',
+      font: { family: 'JetBrains Mono, monospace', color: '#C0C0C0', size: 10 },
+      margin: { t: 36, r: 60, b: 56, l: 72 },
+      xaxis: {
+        gridcolor: '#333', linecolor: '#555', tickcolor: '#555',
+        tickfont: { size: 10, color: '#888' }, zeroline: false,
+      },
+      yaxis: {
+        title: { text: 'Year-to-Date Return (%)', font: { size: 10, color: '#888' } },
+        gridcolor: '#333', linecolor: '#555', tickcolor: '#555',
+        tickfont: { size: 10, color: '#888' },
+        ticksuffix: '%', zeroline: true, zerolinecolor: '#666', zerolinewidth: 1,
+      },
+      showlegend: true,
+      legend: {
+        x: 0.01, y: 0.99, xanchor: 'left', yanchor: 'top',
+        bgcolor: 'rgba(30,30,30,0.92)', bordercolor: '#555', borderwidth: 1,
+        font: { size: 10, color: '#C0C0C0' },
+      },
+      hovermode: 'closest',
+      modebar: { bgcolor: '#1E1E1E', color: '#777', activecolor: '#F5C542' },
+    };
+
+    const plotConfig = {
+      responsive: true,
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d'],
+      displaylogo: false,
+      toImageButtonOptions: { format: 'png', width: 1400, height: 700, scale: 2 },
+    };
+
+    function hoverLabels(year, length) {
+      const dates = yearDates[String(year)];
+      const ref = yearDates[String(asset.bakedThrough)];
+      const out = [];
+      for (let i = 0; i < length; i++) {
+        if (dates && dates[i]) out.push(fmtDate(dates[i]));
+        else if (ref && ref[i]) out.push(fmtDate(ref[i]));
+        else out.push(asset.mode === 'monthly' ? `Month ${i + 1}` : `Day ${i + 1}`);
+      }
+      return out;
+    }
+
+    function hoverTemplate(name) {
+      const unit = asset.mode === 'monthly' ? '' : 'Day %{x} | ';
+      return `<b>%{customdata}</b> | <b>${name}</b><br>${unit}%{y:.1f}%<extra></extra>`;
+    }
+
+    function rebuildChart() {
+      if (!asset) return;
+      const traces = [];
+      const sortedYears = [...visibleYears].sort();
+      const matchSet = new Set(showMatches ? topMatches.map(m => m.year) : []);
+      const cyc = asset.cycles[cycleIdx];
+
+      // A. Background year lines
+      for (const yr of sortedYears) {
+        const pct = yearPct[yr];
+        if (!pct || parseInt(yr, 10) === CURRENT_YEAR || matchSet.has(yr)) continue;
+        const isSearched = searchedYears.has(yr);
+        traces.push({
+          type: 'scattergl', mode: 'lines',
+          x: yearX[yr], y: pct,
+          customdata: hoverLabels(yr, pct.length),
+          name: yr,
+          line: { color: yearColor(parseInt(yr, 10)), width: isSearched ? 2 : 1 },
+          opacity: isSearched ? 0.55 : 0.25,
+          hovertemplate: hoverTemplate(yr),
+          showlegend: isSearched,
+        });
+      }
+
+      // B. Pattern-match analogs (dashed)
+      if (showMatches) {
+        topMatches.forEach((m, i) => {
+          const pct = yearPct[m.year];
+          if (!pct) return;
+          traces.push({
+            type: 'scattergl', mode: 'lines',
+            x: yearX[m.year], y: pct,
+            customdata: hoverLabels(m.year, pct.length),
+            name: `${m.year} (${Math.round(m.composite * 100)}%)`,
+            line: { color: MATCH_COLORS[i], width: 2, dash: 'dash' },
+            opacity: 0.85,
+            hovertemplate: hoverTemplate(m.year),
+          });
+        });
+      }
+
+      // C. Current year (bold white)
+      const curPct = yearPct[String(CURRENT_YEAR)];
+      if (curPct) {
+        traces.push({
+          type: 'scattergl', mode: 'lines',
+          x: yearX[String(CURRENT_YEAR)], y: curPct,
+          customdata: hoverLabels(CURRENT_YEAR, curPct.length),
+          name: String(CURRENT_YEAR),
+          line: { color: '#FFFFFF', width: 3.5 },
+          hovertemplate: hoverTemplate(String(CURRENT_YEAR)),
+        });
+      }
+
+      // D. Averages
+      const histKeys = Object.keys(yearPct).filter(y => parseInt(y, 10) !== CURRENT_YEAR);
+      if (avgToggles.all && histKeys.length) {
+        const avg = computeAverage(histKeys);
+        traces.push({
+          type: 'scattergl', mode: 'lines',
+          x: avg.x, y: avg.y,
+          customdata: hoverLabels(asset.bakedThrough, avg.x.length),
+          name: 'All Time Avg',
+          line: { color: '#F5C542', width: 3 },
+          hovertemplate: hoverTemplate('All Time Avg'),
+        });
+      }
+
+      const buckets = [[], [], [], []];
+      for (const y of histKeys) buckets[cycleOf(parseInt(y, 10))].push(y);
+      for (let i = 0; i < 4; i++) {
+        if (!avgToggles[CYC_KEYS[i]] || !buckets[i].length) continue;
+        const avg = computeAverage(buckets[i]);
+        traces.push({
+          type: 'scattergl', mode: 'lines',
+          x: avg.x, y: avg.y,
+          customdata: hoverLabels(asset.bakedThrough, avg.x.length),
+          name: cyc.names[i] + ' Avg',
+          line: { color: cyc.colors[i], width: 2.5 },
+          hovertemplate: hoverTemplate(cyc.names[i] + ' Avg'),
+        });
+      }
+
+      // Scale the y-axis to the prominent traces only. Faint background years
+      // are excluded so an outlier like Bitcoin 2017 (+1300%) cannot flatten
+      // everything else into a straight line.
+      let maxX = 0, minY = Infinity, maxY = -Infinity;
+      const consider = (t, useY) => {
+        for (let i = 0; i < t.x.length; i++) {
+          if (t.x[i] > maxX) maxX = t.x[i];
+          if (!useY || t.y[i] == null) continue;
+          if (t.y[i] < minY) minY = t.y[i];
+          if (t.y[i] > maxY) maxY = t.y[i];
+        }
+      };
+      traces.forEach(t => consider(t, t.showlegend !== false));
+      if (minY === Infinity) traces.forEach(t => consider(t, true));
+      if (minY === Infinity) { minY = -1; maxY = 1; }
+
+      const layout = JSON.parse(JSON.stringify(baseLayout));
+      if (asset.mode === 'monthly') {
+        layout.xaxis.title = { text: 'Month', font: { size: 10, color: '#888' } };
+        layout.xaxis.tickvals = asset.monthTicks;
+        layout.xaxis.ticktext = asset.monthLabels;
+        layout.xaxis.range = [0.5, 12.5];
+      } else {
+        layout.xaxis.title = { text: 'Day of Year', font: { size: 10, color: '#888' } };
+        const xMax = Math.min(maxX + Math.max(5, Math.round(maxX * 0.05)), 367);
+        const vals = asset.monthTicks.filter(v => v > 0 && v <= xMax);
+        layout.xaxis.tickvals = vals;
+        layout.xaxis.ticktext = vals.map(v => asset.monthLabels[asset.monthTicks.indexOf(v)]);
+        layout.xaxis.range = [0, xMax];
+      }
+      const pad = (maxY - minY || 1) * 0.1;
+      layout.yaxis.range = [minY - pad, maxY + pad];
+      layout.yaxis.autorange = false;
+      plotConfig.toImageButtonOptions.filename = asset.id + '_seasonality';
+
+      Plotly.react('chart', traces, layout, plotConfig);
+      updatePatternCallout();
+    }
+
+    // ================================================================
+    // CONTROLS
+    // ================================================================
+    let searchTimeout = null;
+    function applyYearSearch() {
+      const raw = $('year-search').value.trim();
+      searchedYears = new Set();
+      visibleYears = new Set();
+      if (raw) {
+        for (const tok of raw.split(/[,\s]+/).filter(Boolean)) {
+          const range = tok.match(/^(\d{4})-(\d{4})$/);
+          if (range) {
+            for (let y = +range[1]; y <= +range[2]; y++) {
+              if (yearPct[String(y)]) { visibleYears.add(String(y)); searchedYears.add(String(y)); }
+            }
+          } else if (/^\d{4}$/.test(tok) && yearPct[tok]) {
+            visibleYears.add(tok); searchedYears.add(tok);
+          }
+        }
+      }
+      if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
+      rebuildChart();
+    }
+
+    $('year-search').addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(applyYearSearch, 300);
+    });
+    $('year-search').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { clearTimeout(searchTimeout); applyYearSearch(); }
+    });
+
+    $('show-all-btn').addEventListener('click', function () {
+      showAllYears = !showAllYears;
+      this.classList.toggle('active', showAllYears);
+      this.textContent = showAllYears ? 'Hide All Years' : 'Show All Years';
+      searchedYears = new Set();
+      if (showAllYears) {
+        visibleYears = new Set(Object.keys(yearPct));
+        $('year-search').value = '';
+      } else {
+        visibleYears = new Set();
+        if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
+      }
+      rebuildChart();
+    });
+
+    $('avg-all-btn').addEventListener('click', function () {
+      avgToggles.all = !avgToggles.all;
+      this.classList.toggle('active', avgToggles.all);
+      rebuildChart();
+    });
+
+    CYC_KEYS.forEach((key, i) => {
+      $(`cyc-btn-${i + 1}`).addEventListener('click', function () {
+        avgToggles[key] = !avgToggles[key];
+        this.classList.toggle('active', avgToggles[key]);
+        rebuildChart();
+      });
+    });
+
+    $('show-matches-btn').addEventListener('click', function () {
+      showMatches = !showMatches;
+      this.classList.toggle('active', showMatches);
+      this.textContent = showMatches ? 'Hide from Chart' : 'Show on Chart';
+      rebuildChart();
+    });
+
+    function setCycleIdx(i) {
+      cycleIdx = i;
+      asset.cycles.forEach((c, j) =>
+        $('cycle-btn-' + j).classList.toggle('active', j === i));
+      renderCycleControls();
+      rebuildChart();
+    }
+
+    // ================================================================
+    // PER-ASSET UI
+    // ================================================================
+    function renderCycleControls() {
+      const cyc = asset.cycles[cycleIdx];
+      for (let i = 0; i < 4; i++) $(`cyc-btn-${i + 1}`).textContent = cyc.names[i];
+    }
+
+    function renderCycleToggle() {
+      const multi = asset.cycles.length > 1;
+      $('cycle-toggle').classList.toggle('hidden', !multi);
+      $('cycle-toggle').innerHTML = asset.cycles.map((c, i) =>
+        `<button class="cycle-toggle-btn${i === cycleIdx ? ' active' : ''}" ` +
+        `id="cycle-btn-${i}">${c.label}</button>`).join('');
+      asset.cycles.forEach((c, i) =>
+        $('cycle-btn-' + i).addEventListener('click', () => setCycleIdx(i)));
+    }
+
+    function renderInfoCards() {
+      const monthly = asset.mode === 'monthly';
+      const eras = asset.eraWeights.length > 1
+        ? asset.eraWeights.map(([t, w]) =>
+            (t === null ? 'after' : 'through ' + t) + ` (${Math.round(w * 100)}%)`).join(', ')
+        : null;
+
+      $('how-to-read').innerHTML = [
+        `Each line is one calendar year&#8217;s ${asset.name} path`,
+        monthly
+          ? 'X-axis is the calendar month &#8212; this index publishes monthly, not daily'
+          : 'X-axis is the day of year, so years align by trading day',
+        'Y-axis is the percent change from the start of that year',
+        'The current year is the bold white line',
+        monthly
+          ? 'Pattern matching is off here: twelve monthly points are too few for the correlation to mean anything'
+          : 'Dashed lines are the 5 most similar historical years',
+        eras ? `Averages are era-weighted: ${eras}` : 'All years are weighted equally in the averages',
+        'Use the search box to isolate specific years or ranges',
+      ].map(s => `<li>${s}</li>`).join('');
+
+      $('cycle-key-content').innerHTML = asset.cycles.map((c, i) => `
+        <div class="cycle-key-block">
+          <p class="cycle-key-title">${c.label.toUpperCase()} CYCLE${i === cycleIdx ? ' (active)' : ''}</p>
+          <ul>${c.names.map((n, j) =>
+            `<li><span style="color:${c.colors[j]}">&#9679;</span> ${n}</li>`).join('')}</ul>
+          <p class="cycle-key-note">${c.note}</p>
+        </div>`).join('');
+
+      $('source-note').textContent = asset.source + '. Baked ' + asset.bakedOn +
+        ' through ' + asset.bakedThrough + '.';
+    }
+
+    // ================================================================
+    // LIVE CURRENT-YEAR FETCH
+    // Baked files hold complete years only, so for assets with a live symbol
+    // the current year is pulled from Yahoo on load (via CORS proxies, since
+    // Yahoo blocks direct cross-origin calls).
+    // ================================================================
+    async function fetchYahoo(symbol, period1) {
+      const base = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
+        encodeURIComponent(symbol) + `?period1=${period1}` +
+        `&period2=${Math.floor(Date.now() / 1000)}&interval=1d`;
+      const proxies = [
+        u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+        u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+        u => u,
+      ];
+      for (const wrap of proxies) {
+        try {
+          const resp = await fetch(wrap(base), { cache: 'no-store' });
+          if (!resp.ok) continue;
+          const json = await resp.json();
+          const r = json && json.chart && json.chart.result && json.chart.result[0];
+          if (r && r.timestamp) return r;
+        } catch (e) { /* try next proxy */ }
+      }
+      return null;
+    }
+
+    async function fetchMissingYears() {
+      if (!asset.live) return 0;
+      const missing = [];
+      for (let y = asset.bakedThrough + 1; y <= CURRENT_YEAR; y++) {
+        if (!yearPct[String(y)]) missing.push(y);
+      }
+      if (!missing.length) return 0;
+
+      const p1 = Math.floor(new Date(missing[0], 0, 1).getTime() / 1000);
+      let result = null;
+      for (let attempt = 0; attempt < 3 && !result; attempt++) {
+        result = await fetchYahoo(asset.live.symbol, p1);
+        if (!result && attempt < 2) await new Promise(r => setTimeout(r, 2000));
+      }
+      if (!result) return 0;
+
+      const closes = result.indicators.quote[0].close;
+      const byYear = {};
+      for (let i = 0; i < result.timestamp.length; i++) {
+        if (closes[i] == null) continue;
+        const d = new Date(result.timestamp[i] * 1000);
+        const yr = String(d.getUTCFullYear());
+        const md = String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                   String(d.getUTCDate()).padStart(2, '0');
+        (byYear[yr] = byYear[yr] || { d: [], c: [] });
+        byYear[yr].d.push(md);
+        byYear[yr].c.push(closes[i]);
+      }
+
+      let filled = 0;
+      for (const [yr, data] of Object.entries(byYear)) {
+        if (!data.c.length) continue;
+        yearDates[yr] = data.d;
+        yearPct[yr] = toPctChange(data.c);
+        yearX[yr] = xPositions(data.d, asset.mode);
+        filled++;
+      }
+      if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
+      return filled;
+    }
+
+    // ================================================================
+    // STATUS
+    // ================================================================
+    function setDataStatus(text, state) {
+      $('data-status-text').textContent = text;
+      $('status-dot').className = 'status-dot' + (state ? ' ' + state : '');
+    }
+
+    // ================================================================
+    // ASSET LOADING
+    // ================================================================
+    async function loadAsset(id, pushUrl = true) {
+      ASSETS.forEach(a => $('asset-btn-' + a.id).classList.toggle('active', a.id === id));
+      $('chart-overlay').classList.remove('hidden');
+      $('chart-overlay').textContent = 'Loading…';
+      setDataStatus('Loading data…', 'fetching');
+      $('status-bar').textContent = '';
+
+      if (!cache[id]) {
+        try {
+          const resp = await fetch(DATA_PATH(id), { cache: 'no-store' });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          cache[id] = await resp.json();
+        } catch (e) {
+          $('chart-overlay').textContent =
+            'Could not load ' + id + ' data — run bake_seasonality.py';
+          setDataStatus('Data unavailable', 'error');
+          console.error(e);
+          return;
+        }
+      }
+
+      asset = cache[id];
+      if (pushUrl) {
+        history.replaceState(null, '', '?asset=' + id);
+      }
+
+      // Reset per-asset state
+      cycleIdx = 0;
+      yearPct = {}; yearX = {}; yearDates = {};
+      visibleYears = new Set(); searchedYears = new Set();
+      topMatches = []; showMatches = false; showAllYears = false;
+      avgToggles = { all: true, yr1: false, yr2: false, yr3: false, yr4: false };
+
+      for (const [yr, d] of Object.entries(asset.years)) {
+        yearPct[yr] = toPctChange(d.c);
+        yearDates[yr] = d.d;
+        yearX[yr] = xPositions(d.d, asset.mode);
+      }
+
+      // Header + chrome
+      document.title = asset.name + ' Yearly Seasonality — Acumen';
+      $('asset-title').textContent = asset.name + ' Yearly Seasonality';
+      $('asset-badge').textContent = asset.badge;
+      $('asset-subtitle').textContent =
+        `Year-over-year overlay of ${asset.name} (${asset.start} – present). Each line is one ` +
+        `calendar year, aligned by ${asset.mode === 'monthly' ? 'calendar month' : 'day of year'} ` +
+        `and rebased to its percent change from the start of that year.`;
+
+      $('show-all-btn').classList.remove('active');
+      $('show-all-btn').textContent = 'Show All Years';
+      $('show-matches-btn').classList.remove('active');
+      $('show-matches-btn').textContent = 'Show on Chart';
+      $('avg-all-btn').classList.add('active');
+      $('year-search').value = '';
+      CYC_KEYS.forEach((k, i) => $(`cyc-btn-${i + 1}`).classList.remove('active'));
+
+      renderCycleToggle();
+      renderCycleControls();
+      renderInfoCards();
+
+      // Default the cycle bucket the current year sits in to on, so the page
+      // opens on the comparison most relevant right now.
+      const cur = cycleOf(CURRENT_YEAR);
+      avgToggles[CYC_KEYS[cur]] = true;
+      $(`cyc-btn-${cur + 1}`).classList.add('active');
+
+      $('chart-overlay').classList.add('hidden');
+      runPatternRecognition();
+      rebuildChart();
+
+      // Extend with the live current year where a feed exists
+      if (asset.live) {
+        setDataStatus('Fetching live data…', 'fetching');
+        $('status-bar').textContent = 'Fetching live data…';
+        try {
+          const filled = await fetchMissingYears();
+          if (filled > 0) {
+            runPatternRecognition();
+            rebuildChart();
+            const n = (yearPct[String(CURRENT_YEAR)] || []).length;
+            $('status-bar').textContent = `${CURRENT_YEAR}: ${n} days (live)`;
+            setDataStatus(`Live data — ${n} days`, 'live');
+          } else {
+            $('status-bar').textContent = 'Baked data only';
+            setDataStatus('Baked ' + asset.bakedOn, '');
+          }
+        } catch (e) {
+          console.warn('Live fetch failed:', e);
+          $('status-bar').textContent = 'Live fetch failed';
+          setDataStatus('Baked ' + asset.bakedOn, 'error');
+        }
+      } else {
+        const latest = Object.keys(asset.years).sort().pop();
+        $('status-bar').textContent = `Through ${latest} · no live feed`;
+        setDataStatus('Baked ' + asset.bakedOn, '');
+      }
+    }
+
+    // ================================================================
+    // INIT
+    // ================================================================
+    (function init() {
+      const bar = $('asset-bar');
+      for (const a of ASSETS) {
+        const btn = document.createElement('button');
+        btn.className = 'asset-btn';
+        btn.id = 'asset-btn-' + a.id;
+        btn.textContent = a.label;
+        btn.addEventListener('click', () => loadAsset(a.id));
+        bar.appendChild(btn);
+      }
+      const wanted = new URLSearchParams(location.search).get('asset');
+      const start = ASSETS.some(a => a.id === wanted) ? wanted : 'spx';
+      loadAsset(start, false);
+    })();
+  </script>
+</body>
+</html>

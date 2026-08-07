@@ -39,13 +39,13 @@ jobs:
         continue-on-error: true
         run: python fetch_capital_flows.py
 
-      - name: Bake S&P 500 seasonality data
+      - name: Bake cross-asset seasonality data
         continue-on-error: true
-        run: python bake_sp500.py > sp500_baked.js.tmp && mv sp500_baked.js.tmp sp500_baked.js || echo "bake_sp500 failed, keeping existing data"
-
-      - name: Bake BTC seasonality data
-        continue-on-error: true
-        run: python bake_btc.py > btc_baked.js.tmp && mv btc_baked.js.tmp btc_baked.js || echo "bake_btc failed, keeping existing data"
+        # Writes data/seasonality/*.json for the S&P 500, Bitcoin, gold, Brent
+        # and Case-Shiller. Each asset is fetched independently and a failure
+        # leaves that asset's existing file in place, so one bad source does
+        # not take the page down.
+        run: python bake_seasonality.py
 
       - name: Bake capability portfolio price CSVs
         continue-on-error: true
@@ -55,7 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add indicators/ scripts/ data/ btc_baked.js sp500_baked.js
+          git add indicators/ scripts/ data/
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
