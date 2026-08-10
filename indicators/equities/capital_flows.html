@@ -241,7 +241,7 @@
         <h1>Capital Flows <span class="badge">WEEKLY</span></h1>
         <p class="subtitle">
           Weekly volume analysis across 22 assets — equities, bonds, commodities, and crypto.<br>
-          Buy side = week closed above open. Bars vs. 52-week average volume trendline.
+          Buy side = week closed above the prior week's close. Bars vs. 52-week median volume trendline.
         </p>
       </div>
       <div id="status-bar">Loading…</div>
@@ -251,7 +251,7 @@
   <!-- BOARD 1 -->
   <div class="panel">
     <div class="panel-title">Board 1 — Weekly Volume (6 Months)</div>
-    <div class="panel-desc">Each bar = one week. Green = buy side (closed above open). Red = sell side. Dashed line = 52-week average volume.</div>
+    <div class="panel-desc">Each bar = one week. Green = buy side (closed above the prior week's close). Red = sell side. Dashed line = 52-week median volume.</div>
     <div class="volume-grid" id="volume-grid"></div>
   </div>
 
@@ -297,15 +297,34 @@ const ASSET_CLASSES = {
 const CYCLE_ORDER = ["Debasement","Cyclical","Speculation","Commodities","Defensive","Fixed Income"];
 
 // ── BUY/SELL COLORS ──────────────────────────────────────────────────────────
-const BUY_COLOR  = "#27AE60";   // green — week closed above open
-const SELL_COLOR = "#C0392B";   // red   — week closed below open
+const BUY_COLOR  = "#27AE60";   // green — week closed above the prior week's close
+const SELL_COLOR = "#C0392B";   // red   — week closed below the prior week's close
 
 // Minimum 13-week net-flow score for the cycle to name a dominant phase.
 // Below this (or with every class negative) Board 3 reports "no dominant inflow".
 const CONFIDENCE_THRESHOLD = 0.05;
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
-function buyOrSell(open, close) { return close > open ? 1 : -1; }
+// Week-over-week return: this week's close against the PRIOR week's close.
+// The first bar in history has no prior close, so it falls back to its own
+// open→close for that single week. Returned array is index-aligned with
+// data[ticker].dates / .volumes, so any slice of those slices this too.
+const _returnCache = {};
+function weeklyReturns(ticker) {
+  if (_returnCache[ticker]) return _returnCache[ticker];
+  const d      = CAPITAL_FLOWS.data[ticker] || {};
+  const closes = d.closes || [];
+  const opens  = d.opens  || [];
+  const rets = closes.map((c, i) => {
+    const prev = i === 0 ? opens[0] : closes[i - 1];
+    return prev ? (c - prev) / prev : 0;
+  });
+  _returnCache[ticker] = rets;
+  return rets;
+}
+
+// +1 = buy side (up on the week), -1 = sell side. Flat counts as sell.
+function buyOrSell(ret) { return ret > 0 ? 1 : -1; }
 
 // weeksBack shifts the window into the past, so a read can be recomputed
 // exactly as it stood N weeks ago (used by the Board 3 marker history)
@@ -365,17 +384,14 @@ function buildBoard1() {
 
     const sliceDates   = d.dates.slice(-WEEKS_6M);
     const sliceVols    = d.volumes.slice(-WEEKS_6M);
-    const sliceOpens   = d.opens.slice(-WEEKS_6M);
-    const sliceCloses  = d.closes.slice(-WEEKS_6M);
-    const avg12m       = avgVolume(ticker, WEEKS_12M);
+    const rets         = weeklyReturns(ticker);
+    const sliceRets    = rets.slice(-WEEKS_6M);
+    const med12m       = medianVolume(ticker, WEEKS_12M);
 
-    // Color each bar by side: gold = week closed above open, red = below.
-    const colors = sliceVols.map((_, i) =>
-      sliceCloses[i] > sliceOpens[i] ? BUY_COLOR : SELL_COLOR);
+    // Color each bar by side: green = closed above the prior week's close, red = below.
+    const colors = sliceRets.map(r => r > 0 ? BUY_COLOR : SELL_COLOR);
 
-    const last4Opens  = d.opens.slice(-4);
-    const last4Closes = d.closes.slice(-4);
-    const netSide = last4Opens.reduce((sum, o, i) => sum + buyOrSell(o, last4Closes[i]), 0);
+    const netSide = rets.slice(-4).reduce((sum, r) => sum + buyOrSell(r), 0);
     const lastSide = netSide > 0 ? "buy" : netSide < 0 ? "sell" : "neutral";
 
     card.innerHTML = `
@@ -399,9 +415,9 @@ function buildBoard1() {
       showlegend: false,
     };
 
-    const avgTrace = {
+    const medTrace = {
       x: [sliceDates[0], sliceDates.at(-1)],
-      y: [avg12m, avg12m],
+      y: [med12m, med12m],
       type: "scatter",
       mode: "lines",
       line: { color: "#999999", width: 1, dash: "dot" },
@@ -409,7 +425,7 @@ function buildBoard1() {
       showlegend: false,
     };
 
-    Plotly.newPlot(`chart-${ticker}`, [barTrace, avgTrace], {
+    Plotly.newPlot(`chart-${ticker}`, [barTrace, medTrace], {
       paper_bgcolor: "transparent",
       plot_bgcolor:  "transparent",
       margin: { t: 0, b: 18, l: 0, r: 0 },
@@ -436,7 +452,7 @@ function buildBoard2() {
     const med = medianVolume(ticker, WEEKS_12M) || 1;
     const lastVol  = d.volumes.at(-1);
     const pct      = (lastVol / med) * 100;
-    const side     = buyOrSell(d.opens.at(-1), d.closes.at(-1));
+    const side     = buyOrSell(weeklyReturns(ticker).at(-1));
     rows.push({ ticker, pct, side });
   });
 
@@ -515,15 +531,13 @@ function computeCycleScores(weeksBack = 0) {
       const avg = avgVolume(ticker, WEEKS_12M, weeksBack) || 1;
       const end = weeksBack ? -weeksBack : undefined;
       const last4v = d.volumes.slice(-(WEEKS_13 + weeksBack), end);
-      const last4o = d.opens.slice(-(WEEKS_13 + weeksBack), end);
-      const last4c = d.closes.slice(-(WEEKS_13 + weeksBack), end);
+      const last4r = weeklyReturns(ticker).slice(-(WEEKS_13 + weeksBack), end);
       last4v.forEach((vol, i) => {
         const relVol = vol / avg;
-        // Magnitude-weighted direction: open→close return, capped at ±10% and
-        // scaled to ±1 so a flat week ≈ 0 and a big move counts far more than a
-        // marginal one. Replaces the old binary ±1 sign.
-        const ret = last4o[i] ? (last4c[i] - last4o[i]) / last4o[i] : 0;
-        const dir = Math.max(-0.10, Math.min(0.10, ret)) / 0.10;
+        // Magnitude-weighted direction: week-over-week close return, capped at
+        // ±10% and scaled to ±1 so a flat week ≈ 0 and a big move counts far
+        // more than a marginal one. Replaces the old binary ±1 sign.
+        const dir = Math.max(-0.10, Math.min(0.10, last4r[i])) / 0.10;
         total += relVol * dir;
         count++;
       });
