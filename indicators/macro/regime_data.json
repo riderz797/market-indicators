@@ -1,11 +1,11 @@
 {
-  "as_of": "2026-06-01",
-  "updated_utc": "2026-08-03T12:31:14Z",
+  "as_of": "2026-07-01",
+  "updated_utc": "2026-08-10T10:21:54Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -0.17
+    "score": -0.22
   },
   "inflation": {
     "dir": "Rising",
@@ -15,12 +15,12 @@
   "market_regime_raw": "REFLATION",
   "shares": {
     "GOLDILOCKS": 27,
-    "REFLATION": 31,
+    "REFLATION": 37,
     "INFLATION": 24,
-    "DEFLATION": 18
+    "DEFLATION": 12
   },
-  "signal_strength": 31,
-  "risk_on_prob": 58,
+  "signal_strength": 37,
+  "risk_on_prob": 64,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
@@ -31,9 +31,9 @@
   "components": {
     "growth": {
       "Nonfarm Payrolls": {
-        "yoy": 0.32,
-        "accel6m": 0.25,
-        "score": -2.72
+        "yoy": 0.2,
+        "accel6m": -0.01,
+        "score": -3.0
       },
       "Real Income ex-Transfers": {
         "yoy": 0.14,
@@ -135,10 +135,10 @@
       },
       {
         "name": "Agriculture",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
@@ -190,10 +190,10 @@
       },
       {
         "name": "Cyclicals / Defensives",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
