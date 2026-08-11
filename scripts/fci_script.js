@@ -2,15 +2,21 @@
 const STATIC_DATA = __STATIC_DATA__;
 
 const FRED_API_KEY = '824b29c5afa52f3fc7c6e7dc4925aebb';
+// be_slope and term_premium added 2026-08 (Snider monetary signals). The
+// original ten keep their weights so the component story stays comparable;
+// the denominator grows from 13.6 to 15.8, which shifts index levels slightly.
 const COMPONENT_WEIGHTS = {
     fed_balance_sheet: 1.8, TGA: 1.8, RRP: 1.8,
     hy_spread: 1.5, real_yield: 1.5,
-    vix: 1.2, yield_curve: 1.2,
-    DXY: 1.0, risk_gold: 1.0,
+    vix: 1.2, yield_curve: 1.2, be_slope: 1.2,
+    DXY: 1.0, risk_gold: 1.0, term_premium: 1.0,
     liquidity_spread: 0.8
 };
-const SIGNS = { DXY: 1, risk_gold: -1, liquidity_spread: 1, real_yield: 1, TGA: 1, yield_curve: -1, RRP: -1, fed_balance_sheet: -1, hy_spread: 1, vix: 1 };
-const LABELS = { DXY: 'US Dollar (DXY)', risk_gold: 'Risk/Gold Ratio', liquidity_spread: 'SOFR-IORB Spread', real_yield: 'Real Yield (10Y-Inflation)', TGA: 'Treasury General Account', yield_curve: 'Yield Curve (10Y-2Y)', RRP: 'Reverse Repo (RRP)', fed_balance_sheet: 'Fed Balance Sheet', hy_spread: 'HY Credit Spread', vix: 'VIX' };
+// be_slope is signed -1: a COLLAPSING forward breakeven is tight money, so a
+// falling slope tightens conditions. term_premium is +1 — a rising term
+// premium is a tightening of financial conditions.
+const SIGNS = { DXY: 1, risk_gold: -1, liquidity_spread: 1, real_yield: 1, TGA: 1, yield_curve: -1, RRP: -1, fed_balance_sheet: -1, hy_spread: 1, vix: 1, be_slope: -1, term_premium: 1 };
+const LABELS = { DXY: 'US Dollar (DXY)', risk_gold: 'Risk/Gold Ratio', liquidity_spread: 'SOFR-IORB Spread', real_yield: 'Real Yield (10Y-Inflation)', TGA: 'Treasury General Account', yield_curve: 'Yield Curve (10Y-2Y)', RRP: 'Reverse Repo (RRP)', fed_balance_sheet: 'Fed Balance Sheet', hy_spread: 'HY Credit Spread', vix: 'VIX', be_slope: 'Breakeven Slope (5y5y-5y)', term_premium: 'ACM 10Y Term Premium' };
 const SMOOTH = { '3M': 1, '1Y': 2, '5Y': 4 };
 
 function setLoading(on) { if (on) setStatus('Loading...', 'info'); }
@@ -140,7 +146,10 @@ function buildWeeklyFromMap(rawMap) {
         'SP500': 'spx', 'DJIA': 'dji', 'T10YIE': 'inflation',
         'RRPONTSYD': 'rrp', 'SOFR': 'sofr', 'IORB': 'iorb',
         'BAMLH0A0HYM2': 'hy_spread', 'VIXCLS': 'vix',
-        'DTWEXBGS': 'dxy'
+        'DTWEXBGS': 'dxy',
+        // Snider monetary signals. ACMTP10 is NY Fed (Excel), not FRED — it is
+        // baked into STATIC_DATA only and never merged from the live fetch.
+        'T5YIFR': 'be5y5y', 'T5YIE': 'be5', 'ACMTP10': 'term_premium'
     };
     const weekly = {};
     for (const [id, name] of Object.entries(seriesMapping)) {
@@ -176,6 +185,12 @@ function computeContributions(weekly) {
         series.liquidity_spread = aligned.sofr.map((v, i) => v != null && aligned.iorb[i] != null ? v - aligned.iorb[i] : null);
     if (aligned.rrp)
         series.RRP = aligned.rrp.map((v, i) => i > 0 && v != null && aligned.rrp[i-1] != null ? v - aligned.rrp[i-1] : null);
+    // Breakeven SLOPE, not level — the level already enters via real_yield.
+    // The forward-vs-spot shape is what carries the regime information.
+    if (aligned.be5y5y && aligned.be5)
+        series.be_slope = aligned.be5y5y.map((v, i) => v != null && aligned.be5[i] != null ? v - aligned.be5[i] : null);
+    if (aligned.term_premium)
+        series.term_premium = aligned.term_premium;
 
     const ratios = {};
     if (aligned.btc && aligned.gold) ratios['BTC/Gold'] = aligned.btc.map((v, i) => v && aligned.gold[i] ? v / aligned.gold[i] : null);
@@ -311,7 +326,7 @@ async function updateData() {
         recentStart.setMonth(recentStart.getMonth() - 3);
         const startStr = recentStart.toISOString().slice(0, 10);
 
-        const fredIds = ['WALCL','DGS10','DGS2','SP500','DJIA','T10YIE','RRPONTSYD','SOFR','IORB','BAMLH0A0HYM2','VIXCLS','DTWEXBGS'];
+        const fredIds = ['WALCL','DGS10','DGS2','SP500','DJIA','T10YIE','RRPONTSYD','SOFR','IORB','BAMLH0A0HYM2','VIXCLS','DTWEXBGS','T5YIFR','T5YIE'];
         const fredResults = await Promise.allSettled(fredIds.map(id => fetchFRED(id, startStr)));
         const [btcRes, tgaRes] = await Promise.allSettled([fetchBinanceBTC(), fetchTGA()]);
 

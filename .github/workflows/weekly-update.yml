@@ -31,6 +31,13 @@ jobs:
         continue-on-error: true
         run: python fetch_fdds.py
 
+      - name: Run Snider Signal Board update
+        continue-on-error: true
+        # Writes indicators/macro/snider_data.json. Individual sources degrade
+        # to empty rather than aborting, but the run fails hard if T5YIFR is
+        # missing — Board 1 carries the framework's core argument.
+        run: python fetch_snider.py
+
       - name: Run rebuild_all (all other indicators)
         continue-on-error: true
         run: python rebuild_all.py

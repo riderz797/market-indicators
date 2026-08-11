@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snider's Signal Board — Acumen</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      /* Surfaces & ink — Premium Dark Gold */
+      --page:        #121212;
+      --surface:     #1E1E1E;
+      --surface-2:   #242424;
+      --ink:         #FFFFFF;
+      --ink-2:       #C0C0C0;
+      --muted:       #898781;
+      --grid:        #2C2C2A;
+      --baseline:    #383835;
+      --hairline:    #2A2A2A;
+      --accent:      #F5C542;   /* UI chrome only — fails the dark series band */
+
+      /* Chart series — validated all-pairs on #1E1E1E (OKLab, dark mode) */
+      --series-gold: #C98500;   /* in-band gold, emphasis series */
+      --series-blue: #3987e5;
+      --series-orng: #d95926;
+      --series-aqua: #199e70;
+
+      /* Diverging + status */
+      --div-pos:     #3987e5;
+      --div-neg:     #e66767;
+      --good:        #0ca30c;
+      --warning:     #fab219;
+      --serious:     #ec835a;
+      --critical:    #d03b3b;
+    }
+
+    body {
+      background: var(--page);
+      color: var(--ink);
+      font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+      min-height: 100vh;
+    }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; color: #CCCCCC; text-decoration: none;
+      font-size: 12px; letter-spacing: 0.5px;
+      position: fixed; top: 12px; left: 16px; z-index: 100;
+      border: 1px solid #555555; border-radius: 6px; background: #3A3A3A;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .back-link:hover { color: var(--accent); border-color: var(--accent); }
+
+    .page { max-width: 1400px; margin: 0 auto; padding: 60px 24px 48px; }
+    .header { margin-bottom: 22px; padding-top: 12px; }
+    .header-top {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px; margin-bottom: 6px;
+    }
+
+    .badge {
+      display: inline-block; padding: 3px 10px;
+      background: #3A3A3A; color: var(--accent);
+      border: 1px solid var(--accent); border-radius: 4px;
+      font-size: 10px; letter-spacing: 1.5px; font-weight: 700;
+      vertical-align: middle; margin-left: 12px;
+    }
+
+    h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+    .subtitle {
+      font-size: 11px; color: var(--ink-2); letter-spacing: 0.3px;
+      margin-top: 8px; line-height: 1.7; max-width: 900px;
+    }
+    #status-bar { font-size: 11px; color: var(--ink-2); text-align: right; letter-spacing: 0.5px; }
+    #status-bar.error { color: var(--critical); }
+    #status-bar.loading { color: var(--accent); }
+
+    /* ── Tab strip ───────────────────────────────────────────── */
+    .tabs {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      border-bottom: 1px solid var(--hairline);
+      padding-bottom: 12px; margin-bottom: 22px;
+    }
+    .tab-btn {
+      padding: 9px 18px; font-family: inherit; font-size: 11px;
+      letter-spacing: 1px; font-weight: 600;
+      background: var(--surface-2); color: #888888;
+      border: 1px solid #333333; border-radius: 4px; cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .tab-btn:hover { color: var(--ink); border-color: #555555; }
+    .tab-btn.active {
+      color: var(--accent); border-color: var(--accent); background: #2A2517;
+    }
+    .tab-num {
+      font-size: 9px; opacity: 0.7; font-weight: 700;
+      border: 1px solid currentColor; border-radius: 3px; padding: 0 4px;
+    }
+    .board { display: none; }
+    .board.active { display: block; }
+
+    /* ── Verdict banner ──────────────────────────────────────── */
+    .verdict {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--hairline);
+      border-left: 3px solid var(--muted);
+      border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;
+    }
+    .verdict.state-good     { border-left-color: var(--good); }
+    .verdict.state-warning  { border-left-color: var(--warning); }
+    .verdict.state-serious  { border-left-color: var(--serious); }
+    .verdict.state-critical { border-left-color: var(--critical); }
+    .verdict-state {
+      font-size: 15px; font-weight: 700; letter-spacing: 1.5px; white-space: nowrap;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .verdict-icon { font-size: 13px; }
+    .verdict-note { font-size: 11px; color: var(--ink-2); line-height: 1.7; flex: 1; min-width: 260px; }
+    .verdict-score {
+      font-size: 11px; color: var(--muted); letter-spacing: 1px;
+      border-left: 1px solid var(--hairline); padding-left: 16px; white-space: nowrap;
+    }
+
+    /* ── Stat tiles ──────────────────────────────────────────── */
+    .signal-row {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px; margin-bottom: 22px;
+    }
+    .signal-card {
+      background: var(--surface); border: 1px solid var(--hairline);
+      border-radius: 8px; padding: 16px 18px;
+    }
+    .signal-label {
+      font-size: 9px; letter-spacing: 2px; color: #888888;
+      margin-bottom: 8px; text-transform: uppercase; line-height: 1.5;
+    }
+    .signal-value { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+    .signal-sub { font-size: 10px; color: #888888; margin-top: 5px; line-height: 1.5; }
+    .signal-value.positive { color: #4ade80; }
+    .signal-value.negative { color: #f87171; }
+    .signal-value.neutral  { color: var(--accent); }
+
+    /* ── Charts ──────────────────────────────────────────────── */
+    .chart-container {
+      position: relative; background: var(--surface);
+      border: 1px solid var(--hairline); border-radius: 8px;
+      overflow: hidden; margin-bottom: 22px;
+    }
+    .chart-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      flex-wrap: wrap; gap: 10px; padding: 16px 18px 0;
+    }
+    .chart-title { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
+    .chart-sub { font-size: 10px; color: var(--muted); letter-spacing: 0.3px; line-height: 1.6; }
+    .range-toggles { display: flex; gap: 6px; padding: 10px 18px 0; }
+    .range-btn {
+      padding: 5px 14px; font-family: inherit; font-size: 11px;
+      letter-spacing: 1px; font-weight: 600;
+      background: var(--surface-2); color: #888888;
+      border: 1px solid #333333; border-radius: 4px; cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .range-btn:hover { color: var(--ink); border-color: #555555; }
+    .range-btn.active { color: var(--accent); border-color: var(--accent); }
+    .plot { width: 100%; height: 420px; }
+    .plot.tall { height: 460px; }
+
+    /* ── Quadrant box (Board 4) ──────────────────────────────── */
+    .quad-wrap {
+      display: grid; grid-template-columns: 26px 1fr; gap: 10px;
+      margin-bottom: 22px;
+    }
+    .axis-y {
+      writing-mode: vertical-rl; transform: rotate(180deg);
+      font-size: 9px; letter-spacing: 2px; color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .quad-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+      background: var(--hairline); border: 1px solid var(--hairline);
+      border-radius: 8px; overflow: hidden;
+    }
+    .quad {
+      background: var(--surface); padding: 22px 20px; min-height: 132px;
+      position: relative; transition: background 0.2s;
+    }
+    .quad-name { font-size: 13px; font-weight: 700; letter-spacing: 1.2px; margin-bottom: 8px; }
+    .quad-desc { font-size: 10px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+    .quad-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 9px; letter-spacing: 1.5px; font-weight: 700;
+      padding: 3px 9px; border-radius: 3px; border: 1px solid;
+    }
+    .quad.is-live  { background: #2A2517; }
+    .quad.is-live  .quad-name { color: var(--accent); }
+    .quad.is-live  .quad-status { color: var(--accent); border-color: var(--accent); }
+    .quad.is-watch .quad-name { color: var(--ink-2); }
+    .quad.is-watch .quad-status { color: var(--muted); border-color: #444444; }
+    .quad.is-dead  { background: #191919; }
+    .quad.is-dead  .quad-name { color: #4A4A4A; text-decoration: line-through; }
+    .quad.is-dead  .quad-desc { color: #3D3D3D; }
+    .quad.is-dead  .quad-status { color: #5A5A5A; border-color: #333333; }
+    .axis-x {
+      grid-column: 2; text-align: center; font-size: 9px;
+      letter-spacing: 2px; color: var(--muted); padding-top: 8px;
+    }
+
+    /* ── Meters ──────────────────────────────────────────────── */
+    .meter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; }
+    @media (max-width: 700px) { .meter-row { grid-template-columns: 1fr; } }
+    .meter-card {
+      background: var(--surface); border: 1px solid var(--hairline);
+      border-radius: 8px; padding: 18px 20px;
+    }
+    .meter-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+    .meter-label { font-size: 9px; letter-spacing: 2px; color: #888888; text-transform: uppercase; }
+    .meter-val { font-size: 20px; font-weight: 700; color: var(--accent); }
+    .meter-track { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+    .meter-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
+    .meter-note { font-size: 10px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+
+    /* ── Tables ──────────────────────────────────────────────── */
+    .tbl-wrap {
+      background: var(--surface); border: 1px solid var(--hairline);
+      border-radius: 8px; padding: 18px 20px; margin-bottom: 22px; overflow-x: auto;
+    }
+    .tbl-label {
+      font-size: 9px; letter-spacing: 2px; color: #888888;
+      margin-bottom: 14px; text-transform: uppercase;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th {
+      text-align: left; color: #888888; font-weight: 600; font-size: 9px;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 0 14px 10px 0; border-bottom: 1px solid var(--hairline); white-space: nowrap;
+    }
+    td {
+      padding: 11px 14px 11px 0; color: var(--ink-2);
+      border-bottom: 1px solid #232323; vertical-align: top; line-height: 1.6;
+    }
+    tr:last-child td { border-bottom: none; }
+    td.num { font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+    .chip {
+      display: inline-block; font-size: 9px; letter-spacing: 1px; font-weight: 700;
+      padding: 2px 8px; border-radius: 3px; border: 1px solid; white-space: nowrap;
+    }
+    .chip.yes { color: var(--good); border-color: var(--good); }
+    .chip.no  { color: var(--serious); border-color: var(--serious); }
+
+    /* ── Notes ───────────────────────────────────────────────── */
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; }
+    @media (max-width: 860px) { .meta-grid { grid-template-columns: 1fr; } }
+    .meta-card {
+      background: var(--surface); border: 1px solid var(--hairline);
+      border-radius: 8px; padding: 18px 22px;
+    }
+    .meta-card-label {
+      font-size: 9px; letter-spacing: 2px; color: #888888;
+      margin-bottom: 12px; text-transform: uppercase;
+    }
+    .meta-card p { font-size: 11px; color: var(--ink-2); line-height: 1.8; margin-bottom: 10px; }
+    .meta-card p:last-child { margin-bottom: 0; }
+    .meta-card strong { color: var(--ink); font-weight: 700; }
+    .meta-card code {
+      background: var(--surface-2); border: 1px solid #333333; border-radius: 3px;
+      padding: 1px 5px; font-size: 10px; color: var(--accent);
+    }
+    .caveat {
+      background: #201C10; border: 1px solid #4A3F1C; border-left: 3px solid var(--warning);
+      border-radius: 6px; padding: 14px 18px; margin-bottom: 22px;
+    }
+    .caveat p { font-size: 11px; color: #D8CFB4; line-height: 1.8; }
+    .caveat strong { color: var(--warning); }
+
+    footer {
+      margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--hairline);
+      font-size: 10px; color: #6A6A6A; line-height: 1.9;
+    }
+    footer a { color: #8A8A8A; }
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-link">&larr; Indicators</a>
+
+  <div class="page">
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <h1>Snider's Signal Board<span class="badge">MONETARY</span></h1>
+          <p class="subtitle">
+            Reads monetary conditions off market signals rather than macroeconomic aggregates,
+            following Jeff Snider's Eurodollar University framework. The premise: since the
+            eurodollar system went off-ledger in the 1960s the money supply is unmeasurable, so
+            conditions have to be reconstructed from the prices that embed them. The goal is not
+            to time a top — it is to <strong>eliminate investment quadrants</strong> the market
+            has already ruled out.
+          </p>
+        </div>
+        <div id="status-bar" class="loading">Loading&hellip;</div>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab-btn active" data-board="b1"><span class="tab-num">1</span> BREAKEVEN CURVE</button>
+      <button class="tab-btn" data-board="b2"><span class="tab-num">2</span> COLLATERAL &amp; DEALERS</button>
+      <button class="tab-btn" data-board="b3"><span class="tab-num">3</span> EURODOLLAR QUANTITY</button>
+      <button class="tab-btn" data-board="b4"><span class="tab-num">4</span> MOSAIC</button>
+    </div>
+
+    <!-- ═══ BOARD 1 ═══════════════════════════════════════════ -->
+    <section class="board active" id="board-b1">
+      <div class="verdict" id="v1">
+        <div class="verdict-state" id="v1-state">&mdash;</div>
+        <div class="verdict-note" id="v1-note"></div>
+        <div class="verdict-score" id="v1-score"></div>
+      </div>
+
+      <div class="signal-row" id="s1"></div>
+
+      <div class="chart-container">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Breakeven curve</div>
+            <div class="chart-sub">Demand for inflation protection at 5 years, 10 years, and 5 years forward</div>
+          </div>
+        </div>
+        <div class="range-toggles" data-target="c1a">
+          <button class="range-btn" data-range="3">3Y</button>
+          <button class="range-btn" data-range="10">10Y</button>
+          <button class="range-btn active" data-range="0">ALL</button>
+        </div>
+        <div class="plot" id="c1a"></div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Anchor spread &mdash; the discriminator</div>
+            <div class="chart-sub">
+              5y5y forward minus 5y spot. Deeply negative means the front end is carrying a shock
+              the forward refuses to confirm &mdash; a supply shock, not an inflation regime.
+            </div>
+          </div>
+        </div>
+        <div class="range-toggles" data-target="c1b">
+          <button class="range-btn" data-range="3">3Y</button>
+          <button class="range-btn" data-range="10">10Y</button>
+          <button class="range-btn active" data-range="0">ALL</button>
+        </div>
+        <div class="plot" id="c1b"></div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-card">
+          <div class="meta-card-label">What this board answers</div>
+          <p>Is inflation a <strong>regime change</strong>, or a front-loaded shock passing through?</p>
+          <p>A breakeven is not a forecast of consumer prices. It is the market's relative demand for
+             inflation protection &mdash; what people will pay to be insured. The payload is the
+             <strong>term structure</strong>, not the level.</p>
+          <p>In 2021&ndash;22 the 5-year breakeven went to 3.59% while the 5y5y forward sat at 2.31%.
+             The market was pricing a shock passing through, not a new regime. A forward that moves
+             <em>on its own</em> is what a genuine regime change looks like.</p>
+        </div>
+        <div class="meta-card">
+          <div class="meta-card-label">How the score is built</div>
+          <p><strong>Deviation</strong> &mdash; forward vs its own expanding-median anchor (not a rolling
+             window, which re-bases after a crash and inverts the signal).</p>
+          <p><strong>Momentum</strong> &mdash; 26-week change in the forward.</p>
+          <p><strong>Shock</strong> &mdash; the anchor spread, floored at zero. A negative spread is
+             evidence of a front-loaded shock; a <em>positive</em> one usually means the front end has
+             collapsed in a deflation scare (November 2008 printed &minus;1.94% at 5 years), so it is
+             never allowed to argue <em>for</em> inflation.</p>
+          <p class="chart-sub">Sources: <code>T5YIE</code> <code>T10YIE</code> <code>T5YIFR</code>
+             <code>DGS30</code> <code>DFII30</code> &mdash; daily from 2003, resampled weekly.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ BOARD 2 ═══════════════════════════════════════════ -->
+    <section class="board" id="board-b2">
+      <div class="verdict" id="v2">
+        <div class="verdict-state" id="v2-state">&mdash;</div>
+        <div class="verdict-note" id="v2-note"></div>
+        <div class="verdict-score" id="v2-score"></div>
+      </div>
+
+      <div class="caveat">
+        <p><strong>Standing in for a signal that no longer ships.</strong> Snider's primary indicator is the
+           interest-rate swap spread, which bundles forward rate expectations, dealer balance-sheet
+           capacity, demand for duration and collateral conditions into one price. FRED's swap series
+           ended 2016-10-28 and live swap rates are licence-restricted, so this board reconstructs the
+           same underlying information from official sources. It is a proxy, and it cannot reach 2008 &mdash;
+           no modern funding series can.</p>
+      </div>
+
+      <div class="signal-row" id="s2"></div>
+
+      <div class="chart-container">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Collateral &amp; dealer capacity composite</div>
+            <div class="chart-sub">Mean of available component z-scores. Above zero is tighter than the trailing norm.</div>
+          </div>
+        </div>
+        <div class="range-toggles" data-target="c2a">
+          <button class="range-btn" data-range="3">3Y</button>
+          <button class="range-btn" data-range="10">10Y</button>
+          <button class="range-btn active" data-range="0">ALL</button>
+        </div>
+        <div class="plot tall" id="c2a"></div>
+      </div>
+
+      <div class="tbl-wrap">
+        <div class="tbl-label">Components &mdash; current readings</div>
+        <table>
+          <thead>
+            <tr><th>Component</th><th>Reading</th><th>Z-score</th><th>What it measures</th></tr>
+          </thead>
+          <tbody id="t2"></tbody>
+        </table>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-card">
+          <div class="meta-card-label">Why these five</div>
+          <p>Each captures one dimension a swap spread would carry. All are signed so that
+             <strong>positive means tighter</strong>.</p>
+          <p>The bills-versus-floor component is inverted deliberately: bills trading
+             <em>below</em> the reverse-repo award rate is the stress state, because it means
+             collateral is scarce enough that buyers accept a yield worse than the risk-free floor.</p>
+        </div>
+        <div class="meta-card">
+          <div class="meta-card-label">Coverage</div>
+          <p id="cov2">&mdash;</p>
+          <p>The composite needs at least three of five components before it reports anything.
+             It cannot be compared across the 2008 crisis because the modern funding architecture
+             did not exist yet &mdash; the secured overnight rate only begins in 2018 and the reserve-balance
+             rate in 2021.</p>
+          <p class="chart-sub">Sources: <code>SOFR</code> <code>IORB</code> <code>EFFR</code>
+             <code>DTB4WK</code> <code>RRPONTSYAWARD</code>, plus NY Fed primary dealer positions
+             and Treasury settlement fails.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ BOARD 3 ═══════════════════════════════════════════ -->
+    <section class="board" id="board-b3">
+      <div class="verdict" id="v3">
+        <div class="verdict-state" id="v3-state">&mdash;</div>
+        <div class="verdict-note" id="v3-note"></div>
+        <div class="verdict-score" id="v3-score"></div>
+      </div>
+
+      <div class="signal-row" id="s3"></div>
+
+      <div class="chart-container">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Net due to related foreign offices</div>
+            <div class="chart-sub">
+              US banks' net dollar funding position with their own offshore offices, in billions.
+              The eurodollar system's visible footprint on a domestic release.
+            </div>
+          </div>
+        </div>
+        <div class="range-toggles" data-target="c3a">
+          <button class="range-btn" data-range="3">3Y</button>
+          <button class="range-btn" data-range="10">10Y</button>
+          <button class="range-btn active" data-range="0">ALL</button>
+        </div>
+        <div class="plot" id="c3a"></div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Eurodollar composite</div>
+            <div class="chart-sub">
+              Offshore funding growth against dollar strength, both as z-scores. Below zero is
+              contraction &mdash; a rising dollar <em>is</em> eurodollar scarcity in this framework,
+              not a separate fact about currencies.
+            </div>
+          </div>
+        </div>
+        <div class="range-toggles" data-target="c3b">
+          <button class="range-btn" data-range="3">3Y</button>
+          <button class="range-btn" data-range="10">10Y</button>
+          <button class="range-btn active" data-range="0">ALL</button>
+        </div>
+        <div class="plot" id="c3b"></div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-card">
+          <div class="meta-card-label">Why this series</div>
+          <p>There is no measure of the eurodollar system. <code>NDFACBW027SBOG</code> is the closest
+             free proxy: the H.8 line for US banks' net position with their own foreign offices,
+             weekly and current, starting June 2004 &mdash; so unlike Board 2 it <strong>covers
+             August 2007</strong>.</p>
+          <p>It read <strong>&minus;1.8</strong> in the week of 9 August 2007, the day BNP Paribas froze
+             its funds, and bottomed near <strong>&minus;2.2</strong> the week Lehman failed.</p>
+        </div>
+        <div class="meta-card">
+          <div class="meta-card-label">A measurement note</div>
+          <p>This is a <strong>net</strong> position: it crosses zero 48 times across the sample and
+             runs from &minus;$165bn to +$750bn. A year-over-year <em>percent</em> change on it is
+             meaningless &mdash; it exceeds 70,000% either side of a zero crossing.</p>
+          <p>The board therefore uses the <strong>52-week level change in billions</strong>, which is
+             well defined across sign changes, with the rolling z-score absorbing the growth of the
+             banking system over time.</p>
+          <p class="chart-sub">Treasury International Capital was evaluated as a backdrop and dropped:
+             the global claims file ends in January 2003, a casualty of that year's reporting-form change.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ BOARD 4 ═══════════════════════════════════════════ -->
+    <section class="board" id="board-b4">
+      <div class="verdict" id="v4">
+        <div class="verdict-state" id="v4-state">&mdash;</div>
+        <div class="verdict-note" id="v4-note"></div>
+        <div class="verdict-score" id="v4-score"></div>
+      </div>
+
+      <div class="quad-wrap">
+        <div class="axis-y">GROWTH &rarr;</div>
+        <div class="quad-grid" id="quads"></div>
+        <div class="axis-x">INFLATION &rarr;</div>
+      </div>
+
+      <div class="meter-row">
+        <div class="meter-card">
+          <div class="meter-top">
+            <span class="meter-label">Signal agreement</span>
+            <span class="meter-val" id="m-agree">&mdash;</span>
+          </div>
+          <div class="meter-track"><div class="meter-fill" id="m-agree-bar" style="width:0%"></div></div>
+          <p class="meter-note" id="m-agree-note"></p>
+        </div>
+        <div class="meter-card">
+          <div class="meter-top">
+            <span class="meter-label">Conviction</span>
+            <span class="meter-val" id="m-conv">&mdash;</span>
+          </div>
+          <div class="meter-track"><div class="meter-fill" id="m-conv-bar" style="width:0%"></div></div>
+          <p class="meter-note" id="m-conv-note"></p>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <div class="tbl-label">Signal votes</div>
+        <table>
+          <thead>
+            <tr><th>Signal</th><th>Read</th><th>Axis</th><th>Confirms</th><th>Reasoning</th></tr>
+          </thead>
+          <tbody id="t4"></tbody>
+        </table>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Regime trajectory</div>
+            <div class="chart-sub">
+              Weekly path through the growth/inflation plane. Regimes drift &mdash; they do not jump,
+              which is why this framework is not a timing tool.
+            </div>
+          </div>
+        </div>
+        <div class="range-toggles" data-target="c4a">
+          <button class="range-btn active" data-range="3">3Y</button>
+          <button class="range-btn" data-range="10">10Y</button>
+          <button class="range-btn" data-range="0">ALL</button>
+        </div>
+        <div class="plot tall" id="c4a"></div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-card">
+          <div class="meta-card-label">How the axes are built</div>
+          <p><strong>Inflation</strong> comes entirely from Board 1 &mdash; the forward breakeven is the
+             eliminator.</p>
+          <p><strong>Growth</strong> blends the curve's level, collateral conditions and eurodollar
+             quantity. The curve enters through Friedman's interest-rate fallacy as Snider applies it:
+             a <em>depressed</em> 10-year yield means tight money and weak growth, not stimulus. That is
+             the opposite of the conventional reading and it is deliberate.</p>
+        </div>
+        <div class="meta-card">
+          <div class="meta-card-label">Reading disagreement</div>
+          <p>Divergence is the point. When the signals split, that is information &mdash; not noise to be
+             averaged away. Both 2008 and 2021&ndash;22 were disagreement periods, and in both the market
+             signals were right and the aggregates were late.</p>
+          <p>When both axes sit near zero the board reports <strong>low conviction</strong> and promotes
+             nothing to live. The framework earns its keep by ruling quadrants <em>out</em>, not by
+             always naming a winner.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p id="foot-updated">&mdash;</p>
+      <p>Weekly grid, Friday-anchored. Z-scores are trailing-window only &mdash; no lookahead at any point.</p>
+      <p><strong>This is a regime-state display, not a signal generator.</strong> Breakevens tell you what
+         the market will pay to be protected, which is a different question from what prices will do.
+         By Snider's own framing none of this times entries; transitions take months and are meant to be
+         acted on slowly.</p>
+    </footer>
+  </div>
+
+<script>
+// ═══ Theme constants — mirror the CSS custom properties ═══════════════
+const C = {
+  surface: '#1E1E1E', grid: '#2C2C2A', baseline: '#383835',
+  ink: '#FFFFFF', ink2: '#C0C0C0', muted: '#898781', accent: '#F5C542',
+  gold: '#C98500', blue: '#3987e5', orange: '#d95926', aqua: '#199e70',
+  pos: '#3987e5', neg: '#e66767',
+  good: '#0ca30c', warning: '#fab219', serious: '#ec835a', critical: '#d03b3b'
+};
+
+const FONT = { family: "'JetBrains Mono', monospace", size: 10, color: C.muted };
+
+function layout(over) {
+  return Object.assign({
+    paper_bgcolor: C.surface,
+    plot_bgcolor: C.surface,
+    font: FONT,
+    margin: { l: 56, r: 24, t: 52, b: 40 },
+    hovermode: 'x unified',
+    hoverlabel: {
+      bgcolor: '#141414', bordercolor: '#3A3A3A',
+      font: { family: "'JetBrains Mono', monospace", size: 11, color: C.ink }
+    },
+    xaxis: {
+      gridcolor: C.grid, zeroline: false, linecolor: C.baseline,
+      tickfont: FONT, showspikes: true, spikemode: 'across',
+      spikecolor: '#555555', spikethickness: 1, spikedash: 'dot'
+    },
+    yaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline, tickfont: FONT },
+    legend: {
+      orientation: 'h', y: -0.16, x: 0, font: { family: FONT.family, size: 10, color: C.ink2 },
+      bgcolor: 'rgba(0,0,0,0)'
+    },
+    showlegend: true
+  }, over || {});
+}
+
+const CONFIG = { responsive: true, displayModeBar: false };
+
+// Crisis markers — anecdote as confirmation, per the framework
+const EVENTS = [
+  { date: '2007-08-10', label: 'BNP freeze' },
+  { date: '2008-09-19', label: 'Lehman' },
+  { date: '2020-03-20', label: 'COVID' },
+  { date: '2022-03-25', label: 'CPI peak' }
+];
+
+function eventShapes(dates) {
+  const lo = dates[0], hi = dates[dates.length - 1];
+  return EVENTS.filter(e => e.date >= lo && e.date <= hi).map(e => ({
+    type: 'line', x0: e.date, x1: e.date, yref: 'paper', y0: 0, y1: 1,
+    line: { color: '#4A4A4A', width: 1, dash: 'dot' }
+  }));
+}
+function eventNotes(dates) {
+  const lo = dates[0], hi = dates[dates.length - 1];
+  const shown = EVENTS.filter(e => e.date >= lo && e.date <= hi);
+  // BNP (Aug 2007) and Lehman (Sep 2008) sit ~13 months apart, which collides
+  // at full range. Stagger alternate labels onto a second row instead of
+  // dropping either — both are load-bearing for the 2008 case study.
+  return shown.map((e, i) => ({
+    x: e.date, y: i % 2 ? 1.05 : 1.0, yref: 'paper', text: e.label,
+    showarrow: false, font: { family: FONT.family, size: 9, color: C.muted },
+    xanchor: 'left', yanchor: 'bottom'
+  }));
+}
+
+function zeroLine() {
+  return { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0, y1: 0,
+           line: { color: C.baseline, width: 1 } };
+}
+
+// ═══ Helpers ══════════════════════════════════════════════════════════
+const fmt = (v, d = 2, suf = '') =>
+  (v === null || v === undefined || Number.isNaN(v)) ? '&mdash;' : v.toFixed(d) + suf;
+
+// Sign goes outside the currency symbol: -$80bn, not $-80bn
+const money = (v, d = 0, suf = 'bn') =>
+  (v === null || v === undefined || Number.isNaN(v))
+    ? '&mdash;' : (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(d) + suf;
+
+function sliceYears(dates, years) {
+  if (!years) return 0;
+  const cutoff = new Date(dates[dates.length - 1]);
+  cutoff.setFullYear(cutoff.getFullYear() - years);
+  const iso = cutoff.toISOString().slice(0, 10);
+  const i = dates.findIndex(d => d >= iso);
+  return i < 0 ? 0 : i;
+}
+
+function stateClass(state) {
+  const s = String(state).toUpperCase();
+  if (['ELIMINATED', 'EASING', 'EXPANDING'].includes(s)) return 'state-good';
+  if (['WATCH', 'NEUTRAL', 'FLAT', 'NO CLEAR REGIME'].includes(s)) return 'state-warning';
+  if (['CONTRACTING', 'TIGHTENING'].includes(s)) return 'state-serious';
+  if (s === 'LIVE') return 'state-critical';
+  return '';
+}
+function stateIcon(state) {
+  const s = String(state).toUpperCase();
+  if (['ELIMINATED', 'EASING', 'EXPANDING'].includes(s)) return '&#10003;';
+  if (['WATCH', 'NEUTRAL', 'FLAT'].includes(s)) return '&#9679;';
+  return '&#9888;';
+}
+
+function renderVerdict(n, verdict) {
+  const el = document.getElementById('v' + n);
+  el.className = 'verdict ' + stateClass(verdict.state);
+  document.getElementById('v' + n + '-state').innerHTML =
+    '<span class="verdict-icon">' + stateIcon(verdict.state) + '</span>' + verdict.state;
+  document.getElementById('v' + n + '-note').textContent = verdict.note;
+  const scoreEl = document.getElementById('v' + n + '-score');
+  if (verdict.score === undefined) {
+    const c = D.board4.current;
+    scoreEl.innerHTML = 'growth ' + fmt(c.growth, 2) + ' · inflation ' + fmt(c.inflation, 2);
+  } else {
+    scoreEl.innerHTML = 'score ' + fmt(verdict.score, 2);
+  }
+}
+
+function tiles(containerId, items) {
+  document.getElementById(containerId).innerHTML = items.map(it => `
+    <div class="signal-card">
+      <div class="signal-label">${it.label}</div>
+      <div class="signal-value ${it.tone || 'neutral'}">${it.value}</div>
+      <div class="signal-sub">${it.sub}</div>
+    </div>`).join('');
+}
+
+// ═══ Board renderers ══════════════════════════════════════════════════
+let D = null;   // the loaded payload
+
+function drawB1(range) {
+  const d = D.dates, b = D.board1;
+  const i0 = sliceYears(d, range);
+  const x = d.slice(i0);
+  const traces = [
+    { x, y: b.be5.slice(i0),    name: '5-year',          mode: 'lines',
+      line: { color: C.blue,  width: 2 }, hovertemplate: '%{y:.2f}%<extra>5-year</extra>' },
+    { x, y: b.be10.slice(i0),   name: '10-year',         mode: 'lines',
+      line: { color: C.aqua,  width: 2 }, hovertemplate: '%{y:.2f}%<extra>10-year</extra>' },
+    { x, y: b.be5y5y.slice(i0), name: '5y5y forward',    mode: 'lines',
+      line: { color: C.gold,  width: 2.6 }, hovertemplate: '%{y:.2f}%<extra>5y5y forward</extra>' },
+    { x, y: b.fwd_ref.slice(i0), name: 'forward anchor', mode: 'lines',
+      line: { color: C.muted, width: 1, dash: 'dash' }, hovertemplate: '%{y:.2f}%<extra>anchor</extra>' }
+  ];
+  Plotly.react('c1a', traces, layout({
+    yaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline,
+             tickfont: FONT, ticksuffix: '%', title: { text: 'percent', font: FONT } },
+    shapes: eventShapes(x), annotations: eventNotes(x)
+  }), CONFIG);
+
+  // Anchor spread — diverging fill about zero
+  const anchor = b.anchor.slice(i0);
+  Plotly.react('c1b', [
+    { x, y: anchor.map(v => v === null ? null : Math.max(v, 0)), name: 'forward above spot',
+      mode: 'lines', line: { color: C.pos, width: 0 }, fill: 'tozeroy',
+      fillcolor: 'rgba(57,135,229,0.35)', hoverinfo: 'skip' },
+    { x, y: anchor.map(v => v === null ? null : Math.min(v, 0)), name: 'shock (spot above forward)',
+      mode: 'lines', line: { color: C.neg, width: 0 }, fill: 'tozeroy',
+      fillcolor: 'rgba(230,103,103,0.35)', hoverinfo: 'skip' },
+    { x, y: anchor, name: 'anchor spread', mode: 'lines',
+      line: { color: C.ink2, width: 1.6 },
+      hovertemplate: '%{y:.2f} pp<extra>anchor spread</extra>' }
+  ], layout({
+    yaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline,
+             tickfont: FONT, title: { text: 'percentage points', font: FONT } },
+    shapes: [zeroLine()].concat(eventShapes(x)), annotations: eventNotes(x)
+  }), CONFIG);
+
+  const c = b.current;
+  tiles('s1', [
+    { label: '5y5y forward', value: fmt(c.be5y5y, 2, '%'),
+      sub: 'anchor ' + fmt(c.fwd_ref, 2, '%') },
+    { label: '5-year spot', value: fmt(c.be5, 2, '%'), sub: '10-year ' + fmt(c.be10, 2, '%') },
+    { label: 'Anchor spread', value: fmt(c.anchor, 2, ' pp'),
+      tone: c.anchor < -0.25 ? 'negative' : (c.anchor > 0.25 ? 'positive' : 'neutral'),
+      sub: c.anchor < -0.25 ? 'front-loaded shock' : 'forward at or above spot' },
+    { label: 'Forward 6m change', value: fmt(c.fwd_chg6m, 2, ' pp'),
+      tone: c.fwd_chg6m > 0.15 ? 'negative' : 'neutral',
+      sub: 'is the forward moving on its own?' }
+  ]);
+}
+
+function drawB2(range) {
+  const d = D.dates, b = D.board2;
+  const i0 = sliceYears(d, range);
+  const x = d.slice(i0);
+  Plotly.react('c2a', [
+    { x, y: b.composite.slice(i0), name: 'composite', mode: 'lines',
+      line: { color: C.gold, width: 2.6 }, fill: 'tozeroy',
+      fillcolor: 'rgba(201,133,0,0.14)',
+      customdata: b.n_components.slice(i0),
+      hovertemplate: '%{y:.2f}&sigma; · %{customdata} of 5 components<extra>composite</extra>' }
+  ], layout({
+    showlegend: false,
+    yaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline,
+             tickfont: FONT, title: { text: 'z-score (+ = tighter)', font: FONT } },
+    shapes: [zeroLine()].concat(eventShapes(x)), annotations: eventNotes(x)
+  }), CONFIG);
+
+  const c = b.current;
+  tiles('s2', [
+    { label: 'Composite', value: fmt(b.verdict.score, 2, '&sigma;'),
+      tone: b.verdict.score > 0.5 ? 'negative' : (b.verdict.score < -0.5 ? 'positive' : 'neutral'),
+      sub: c.n_components + ' of 5 components live' },
+    { label: 'Secured vs floor', value: fmt(c.sofr_iorb, 2, '%'), sub: 'repo minus reserve rate' },
+    { label: 'Secured vs unsecured', value: fmt(c.sofr_effr, 2, '%'), sub: 'repo minus fed funds' },
+    { label: 'Bills vs repo floor', value: fmt(c.bill_floor, 2, '%'),
+      tone: c.bill_floor < 0 ? 'negative' : 'neutral',
+      sub: c.bill_floor < 0 ? 'bills through the floor' : 'bills above the floor' },
+    { label: 'Settlement fails', value: fmt(c.fails / 1000, 0, 'bn'), sub: 'deliver + receive' }
+  ]);
+
+  const zl = b.z, n = b.composite.length - 1;
+  const rows = [
+    ['Secured vs floor', fmt(c.sofr_iorb, 2, '%'), zl.sofr_iorb[n],
+     'Repo above the administered floor means collateral is bid.'],
+    ['Secured vs unsecured', fmt(c.sofr_effr, 2, '%'), zl.sofr_effr[n],
+     'Secured trading above unsecured is balance-sheet scarcity.'],
+    ['Bills vs repo floor', fmt(c.bill_floor, 2, '%'), zl.bill_floor[n],
+     'Bills below the floor is pure collateral scarcity (sign inverted).'],
+    ['Dealer Treasury inventory', fmt(c.dealer_pos / 1000, 0, 'bn'), zl.dealer_pos[n],
+     'More inventory absorbed means less balance sheet free.'],
+    ['Settlement fails', fmt(c.fails / 1000, 0, 'bn'), zl.fails[n],
+     'Collateral that could not actually be delivered.']
+  ];
+  document.getElementById('t2').innerHTML = rows.map(r => `
+    <tr><td><span class="dot" style="background:${C.gold}"></span>${r[0]}</td>
+        <td class="num">${r[1]}</td>
+        <td class="num">${fmt(r[2], 2, '&sigma;')}</td>
+        <td>${r[3]}</td></tr>`).join('');
+
+  const cov = D.meta.coverage;
+  document.getElementById('cov2').innerHTML =
+    'Three of five components from <strong>' + (cov.board2_start || '&mdash;') +
+    '</strong>; all five from <strong>' + (cov.board2_full || '&mdash;') + '</strong>.';
+}
+
+function drawB3(range) {
+  const d = D.dates, b = D.board3;
+  const i0 = sliceYears(d, range);
+  const x = d.slice(i0);
+
+  Plotly.react('c3a', [
+    { x, y: b.ndfa.slice(i0), name: 'net position', mode: 'lines',
+      line: { color: C.gold, width: 2.4 },
+      hovertemplate: '$%{y:.0f}bn<extra>net position</extra>' },
+    { x, y: b.ndfa_chg52.slice(i0), name: '52-week change', mode: 'lines',
+      line: { color: C.blue, width: 1.8 },
+      hovertemplate: '$%{y:.0f}bn<extra>52-week change</extra>' }
+  ], layout({
+    yaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline,
+             tickfont: FONT, tickprefix: '$', ticksuffix: 'bn',
+             title: { text: 'billions of dollars', font: FONT } },
+    shapes: [zeroLine()].concat(eventShapes(x)), annotations: eventNotes(x)
+  }), CONFIG);
+
+  Plotly.react('c3b', [
+    { x, y: b.composite.slice(i0), name: 'composite', mode: 'lines',
+      line: { color: C.gold, width: 2.6 }, fill: 'tozeroy',
+      fillcolor: 'rgba(201,133,0,0.14)',
+      hovertemplate: '%{y:.2f}&sigma;<extra>composite</extra>' },
+    { x, y: b.z_ndfa.slice(i0), name: 'offshore funding', mode: 'lines',
+      line: { color: C.blue, width: 1.6 },
+      hovertemplate: '%{y:.2f}&sigma;<extra>offshore funding</extra>' },
+    { x, y: b.z_dxy.slice(i0), name: 'dollar (drain)', mode: 'lines',
+      line: { color: C.orange, width: 1.6 },
+      hovertemplate: '%{y:.2f}&sigma;<extra>dollar</extra>' }
+  ], layout({
+    yaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline,
+             tickfont: FONT, title: { text: 'z-score (+ = expansion)', font: FONT } },
+    shapes: [zeroLine()].concat(eventShapes(x)), annotations: eventNotes(x)
+  }), CONFIG);
+
+  const c = b.current;
+  tiles('s3', [
+    { label: 'Net position', value: money(c.ndfa), sub: 'due to foreign offices' },
+    { label: '52-week change', value: money(c.ndfa_chg52),
+      tone: c.ndfa_chg52 < 0 ? 'negative' : 'positive',
+      sub: c.ndfa_chg52 < 0 ? 'offshore funding pulled back' : 'offshore funding added' },
+    { label: 'Broad dollar', value: fmt(c.dxy, 1), sub: fmt(c.dxy_yoy, 1, '% year on year') },
+    { label: 'Composite', value: fmt(b.verdict.score, 2, '&sigma;'),
+      tone: b.verdict.score < -0.5 ? 'negative' : (b.verdict.score > 0.5 ? 'positive' : 'neutral'),
+      sub: b.verdict.state.toLowerCase() }
+  ]);
+}
+
+const QUAD_DESC = {
+  'SWEET SPOT':        'Growth without inflation. Risk assets and duration both work.',
+  'INFLATIONARY BOOM': 'Growth with inflation. Real assets and commodities lead.',
+  'STAGFLATION':       'Inflation without growth. The hardest quadrant to hold anything in.',
+  'DEFLATIONARY BUST': 'Neither growth nor inflation. Duration and the dollar win.'
+};
+// Grid order places growth on the vertical axis and inflation on the horizontal
+const QUAD_ORDER = ['SWEET SPOT', 'INFLATIONARY BOOM', 'DEFLATIONARY BUST', 'STAGFLATION'];
+
+function drawB4(range) {
+  const b = D.board4;
+
+  document.getElementById('quads').innerHTML = QUAD_ORDER.map(q => {
+    const st = b.status[q];
+    const label = st === 'live' ? 'LIVE' : (st === 'dead' ? 'ELIMINATED' : 'WATCH');
+    return `<div class="quad is-${st}">
+      <div class="quad-name">${q}</div>
+      <div class="quad-desc">${QUAD_DESC[q]}</div>
+      <span class="quad-status">${label}</span>
+    </div>`;
+  }).join('');
+
+  const agree = Math.round(b.agreement * 100);
+  const conv  = Math.round(b.conviction * 100);
+  document.getElementById('m-agree').textContent = agree + '%';
+  document.getElementById('m-agree-bar').style.width = agree + '%';
+  document.getElementById('m-agree-note').textContent =
+    b.votes.filter(v => v.confirms).length + ' of ' + b.votes.length +
+    ' signals point the same way as the resolved quadrant.';
+  document.getElementById('m-conv').textContent = conv + '%';
+  document.getElementById('m-conv-bar').style.width = conv + '%';
+  document.getElementById('m-conv-note').textContent = b.decisive
+    ? 'Both axes are far enough from zero to name a quadrant.'
+    : 'Both axes sit near zero — no quadrant is promoted to live.';
+
+  document.getElementById('t4').innerHTML = b.votes.map(v => `
+    <tr>
+      <td><span class="dot" style="background:${v.confirms ? C.good : C.serious}"></span>${v.signal}</td>
+      <td class="num">${v.read}</td>
+      <td>${v.axis}</td>
+      <td><span class="chip ${v.confirms ? 'yes' : 'no'}">${v.confirms ? 'CONFIRMS' : 'DISSENTS'}</span></td>
+      <td>${v.note}</td>
+    </tr>`).join('');
+
+  // Trajectory through the plane
+  const d = D.dates, i0 = sliceYears(d, range);
+  const gx = b.inflation.slice(i0), gy = b.growth.slice(i0), gd = d.slice(i0);
+  const pts = gx.map((v, i) => [v, gy[i], gd[i]]).filter(p => p[0] !== null && p[1] !== null);
+  const lim = 1.05;
+  if (!pts.length) { Plotly.purge('c4a'); return; }
+
+  Plotly.react('c4a', [
+    { x: pts.map(p => p[0]), y: pts.map(p => p[1]), mode: 'lines',
+      name: 'path', line: { color: '#4A4A4A', width: 1.2 },
+      hoverinfo: 'skip', showlegend: false },
+    { x: pts.map(p => p[0]), y: pts.map(p => p[1]), mode: 'markers',
+      name: 'weekly', marker: { color: C.blue, size: 5, opacity: 0.55 },
+      text: pts.map(p => p[2]),
+      hovertemplate: '%{text}<br>inflation %{x:.2f}<br>growth %{y:.2f}<extra></extra>' },
+    { x: [pts[pts.length - 1][0]], y: [pts[pts.length - 1][1]], mode: 'markers',
+      name: 'current', marker: { color: C.accent, size: 13, line: { color: C.surface, width: 2 } },
+      hovertemplate: 'now<br>inflation %{x:.2f}<br>growth %{y:.2f}<extra></extra>' }
+  ], layout({
+    margin: { l: 56, r: 24, t: 14, b: 44 },
+    hovermode: 'closest',
+    xaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline, tickfont: FONT,
+             range: [-lim, lim], title: { text: 'inflation axis', font: FONT } },
+    yaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline, tickfont: FONT,
+             range: [-lim, lim], title: { text: 'growth axis', font: FONT } },
+    shapes: [
+      { type: 'line', x0: 0, x1: 0, y0: -lim, y1: lim, line: { color: C.baseline, width: 1 } },
+      { type: 'line', x0: -lim, x1: lim, y0: 0, y1: 0, line: { color: C.baseline, width: 1 } }
+    ],
+    annotations: [
+      { x: -lim * 0.94, y: lim * 0.94, text: 'SWEET SPOT', showarrow: false, xanchor: 'left',
+        font: { family: FONT.family, size: 9, color: C.muted } },
+      { x: lim * 0.94, y: lim * 0.94, text: 'INFLATIONARY BOOM', showarrow: false, xanchor: 'right',
+        font: { family: FONT.family, size: 9, color: C.muted } },
+      { x: -lim * 0.94, y: -lim * 0.94, text: 'DEFLATIONARY BUST', showarrow: false, xanchor: 'left',
+        font: { family: FONT.family, size: 9, color: C.muted } },
+      { x: lim * 0.94, y: -lim * 0.94, text: 'STAGFLATION', showarrow: false, xanchor: 'right',
+        font: { family: FONT.family, size: 9, color: C.muted } }
+    ]
+  }), CONFIG);
+}
+
+// ═══ Wiring ═══════════════════════════════════════════════════════════
+const DRAW = { c1a: drawB1, c1b: drawB1, c2a: drawB2, c3a: drawB3, c3b: drawB3, c4a: drawB4 };
+const RANGES = { c1a: 0, c1b: 0, c2a: 0, c3a: 0, c3b: 0, c4a: 3 };
+
+function showBoard(id) {
+  if (!document.getElementById('board-' + id)) return;
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.board === id));
+  document.querySelectorAll('.board').forEach(s =>
+    s.classList.toggle('active', s.id === 'board-' + id));
+  // Plotly sizes to a zero-width container while hidden, so re-measure on reveal
+  document.querySelectorAll('#board-' + id + ' .plot').forEach(p => Plotly.Plots.resize(p));
+}
+
+document.getElementById('tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  history.replaceState(null, '', '#' + btn.dataset.board);
+  showBoard(btn.dataset.board);
+});
+
+window.addEventListener('hashchange', () => showBoard(location.hash.slice(1)));
+
+document.querySelectorAll('.range-toggles').forEach(grp => {
+  grp.addEventListener('click', e => {
+    const btn = e.target.closest('.range-btn');
+    if (!btn) return;
+    grp.querySelectorAll('.range-btn').forEach(b => b.classList.toggle('active', b === btn));
+    const target = grp.dataset.target;
+    RANGES[target] = Number(btn.dataset.range);
+    DRAW[target](RANGES[target]);
+  });
+});
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+fetch('snider_data.json', { cache: 'no-store' })
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(json => {
+    D = json;
+    renderVerdict(1, D.board1.verdict);
+    renderVerdict(2, D.board2.verdict);
+    renderVerdict(3, D.board3.verdict);
+    // Don't headline a quadrant the box refuses to promote — say so instead.
+    renderVerdict(4, {
+      state: D.board4.decisive ? D.board4.quadrant : 'NO CLEAR REGIME',
+      note: D.board4.decisive
+        ? 'Resolved quadrant. ' + Math.round(D.board4.agreement * 100) + '% of signals agree.'
+        : 'Both axes sit near zero, so no quadrant is promoted to live. The nominal lean is '
+          + D.board4.quadrant.toLowerCase() + ', but it is not strong enough to act on. '
+          + 'Any eliminations shown below still stand on their own.'
+    });
+    drawB1(RANGES.c1a); drawB2(RANGES.c2a); drawB3(RANGES.c3a); drawB4(RANGES.c4a);
+    if (location.hash) showBoard(location.hash.slice(1));
+
+    const cov = D.meta.coverage;
+    document.getElementById('foot-updated').innerHTML =
+      'Data through <strong>' + D.as_of + '</strong> (week ending ' + D.week_ending +
+      '). Built ' + D.updated_utc + '. Board 1 from ' + cov.board1_start +
+      ', Board 2 from ' + (cov.board2_start || '&mdash;') +
+      ', Board 3 from ' + cov.board3_start + '.';
+    setStatus('Updated ' + D.as_of, '');
+  })
+  .catch(err => {
+    setStatus('Could not load snider_data.json — ' + err.message, 'error');
+    console.error(err);
+  });
+</script>
+</body>
+</html>

@@ -13,25 +13,51 @@ REQUIREMENTS:
     pip install pandas numpy matplotlib requests
 
 INPUTS (all free, no API keys):
-    - FRED:  WALCL, WTREGEN, RRPONTSYD, TOTBKCR, ECBASSETSW, JPNASSETS,
-             TRESEGCNM052N, DTWEXBGS, DCOILWTICO, DEXUSEU, DEXJPUS
+    - FRED:  WALCL, WTREGEN, RRPONTSYD, TOTBKCR, NDFACBW027SBOG, ECBASSETSW,
+             JPNASSETS, TRESEGCNM052N, DTWEXBGS, DCOILWTICO, DEXUSEU, DEXJPUS,
+             DTB4WK, RRPONTSYAWARD
     - Yahoo: ^MOVE, ^GSPC, ^NDX, ^RUT, ^DJI
 
 CONSTRUCTION:
     1. Central Bank Liquidity = Fed (WALCL - TGA - RRP) + ECB + BoJ + China FX
-    2. Private Liquidity      = US bank credit (H.8)
+    2. Private Liquidity      = US bank credit (H.8) + eurodollar leg (NDFA)
     3. Gross Global Liquidity = CB + Private
-    4. Drains (per Howell):
-         -3% per +$10/bbl oil      vs 2y rolling baseline
-         -4% per +10 MOVE points   vs 2y rolling baseline
-        -10% per +10% DXY          vs 2y rolling baseline
+    4. Drains:
+         -3% per +$10/bbl oil      vs 2y rolling baseline   (Howell)
+         -4% per +10 MOVE points   vs 2y rolling baseline   (Howell)
+        -10% per +10% DXY          vs 2y rolling baseline   (Howell)
+         -3% per -10bp bills vs the RRP floor               (UNVALIDATED)
        Total drain capped at +/-30%
     5. Net Liquidity = Gross * (1 + drain_pct)
     6. Indicator = 3-month MA of YoY % change in Net Liquidity
 
+2026-08 REVISION (Snider inputs):
+    The private leg was domestic bank credit alone, which measures the onshore
+    banking system and misses the offshore dollar entirely. NDFACBW027SBOG —
+    US banks' net position with their own foreign offices — adds the eurodollar
+    leg from the same weekly H.8 release. A collateral drain was added on top,
+    driven by bills trading through the reverse-repo floor.
+
+    This changed the index, so the lead and correlations were re-derived rather
+    than carried over. Measured on the same basis the page publishes (UNSMOOTHED
+    equity YoY vs smoothed liquidity YoY), scanning the lead on each variant:
+
+        variant                          lead   r full   r post-2020
+        old (bank credit, 3 drains)      190d    0.749       0.794
+        + eurodollar leg only            190d    0.748       0.791
+        + collateral drain only          195d    0.755       0.812
+        new (both)                       200d    0.754       0.809
+
+    Read that honestly: the improvement is MARGINAL and within noise, and it
+    comes almost entirely from the collateral drain. The eurodollar leg does not
+    improve the equity-lead fit at all — it is retained because the private leg
+    measuring only onshore bank credit was conceptually wrong for a "global"
+    liquidity index, not because it scores better. It is also small in level
+    (~$418bn against ~$19,750bn of bank credit), so its effect is at the margin.
+
 EMPIRICAL RESULTS (2015-present, vs USEQUITIES = equal-weighted SPX/NDX/RUT/DJI):
-    - Best forward lead: 195 days
-    - Correlation: 0.75 full sample, 0.80 post-2020
+    - Best forward lead: 200 days
+    - Correlation: 0.75 full sample, 0.81 post-2020
 ================================================================================
 """
 
@@ -46,10 +72,18 @@ from io import StringIO
 # CONFIG
 # ============================================================================
 
-LEAD_DAYS = 195             # forward lead empirically optimized vs USEQUITIES
+LEAD_DAYS = 200             # forward lead empirically optimized vs USEQUITIES
 SMOOTH_DAYS = 63            # ~3-month MA on the YoY series
 DRAIN_BASELINE_DAYS = 504   # ~2-year rolling baseline for oil/DXY/MOVE drains
 DRAIN_CAP = 0.30            # cap total drain at +/-30%
+
+# Collateral drain coefficient. UNVALIDATED — this is a judgment call, not a
+# fitted parameter. Howell publishes coefficients for oil, MOVE and the dollar;
+# he does not publish one for collateral. 0.30 sizes a 10bp move in bills
+# relative to the reverse-repo floor at roughly a 3% drain, putting it on the
+# same order as the existing MOVE term. Treat it as a placeholder to revisit,
+# not as a calibrated input.
+COLL_DRAIN_COEF = 0.30
 PLOT_START = '2015-01-01'
 
 # Acumen palette (warm/light version for PNG)
@@ -135,6 +169,13 @@ def build_liquidity_index():
     oil     = fred('DCOILWTICO')    # WTI oil, $/bbl, daily
     eurusd  = fred('DEXUSEU')       # USD per EUR, daily
     jpyusd  = fred('DEXJPUS')       # JPY per USD, daily
+    # Eurodollar leg: US banks' net position with their own foreign offices
+    # (H.8, weekly, $B). Makes the private-liquidity leg cross-border rather
+    # than purely domestic. Same release as TOTBKCR, so alignment is trivial.
+    ndfa    = fred('NDFACBW027SBOG')
+    # Collateral drain inputs: bills trading through the reverse-repo floor
+    tb4wk   = fred('DTB4WK')        # 4-week bill, %, daily
+    rrpaw   = fred('RRPONTSYAWARD') # ON RRP award rate, %, daily
 
     print("Fetching Yahoo data...")
     move = yahoo('^MOVE', 'move')
@@ -156,6 +197,9 @@ def build_liquidity_index():
     m['eurusd'] = eurusd['DEXUSEU'].reindex(idx).ffill()
     m['jpyusd'] = jpyusd['DEXJPUS'].reindex(idx).ffill()
     m['move']   = move['move'].reindex(idx).ffill()
+    m['ndfa']   = ndfa['NDFACBW027SBOG'].reindex(idx).ffill()   # already $B
+    m['tb4wk']  = tb4wk['DTB4WK'].reindex(idx).ffill()
+    m['rrpaw']  = rrpaw['RRPONTSYAWARD'].reindex(idx).ffill()
 
     # ----- Central Bank Liquidity (USD billions) -----
     # Fed: (WALCL - TGA - RRP) in $MM, convert to $B
@@ -168,7 +212,11 @@ def build_liquidity_index():
     m['cn_usd_b']  = m['cnfx'] / 1000.0
 
     m['cb_liq']   = m['fed_liq_b'] + m['ecb_usd_b'] + m['boj_usd_b'] + m['cn_usd_b']
-    m['priv_liq'] = m['bankcr']
+    # Private liquidity = domestic bank credit + the offshore (eurodollar) leg.
+    # NDFA is a net position and can be negative, which is correct here: when
+    # US banks pull funding back from their foreign offices that is a genuine
+    # contraction of private dollar liquidity, not a missing observation.
+    m['priv_liq'] = m['bankcr'] + m['ndfa']
     m['gl_gross'] = m['cb_liq'] + m['priv_liq']
 
     # ----- Drains (Howell coefficients vs 2-year rolling baseline) -----
@@ -177,11 +225,19 @@ def build_liquidity_index():
     m['dxy_base']  = m['dxy'].rolling(win, min_periods=180).mean()
     m['move_base'] = m['move'].rolling(win, min_periods=180).mean()
 
+    # Collateral: bills trading BELOW the reverse-repo floor means collateral is
+    # scarce enough that buyers accept a yield worse than the risk-free floor.
+    m['bill_floor'] = m['tb4wk'] - m['rrpaw']
+    m['bill_base']  = m['bill_floor'].rolling(win, min_periods=180).mean()
+
     m['oil_drain']  = -0.003 * (m['oil']  - m['oil_base'])
     m['move_drain'] = -0.004 * (m['move'] - m['move_base'])
     m['dxy_drain']  = -0.010 * ((m['dxy'] / m['dxy_base'] - 1.0) * 100.0)
+    # COLL_DRAIN_COEF is a judgment call, not a fitted parameter — see config.
+    m['coll_drain'] = COLL_DRAIN_COEF * (m['bill_floor'] - m['bill_base'])
 
     m['total_drain'] = (m['oil_drain'] + m['move_drain'] + m['dxy_drain']
+                        + m['coll_drain'].fillna(0.0)
                         ).clip(-DRAIN_CAP, DRAIN_CAP)
     m['gl_net'] = m['gl_gross'] * (1.0 + m['total_drain'])
 
@@ -399,7 +455,9 @@ def bake_js(m, useq, write_file=True):
                 'ECB':     round(float(latest['ecb_usd_b']),  1),
                 'BoJ':     round(float(latest['boj_usd_b']),  1),
                 'China FX': round(float(latest['cn_usd_b']),  1),
-                'US Bank Credit': round(float(latest['priv_liq']), 1),
+                # priv_liq is bank credit PLUS the eurodollar leg, so the label
+                # has to say so — it read "US Bank Credit" while carrying both.
+                'Bank Credit + Eurodollar': round(float(latest['priv_liq']), 1),
             },
         },
         'lqi_z':      to_js_series(lqi_z_plot,   'Acumen Liquidity (z-score)'),

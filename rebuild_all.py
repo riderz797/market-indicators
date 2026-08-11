@@ -47,6 +47,27 @@ def fetch_tga():
     return dates, values
 
 
+def fetch_acm_tp10():
+    """NY Fed ACM 10-year term premium, monthly from 1961-06.
+
+    Same source as fetch_fdds.py. Lives on a NY Fed spreadsheet rather than
+    FRED, so it is baked into the FCI's static data and never refreshed by the
+    page's live FRED merge — acceptable for a slow monthly series.
+    """
+    import io
+    import pandas as pd
+    import requests
+    url = ('https://www.newyorkfed.org/medialibrary/media/research/'
+           'data_indicators/ACMTermPremium.xls')
+    r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=120)
+    r.raise_for_status()
+    df = pd.read_excel(io.BytesIO(r.content), sheet_name='ACM Monthly')
+    dts = pd.to_datetime(df['DATE'], format='%d-%b-%Y')
+    pairs = [(d.strftime('%Y-%m-%d'), float(v))
+             for d, v in zip(dts, df['ACMTP10']) if pd.notna(v)]
+    return [p[0] for p in pairs], [p[1] for p in pairs]
+
+
 def resample_weekly(dates, values, target_day):
     """Resample daily data to weekly buckets. target_day: 0=Monday, 4=Friday."""
     weekly = {}
@@ -170,7 +191,8 @@ def main():
     # ── 3. Financial Conditions Index (Friday-resampled, 14 series) ──
     print('\n=== Financial Conditions Index ===')
     fci_fred_ids = ['WALCL', 'DGS10', 'DGS2', 'SP500', 'DJIA', 'T10YIE',
-                    'RRPONTSYD', 'SOFR', 'IORB', 'BAMLH0A0HYM2', 'VIXCLS', 'DTWEXBGS']
+                    'RRPONTSYD', 'SOFR', 'IORB', 'BAMLH0A0HYM2', 'VIXCLS', 'DTWEXBGS',
+                    'T5YIFR', 'T5YIE']
     fci_static = {'generated': today}
 
     for sid in fci_fred_ids:
@@ -205,6 +227,17 @@ def main():
         print(f'  TGA: {len(td)} weeks')
     except Exception as e:
         print(f'  TGA: FAILED ({e})')
+
+    print('  ACM term premium (NY Fed)...')
+    try:
+        acm_d, acm_v = fetch_acm_tp10()
+        # Monthly observations snapped onto the Friday grid; the page's
+        # alignToIndex carries each value forward until the next print.
+        ad, av = resample_weekly(acm_d, acm_v, 4)
+        fci_static['ACMTP10'] = {'dates': ad, 'values': rd(av, 4)}
+        print(f'  ACMTP10: {len(ad)} weeks')
+    except Exception as e:
+        print(f'  ACMTP10: FAILED ({e})')
 
     fci_script = build_script('fci_script.js', fci_static)
     replace_script_block(
