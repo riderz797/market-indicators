@@ -10,18 +10,18 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #121212; }
+    body { background: #FFFFFF; }
     .back-link {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 14px; color: #AAAAAA; text-decoration: none;
+      padding: 8px 14px; color: #555555; text-decoration: none;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 12px; letter-spacing: 0.5px;
       position: fixed; top: 12px; left: 16px; z-index: 100;
-      border: 1px solid #333; border-radius: 6px; background: #1E1E1E;
+      border: 1px solid #DDDDDD; border-radius: 6px; background: #FAFAFA;
       transition: color 0.2s, border-color 0.2s;
     }
-    .back-link:hover { color: #F5C542; border-color: #F5C542; }
-    textarea:focus, input:focus { outline: none; border-color: #F5C542 !important; }
+    .back-link:hover { color: #B8860B; border-color: #B8860B; }
+    textarea:focus, input:focus { outline: none; border-color: #B8860B !important; }
   </style>
 </head>
 <body>
@@ -99,17 +99,17 @@
       if (!text) return null;
       return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
         p.startsWith('**') && p.endsWith('**')
-          ? <strong key={i} style={{ color: '#CCC' }}>{p.slice(2, -2)}</strong>
+          ? <strong key={i} style={{ color: '#444444' }}>{p.slice(2, -2)}</strong>
           : p
       );
     }
 
     function parseDataLines(text) {
       return (text || '').split('\n').filter(l => l.trim()).map((line, i) => {
-        let color = '#888', body = line;
-        if      (line.startsWith('CREDIT:')) { color = '#3b82f6'; body = line.slice(7).trim(); }
-        else if (line.startsWith('RATE:'))   { color = '#eab308'; body = line.slice(5).trim(); }
-        else if (line.startsWith('FLOW:'))   { color = '#a855f7'; body = line.slice(5).trim(); }
+        let color = '#6E6E6E', body = line;
+        if      (line.startsWith('CREDIT:')) { color = '#1D4ED8'; body = line.slice(7).trim(); }
+        else if (line.startsWith('RATE:'))   { color = '#A16207'; body = line.slice(5).trim(); }
+        else if (line.startsWith('FLOW:'))   { color = '#7E22CE'; body = line.slice(5).trim(); }
         return { color, body, key: i };
       });
     }
@@ -362,14 +362,14 @@ FLOW: [...]`;
 
     /* ── SHARED FIELD STYLES ───────────────────────────────────────────── */
     const fieldBase = {
-      width: "100%", background: "#121212", border: "1px solid #333",
-      borderRadius: 4, color: "#CCC",
+      width: "100%", background: "#FFFFFF", border: "1px solid #DDDDDD",
+      borderRadius: 4, color: "#444444",
       fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
       padding: "7px 10px", lineHeight: 1.5,
     };
     const inputStyle  = { ...fieldBase };
     const taStyle     = { ...fieldBase, resize: "vertical" };
-    const labelStyle  = { fontSize: 8, letterSpacing: 1.5, color: "#888", marginBottom: 4, display: "block" };
+    const labelStyle  = { fontSize: 8, letterSpacing: 1.5, color: "#6E6E6E", marginBottom: 4, display: "block" };
 
     /* ═══════════════════════════════════════════════════════════════════
        SUB-COMPONENTS
@@ -378,26 +378,26 @@ FLOW: [...]`;
       const v = Math.max(-2, Math.min(2, value));
       const angle = -135 + ((v + 2) / 4) * 270;
       const [label, color] =
-        v <= -1.2 ? ["STRONG EXPANSION","#22c55e"] : v <= -0.4 ? ["EXPANSION","#4ade80"] :
-        v <=  0.4 ? ["NEUTRAL","#eab308"] : v <= 1.2 ? ["CAUTION","#f97316"] : ["ELEVATED RISK","#ef4444"];
+        v <= -1.2 ? ["STRONG EXPANSION","#15803D"] : v <= -0.4 ? ["EXPANSION","#16A34A"] :
+        v <=  0.4 ? ["NEUTRAL","#A16207"] : v <= 1.2 ? ["CAUTION","#C2410C"] : ["ELEVATED RISK","#DC2626"];
       return (
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
           <svg viewBox="0 0 200 130" style={{ width:260, height:170 }}>
             <defs>
               <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%"   stopColor="#22c55e"/><stop offset="35%" stopColor="#eab308"/>
-                <stop offset="65%"  stopColor="#f97316"/><stop offset="100%" stopColor="#ef4444"/>
+                <stop offset="0%"   stopColor="#15803D"/><stop offset="35%" stopColor="#A16207"/>
+                <stop offset="65%"  stopColor="#C2410C"/><stop offset="100%" stopColor="#DC2626"/>
               </linearGradient>
             </defs>
-            <path d="M 25 115 A 75 75 0 1 1 175 115" fill="none" stroke="#1A1A1A" strokeWidth="14" strokeLinecap="round"/>
+            <path d="M 25 115 A 75 75 0 1 1 175 115" fill="none" stroke="#E5E5E5" strokeWidth="14" strokeLinecap="round"/>
             <path d="M 25 115 A 75 75 0 1 1 175 115" fill="none" stroke="url(#gaugeGrad)" strokeWidth="10" strokeLinecap="round" opacity="0.8"/>
-            {[-135,-90,-45,0,45,90,135].map((a,i)=>{const r=a*Math.PI/180; return <line key={i} x1={100+65*Math.cos(r)} y1={115+65*Math.sin(r)} x2={100+58*Math.cos(r)} y2={115+58*Math.sin(r)} stroke="#444" strokeWidth="1.5"/>;})}
+            {[-135,-90,-45,0,45,90,135].map((a,i)=>{const r=a*Math.PI/180; return <line key={i} x1={100+65*Math.cos(r)} y1={115+65*Math.sin(r)} x2={100+58*Math.cos(r)} y2={115+58*Math.sin(r)} stroke="#D5D5D5" strokeWidth="1.5"/>;})}
             <g transform={`rotate(${angle},100,115)`}>
               <polygon points="100,48 96,115 104,115" fill={color} opacity="0.9"/>
               <circle cx="100" cy="115" r="6" fill={color}/>
-              <circle cx="100" cy="115" r="3" fill="#191919"/>
+              <circle cx="100" cy="115" r="3" fill="#9A9A9A"/>
             </g>
-            <text x="100" y="108" textAnchor="middle" fill="#888" fontSize="9" fontFamily="'JetBrains Mono',monospace">{v.toFixed(2)}</text>
+            <text x="100" y="108" textAnchor="middle" fill="#6E6E6E" fontSize="9" fontFamily="'JetBrains Mono',monospace">{v.toFixed(2)}</text>
           </svg>
           <div style={{ fontSize:13, fontWeight:700, letterSpacing:3, color, fontFamily:"'JetBrains Mono',monospace", textTransform:"uppercase" }}>{label}</div>
         </div>
@@ -409,16 +409,16 @@ FLOW: [...]`;
       return (
         <div style={{ overflowX:"auto", padding:"12px 0" }}>
           <svg viewBox="0 0 1000 180" style={{ width:"100%", minWidth:800, height:180 }}>
-            <line x1={0} y1={90} x2={1000} y2={90} stroke="#333" strokeWidth="1"/>
-            <line x1={toX(CURRENT_YEAR)} y1={15} x2={toX(CURRENT_YEAR)} y2={165} stroke="#f97316" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.6"/>
-            <text x={toX(CURRENT_YEAR)} y={12} textAnchor="middle" fill="#f97316" fontSize="9" fontWeight="700" fontFamily="'JetBrains Mono',monospace">NOW</text>
-            {BENNER_DATA.peaks.map((y,i)=>{const x=toX(y),hi=y===2026;return(<g key={`p${i}`}><line x1={x} y1={60} x2={x} y2={90} stroke={hi?"#ef4444":"#ef444466"} strokeWidth={hi?2:1}/><circle cx={x} cy={55} r={hi?5:3} fill={hi?"#ef4444":"#ef444488"}/><text x={x} y={48} textAnchor="middle" fill={hi?"#ef4444":"#ef444488"} fontSize={hi?"8":"7"} fontFamily="'JetBrains Mono',monospace" fontWeight={hi?700:400}>{y}</text></g>);})}
-            {BENNER_DATA.troughs.map((y,i)=>{const x=toX(y),hi=y===2023;return(<g key={`t${i}`}><line x1={x} y1={90} x2={x} y2={120} stroke={hi?"#22c55e":"#22c55e66"} strokeWidth={hi?2:1}/><circle cx={x} cy={125} r={hi?5:3} fill={hi?"#22c55e":"#22c55e66"}/><text x={x} y={138} textAnchor="middle" fill={hi?"#22c55e":"#22c55e66"} fontSize={hi?"8":"7"} fontFamily="'JetBrains Mono',monospace" fontWeight={hi?700:400}>{y}</text></g>);})}
-            {BENNER_DATA.panics.map((y,i)=>{const x=toX(y),hi=y===2035;return(<g key={`pa${i}`}><line x1={x} y1={30} x2={x} y2={90} stroke={hi?"#a855f7":"#a855f766"} strokeWidth={hi?2:1} strokeDasharray="3,3"/><text x={x} y={26} textAnchor="middle" fill={hi?"#a855f7":"#a855f766"} fontSize={hi?"8":"7"} fontFamily="'JetBrains Mono',monospace" fontWeight={hi?700:400}>&#9889;{y}</text></g>);})}
+            <line x1={0} y1={90} x2={1000} y2={90} stroke="#DDDDDD" strokeWidth="1"/>
+            <line x1={toX(CURRENT_YEAR)} y1={15} x2={toX(CURRENT_YEAR)} y2={165} stroke="#C2410C" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.6"/>
+            <text x={toX(CURRENT_YEAR)} y={12} textAnchor="middle" fill="#C2410C" fontSize="9" fontWeight="700" fontFamily="'JetBrains Mono',monospace">NOW</text>
+            {BENNER_DATA.peaks.map((y,i)=>{const x=toX(y),hi=y===2026;return(<g key={`p${i}`}><line x1={x} y1={60} x2={x} y2={90} stroke={hi?"#DC2626":"#DC262666"} strokeWidth={hi?2:1}/><circle cx={x} cy={55} r={hi?5:3} fill={hi?"#DC2626":"#DC262688"}/><text x={x} y={48} textAnchor="middle" fill={hi?"#DC2626":"#DC262688"} fontSize={hi?"8":"7"} fontFamily="'JetBrains Mono',monospace" fontWeight={hi?700:400}>{y}</text></g>);})}
+            {BENNER_DATA.troughs.map((y,i)=>{const x=toX(y),hi=y===2023;return(<g key={`t${i}`}><line x1={x} y1={90} x2={x} y2={120} stroke={hi?"#15803D":"#15803D66"} strokeWidth={hi?2:1}/><circle cx={x} cy={125} r={hi?5:3} fill={hi?"#15803D":"#15803D66"}/><text x={x} y={138} textAnchor="middle" fill={hi?"#15803D":"#15803D66"} fontSize={hi?"8":"7"} fontFamily="'JetBrains Mono',monospace" fontWeight={hi?700:400}>{y}</text></g>);})}
+            {BENNER_DATA.panics.map((y,i)=>{const x=toX(y),hi=y===2035;return(<g key={`pa${i}`}><line x1={x} y1={30} x2={x} y2={90} stroke={hi?"#7E22CE":"#7E22CE66"} strokeWidth={hi?2:1} strokeDasharray="3,3"/><text x={x} y={26} textAnchor="middle" fill={hi?"#7E22CE":"#7E22CE66"} fontSize={hi?"8":"7"} fontFamily="'JetBrains Mono',monospace" fontWeight={hi?700:400}>&#9889;{y}</text></g>);})}
             <g transform="translate(10,158)">
-              <circle cx={0}   cy={0} r={3} fill="#ef4444"/><text x={8}   y={3} fill="#888" fontSize="7" fontFamily="'JetBrains Mono',monospace">Peak/Sell</text>
-              <circle cx={80}  cy={0} r={3} fill="#22c55e"/><text x={88}  y={3} fill="#888" fontSize="7" fontFamily="'JetBrains Mono',monospace">Trough/Buy</text>
-              <circle cx={170} cy={0} r={3} fill="#a855f7"/><text x={178} y={3} fill="#888" fontSize="7" fontFamily="'JetBrains Mono',monospace">Panic</text>
+              <circle cx={0}   cy={0} r={3} fill="#DC2626"/><text x={8}   y={3} fill="#6E6E6E" fontSize="7" fontFamily="'JetBrains Mono',monospace">Peak/Sell</text>
+              <circle cx={80}  cy={0} r={3} fill="#15803D"/><text x={88}  y={3} fill="#6E6E6E" fontSize="7" fontFamily="'JetBrains Mono',monospace">Trough/Buy</text>
+              <circle cx={170} cy={0} r={3} fill="#7E22CE"/><text x={178} y={3} fill="#6E6E6E" fontSize="7" fontFamily="'JetBrains Mono',monospace">Panic</text>
             </g>
           </svg>
         </div>
@@ -427,14 +427,14 @@ FLOW: [...]`;
 
     function MiniBar({ value, max=2 }) {
       const c = Math.max(0,Math.min(1,(value+max)/(max*2)));
-      const color = c<0.3?"#22c55e":c<0.5?"#4ade80":c<0.6?"#eab308":c<0.8?"#f97316":"#ef4444";
-      return (<div style={{ width:"100%",height:6,background:"#1A1A1A",borderRadius:3,overflow:"hidden" }}><div style={{ width:`${c*100}%`,height:"100%",background:color,borderRadius:3,transition:"width 0.4s ease,background 0.4s ease" }}/></div>);
+      const color = c<0.3?"#15803D":c<0.5?"#16A34A":c<0.6?"#A16207":c<0.8?"#C2410C":"#DC2626";
+      return (<div style={{ width:"100%",height:6,background:"#E5E5E5",borderRadius:3,overflow:"hidden" }}><div style={{ width:`${c*100}%`,height:"100%",background:color,borderRadius:3,transition:"width 0.4s ease,background 0.4s ease" }}/></div>);
     }
 
     function ScoreBreakdown({ label, score, color }) {
       return (
-        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"#121212",borderRadius:6,border:"1px solid #333" }}>
-          <span style={{ fontSize:11,color:"#888",fontFamily:"'JetBrains Mono',monospace",letterSpacing:1 }}>{label}</span>
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"#FFFFFF",borderRadius:6,border:"1px solid #DDDDDD" }}>
+          <span style={{ fontSize:11,color:"#6E6E6E",fontFamily:"'JetBrains Mono',monospace",letterSpacing:1 }}>{label}</span>
           <div style={{ display:"flex",alignItems:"center",gap:8 }}>
             <div style={{ width:60 }}><MiniBar value={score}/></div>
             <span style={{ fontSize:12,fontWeight:700,color,fontFamily:"'JetBrains Mono',monospace",minWidth:40,textAlign:"right" }}>{score>0?"+":""}{score.toFixed(1)}</span>
@@ -529,109 +529,109 @@ FLOW: [...]`;
       };
 
       const catLabels = { credit:"CREDIT", rate:"RATE", flow:"FLOW" };
-      const catColors = { credit:"#3b82f6", rate:"#eab308", flow:"#a855f7" };
-      const statusChip = dataStatus==="loading" ? { text:"Fetching live data…", color:"#F5C542" }
-                       : dataStatus==="loaded"  ? { text:"Live data loaded",     color:"#22c55e" }
-                       : dataStatus==="error"   ? { text:"Fetch failed — using defaults", color:"#ef4444" } : null;
+      const catColors = { credit:"#1D4ED8", rate:"#A16207", flow:"#7E22CE" };
+      const statusChip = dataStatus==="loading" ? { text:"Fetching live data…", color:"#B8860B" }
+                       : dataStatus==="loaded"  ? { text:"Live data loaded",     color:"#15803D" }
+                       : dataStatus==="error"   ? { text:"Fetch failed — using defaults", color:"#DC2626" } : null;
       const autoFedIds = ["hy_spreads","sloos","yield_curve","real_yields","fed_direction","dollar_index"];
 
       /* ── RENDER ──────────────────────────────────────────────────── */
       return (
-        <div style={{ fontFamily:"'JetBrains Mono','SF Mono','Fira Code',monospace", background:"#191919", color:"#E0E0E0", minHeight:"100vh", padding:"60px 16px 24px" }}>
+        <div style={{ fontFamily:"'JetBrains Mono','SF Mono','Fira Code',monospace", background:"#FFFFFF", color:"#1A1A1A", minHeight:"100vh", padding:"60px 16px 24px" }}>
 
           {/* HEADER */}
           <div style={{ maxWidth:900, margin:"0 auto", marginBottom:32 }}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 220 200" width="28" height="28">
-                  <polygon points="50,0 150,0 200,87 150,174 50,174 0,87" fill="none" stroke="#F5C542" strokeWidth="18" strokeLinejoin="round"/>
-                  <text x="100" y="128" textAnchor="middle" fontSize="84" fontFamily="'Segoe UI',system-ui,sans-serif" fontWeight="500" fill="#F5C542">A</text>
+                  <polygon points="50,0 150,0 200,87 150,174 50,174 0,87" fill="none" stroke="#B8860B" strokeWidth="18" strokeLinejoin="round"/>
+                  <text x="100" y="128" textAnchor="middle" fontSize="84" fontFamily="'Segoe UI',system-ui,sans-serif" fontWeight="500" fill="#B8860B">A</text>
                 </svg>
-                <span style={{ fontSize:11, fontWeight:700, letterSpacing:4, color:"#F5C542" }}>ACUMEN</span>
+                <span style={{ fontSize:11, fontWeight:700, letterSpacing:4, color:"#B8860B" }}>ACUMEN</span>
               </div>
               {statusChip && <span style={{ fontSize:9, color:statusChip.color, letterSpacing:1, fontFamily:"'JetBrains Mono',monospace" }}>{statusChip.text}</span>}
             </div>
-            <h1 style={{ fontSize:22, fontWeight:300, margin:"8px 0 4px", letterSpacing:1, color:"#FFFFFF" }}>Macro Cycle Dashboard</h1>
-            <p style={{ fontSize:10, color:"#888", letterSpacing:2, margin:0 }}>BENNER CYCLE &#215; MECHANICAL INDICATORS — {MONTH_LABEL.toUpperCase()}</p>
+            <h1 style={{ fontSize:22, fontWeight:300, margin:"8px 0 4px", letterSpacing:1, color:"#1A1A1A" }}>Macro Cycle Dashboard</h1>
+            <p style={{ fontSize:10, color:"#6E6E6E", letterSpacing:2, margin:0 }}>BENNER CYCLE &#215; MECHANICAL INDICATORS — {MONTH_LABEL.toUpperCase()}</p>
           </div>
 
           <div style={{ maxWidth:900, margin:"0 auto" }}>
 
             {/* CYCLE TIMELINE */}
-            <div style={{ background:"#1E1E1E", borderRadius:8, border:"1px solid #333", padding:"16px 16px 8px", marginBottom:20 }}>
-              <div style={{ fontSize:9, letterSpacing:2, color:"#888", marginBottom:8 }}>BENNER CYCLE TIMELINE — 1920–2060</div>
+            <div style={{ background:"#FAFAFA", borderRadius:8, border:"1px solid #DDDDDD", padding:"16px 16px 8px", marginBottom:20 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"#6E6E6E", marginBottom:8 }}>BENNER CYCLE TIMELINE — 1920–2060</div>
               <CycleTimeline/>
             </div>
 
             {/* CLOCK + COMPOSITE */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:20 }}>
-              <div style={{ background:"#1E1E1E", borderRadius:8, border:"1px solid #333", padding:20 }}>
-                <div style={{ fontSize:9, letterSpacing:2, color:"#888", marginBottom:16 }}>CYCLE CLOCK POSITION</div>
+              <div style={{ background:"#FAFAFA", borderRadius:8, border:"1px solid #DDDDDD", padding:20 }}>
+                <div style={{ fontSize:9, letterSpacing:2, color:"#6E6E6E", marginBottom:16 }}>CYCLE CLOCK POSITION</div>
                 <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                  {[["Last Trough (Buy)",cyclePos.lastTrough,"#22c55e"],["Next Peak (Sell)",cyclePos.nextPeak,"#ef4444"],["Next Panic",cyclePos.nextPanic,"#a855f7"],["Next Trough",cyclePos.nextTrough,"#22c55e"]].map(([l,v,c])=>(
+                  {[["Last Trough (Buy)",cyclePos.lastTrough,"#15803D"],["Next Peak (Sell)",cyclePos.nextPeak,"#DC2626"],["Next Panic",cyclePos.nextPanic,"#7E22CE"],["Next Trough",cyclePos.nextTrough,"#15803D"]].map(([l,v,c])=>(
                     <div key={l} style={{ display:"flex", justifyContent:"space-between" }}>
-                      <span style={{ fontSize:10, color:"#888" }}>{l}</span>
+                      <span style={{ fontSize:10, color:"#6E6E6E" }}>{l}</span>
                       <span style={{ fontSize:12, fontWeight:700, color:c }}>{v}</span>
                     </div>
                   ))}
-                  <div style={{ height:1, background:"#333", margin:"4px 0" }}/>
+                  <div style={{ height:1, background:"#DDDDDD", margin:"4px 0" }}/>
                   <div>
                     <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-                      <span style={{ fontSize:10, color:"#888" }}>Progress to Peak</span>
-                      <span style={{ fontSize:12, fontWeight:700, color:"#f97316" }}>{(cyclePos.progressTowardPeak*100).toFixed(0)}%</span>
+                      <span style={{ fontSize:10, color:"#6E6E6E" }}>Progress to Peak</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:"#C2410C" }}>{(cyclePos.progressTowardPeak*100).toFixed(0)}%</span>
                     </div>
-                    <div style={{ width:"100%", height:8, background:"#1A1A1A", borderRadius:4, overflow:"hidden" }}>
-                      <div style={{ width:`${Math.min(100,cyclePos.progressTowardPeak*100)}%`, height:"100%", background:"linear-gradient(90deg,#22c55e,#eab308,#ef4444)", borderRadius:4, transition:"width 0.5s ease" }}/>
+                    <div style={{ width:"100%", height:8, background:"#E5E5E5", borderRadius:4, overflow:"hidden" }}>
+                      <div style={{ width:`${Math.min(100,cyclePos.progressTowardPeak*100)}%`, height:"100%", background:"linear-gradient(90deg,#15803D,#A16207,#DC2626)", borderRadius:4, transition:"width 0.5s ease" }}/>
                     </div>
                   </div>
-                  <div style={{ fontSize:10, color:"#888", fontStyle:"italic", lineHeight:1.4, marginTop:4 }}>
+                  <div style={{ fontSize:10, color:"#6E6E6E", fontStyle:"italic", lineHeight:1.4, marginTop:4 }}>
                     Clock score: {signal.clockScore.toFixed(1)} — {cyclePos.progressTowardPeak>=0.85?"At predicted peak":cyclePos.progressTowardPeak>=0.70?"Approaching peak zone":"Mid-cycle"}
                   </div>
                 </div>
               </div>
-              <div style={{ background:"#1E1E1E", borderRadius:8, border:"1px solid #333", padding:20, display:"flex", flexDirection:"column", alignItems:"center" }}>
-                <div style={{ fontSize:9, letterSpacing:2, color:"#888", marginBottom:8, alignSelf:"flex-start" }}>COMPOSITE SIGNAL</div>
+              <div style={{ background:"#FAFAFA", borderRadius:8, border:"1px solid #DDDDDD", padding:20, display:"flex", flexDirection:"column", alignItems:"center" }}>
+                <div style={{ fontSize:9, letterSpacing:2, color:"#6E6E6E", marginBottom:8, alignSelf:"flex-start" }}>COMPOSITE SIGNAL</div>
                 <SignalGauge value={signal.composite}/>
                 <div style={{ width:"100%", display:"flex", flexDirection:"column", gap:6, marginTop:12 }}>
-                  <ScoreBreakdown label="CREDIT" score={signal.creditScore} color={signal.creditScore>0.5?"#f97316":signal.creditScore<-0.5?"#22c55e":"#eab308"}/>
-                  <ScoreBreakdown label="RATE"   score={signal.rateScore}   color={signal.rateScore>0.5?"#f97316":signal.rateScore<-0.5?"#22c55e":"#eab308"}/>
-                  <ScoreBreakdown label="FLOW"   score={signal.flowScore}   color={signal.flowScore>0.5?"#f97316":signal.flowScore<-0.5?"#22c55e":"#eab308"}/>
+                  <ScoreBreakdown label="CREDIT" score={signal.creditScore} color={signal.creditScore>0.5?"#C2410C":signal.creditScore<-0.5?"#15803D":"#A16207"}/>
+                  <ScoreBreakdown label="RATE"   score={signal.rateScore}   color={signal.rateScore>0.5?"#C2410C":signal.rateScore<-0.5?"#15803D":"#A16207"}/>
+                  <ScoreBreakdown label="FLOW"   score={signal.flowScore}   color={signal.flowScore>0.5?"#C2410C":signal.flowScore<-0.5?"#15803D":"#A16207"}/>
                 </div>
-                <div style={{ fontSize:9, color:"#777", marginTop:10, textAlign:"center", lineHeight:1.4 }}>Regime multiplier: &#215;{signal.regimeMultiplier.toFixed(2)} — 8/8 inputs</div>
+                <div style={{ fontSize:9, color:"#7A7A7A", marginTop:10, textAlign:"center", lineHeight:1.4 }}>Regime multiplier: &#215;{signal.regimeMultiplier.toFixed(2)} — 8/8 inputs</div>
               </div>
             </div>
 
             {/* MECHANICAL INDICATORS */}
-            <div style={{ background:"#1E1E1E", borderRadius:8, border:"1px solid #333", padding:20, marginBottom:20 }}>
-              <div style={{ fontSize:9, letterSpacing:2, color:"#888", marginBottom:16 }}>MECHANICAL INDICATORS — SET CURRENT CONDITIONS</div>
+            <div style={{ background:"#FAFAFA", borderRadius:8, border:"1px solid #DDDDDD", padding:20, marginBottom:20 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"#6E6E6E", marginBottom:16 }}>MECHANICAL INDICATORS — SET CURRENT CONDITIONS</div>
               <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
                 {indicators.map(ind => {
                   const isOpen = expandedIndicator === ind.id;
                   const curOpt = ind.options.find(o => o.value === indicatorValues[ind.id]);
                   const isAuto = dataStatus==="loaded" && autoFedIds.includes(ind.id);
                   return (
-                    <div key={ind.id} style={{ background:isOpen?"#242424":"transparent", borderRadius:6, overflow:"hidden", border:isOpen?"1px solid #333":"1px solid transparent", transition:"all 0.2s ease" }}>
+                    <div key={ind.id} style={{ background:isOpen?"#F2F2F2":"transparent", borderRadius:6, overflow:"hidden", border:isOpen?"1px solid #DDDDDD":"1px solid transparent", transition:"all 0.2s ease" }}>
                       <div onClick={()=>setExpandedIndicator(isOpen?null:ind.id)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 12px", cursor:"pointer", borderLeft:`3px solid ${catColors[ind.category]}` }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                           <span style={{ fontSize:8, fontWeight:700, letterSpacing:1, color:catColors[ind.category], minWidth:42 }}>{catLabels[ind.category]}</span>
-                          <span style={{ fontSize:11, color:"#CCC" }}>{ind.name}</span>
-                          {isAuto && <span style={{ fontSize:7, color:"#22c55e", letterSpacing:1, border:"1px solid #22c55e44", borderRadius:3, padding:"1px 4px" }}>LIVE</span>}
+                          <span style={{ fontSize:11, color:"#444444" }}>{ind.name}</span>
+                          {isAuto && <span style={{ fontSize:7, color:"#15803D", letterSpacing:1, border:"1px solid #15803D44", borderRadius:3, padding:"1px 4px" }}>LIVE</span>}
                         </div>
                         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                          {curOpt && <span style={{ fontSize:10, color:"#888", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{curOpt.label}</span>}
-                          <span style={{ fontSize:10, color:"#888", display:"inline-block", transform:isOpen?"rotate(180deg)":"none", transition:"transform 0.2s" }}>&#9660;</span>
+                          {curOpt && <span style={{ fontSize:10, color:"#6E6E6E", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{curOpt.label}</span>}
+                          <span style={{ fontSize:10, color:"#6E6E6E", display:"inline-block", transform:isOpen?"rotate(180deg)":"none", transition:"transform 0.2s" }}>&#9660;</span>
                         </div>
                       </div>
                       {isOpen && (
                         <div style={{ padding:"4px 12px 12px 18px" }}>
-                          <p style={{ fontSize:10, color:"#888", margin:"0 0 10px", lineHeight:1.4 }}>{ind.desc}</p>
+                          <p style={{ fontSize:10, color:"#6E6E6E", margin:"0 0 10px", lineHeight:1.4 }}>{ind.desc}</p>
                           <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                             {ind.options.map((opt,i)=>{
                               const sel = indicatorValues[ind.id]===opt.value;
                               return (
                                 <div key={i} onClick={()=>{ setIndicatorValues(p=>({...p,[ind.id]:opt.value})); setExpandedIndicator(null); }}
-                                     style={{ padding:"8px 12px", borderRadius:4, cursor:"pointer", fontSize:11, transition:"all 0.15s ease", color:sel?"#FFFFFF":"#999", background:sel?"#242424":"transparent", border:sel?"1px solid #F5C542":"1px solid transparent" }}
-                                     onMouseEnter={e=>{if(!sel)e.currentTarget.style.background="#1A1A1A";}}
+                                     style={{ padding:"8px 12px", borderRadius:4, cursor:"pointer", fontSize:11, transition:"all 0.15s ease", color:sel?"#1A1A1A":"#999", background:sel?"#F2F2F2":"transparent", border:sel?"1px solid #B8860B":"1px solid transparent" }}
+                                     onMouseEnter={e=>{if(!sel)e.currentTarget.style.background="#E5E5E5";}}
                                      onMouseLeave={e=>{if(!sel)e.currentTarget.style.background="transparent";}}>
                                   <span style={{ marginRight:8, opacity:sel?1:0.3 }}>&#9679;</span>{opt.label}
                                 </div>
@@ -647,16 +647,16 @@ FLOW: [...]`;
             </div>
 
             {/* REGIME OVERLAY */}
-            <div style={{ background:"#1E1E1E", borderRadius:8, border:"1px solid #333", padding:20, marginBottom:20 }}>
-              <div style={{ fontSize:9, letterSpacing:2, color:"#888", marginBottom:16 }}>STRUCTURAL REGIME OVERLAY</div>
+            <div style={{ background:"#FAFAFA", borderRadius:8, border:"1px solid #DDDDDD", padding:20, marginBottom:20 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"#6E6E6E", marginBottom:16 }}>STRUCTURAL REGIME OVERLAY</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
                 {regimeQuestions.map(rq=>(
                   <div key={rq.id}>
-                    <div style={{ fontSize:10, color:"#888", marginBottom:8, fontWeight:500 }}>{rq.name}</div>
+                    <div style={{ fontSize:10, color:"#6E6E6E", marginBottom:8, fontWeight:500 }}>{rq.name}</div>
                     <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                       {rq.options.map(opt=>{
                         const sel = regimeValues[rq.id]===opt.value;
-                        return (<div key={opt.value} onClick={()=>setRegimeValues(p=>({...p,[rq.id]:opt.value}))} style={{ padding:"6px 10px", borderRadius:4, cursor:"pointer", fontSize:10, lineHeight:1.3, transition:"all 0.15s ease", color:sel?"#FFFFFF":"#888", background:sel?"#242424":"transparent", border:sel?"1px solid #F5C542":"1px solid #333" }}>{opt.label}</div>);
+                        return (<div key={opt.value} onClick={()=>setRegimeValues(p=>({...p,[rq.id]:opt.value}))} style={{ padding:"6px 10px", borderRadius:4, cursor:"pointer", fontSize:10, lineHeight:1.3, transition:"all 0.15s ease", color:sel?"#1A1A1A":"#6E6E6E", background:sel?"#F2F2F2":"transparent", border:sel?"1px solid #B8860B":"1px solid #DDDDDD" }}>{opt.label}</div>);
                       })}
                     </div>
                   </div>
@@ -665,67 +665,67 @@ FLOW: [...]`;
             </div>
 
             {/* ── SIGNAL INTERPRETATION ─────────────────────────────── */}
-            <div style={{ background:"#1E1E1E", borderRadius:8, border:"1px solid #333", borderLeft:"3px solid #F5C542", padding:20, marginBottom: editOpen ? 0 : 20 }}>
+            <div style={{ background:"#FAFAFA", borderRadius:8, border:"1px solid #DDDDDD", borderLeft:"3px solid #B8860B", padding:20, marginBottom: editOpen ? 0 : 20 }}>
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                <div style={{ fontSize:9, letterSpacing:2, color:"#F5C542" }}>&#9889; SIGNAL INTERPRETATION — {MONTH_LABEL.toUpperCase()}</div>
+                <div style={{ fontSize:9, letterSpacing:2, color:"#B8860B" }}>&#9889; SIGNAL INTERPRETATION — {MONTH_LABEL.toUpperCase()}</div>
                 <div style={{ display:"flex", gap:8 }}>
                   <button onClick={handleOpenEdit} disabled={editOpen}
-                          style={{ fontSize:9, letterSpacing:1, cursor:editOpen?"default":"pointer", padding:"4px 12px", borderRadius:4, border:"1px solid #333", background:"#242424", color:editOpen?"#777":"#AAAAAA", fontFamily:"'JetBrains Mono',monospace", transition:"all 0.2s" }}>
+                          style={{ fontSize:9, letterSpacing:1, cursor:editOpen?"default":"pointer", padding:"4px 12px", borderRadius:4, border:"1px solid #DDDDDD", background:"#F2F2F2", color:editOpen?"#7A7A7A":"#555555", fontFamily:"'JetBrains Mono',monospace", transition:"all 0.2s" }}>
                     UPDATE ANALYSIS
                   </button>
                   <button onClick={handleCopyPrompt}
-                          style={{ fontSize:9, letterSpacing:1, cursor:"pointer", padding:"4px 12px", borderRadius:4, border:`1px solid ${copyStatus==="copied"?"#22c55e":"#333"}`, background:copyStatus==="copied"?"#0d1f0d":"#242424", color:copyStatus==="copied"?"#22c55e":"#AAAAAA", fontFamily:"'JetBrains Mono',monospace", transition:"all 0.2s" }}>
+                          style={{ fontSize:9, letterSpacing:1, cursor:"pointer", padding:"4px 12px", borderRadius:4, border:`1px solid ${copyStatus==="copied"?"#15803D":"#DDDDDD"}`, background:copyStatus==="copied"?"#E8F5E9":"#F2F2F2", color:copyStatus==="copied"?"#15803D":"#555555", fontFamily:"'JetBrains Mono',monospace", transition:"all 0.2s" }}>
                     {copyStatus==="copied" ? "&#10003; COPIED" : "COPY PROMPT FOR CLAUDE"}
                   </button>
                 </div>
               </div>
 
               {/* Rendered analysis content */}
-              <div style={{ fontSize:12, color:"#CCC", lineHeight:1.8 }}>
-                <strong style={{ color:"#FFFFFF" }}>{analysis.thesis}</strong>{" "}{analysis.body}
+              <div style={{ fontSize:12, color:"#444444", lineHeight:1.8 }}>
+                <strong style={{ color:"#1A1A1A" }}>{analysis.thesis}</strong>{" "}{analysis.body}
               </div>
               <div style={{ marginTop:12, display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                <div style={{ padding:12, background:"#121212", borderRadius:6, border:"1px solid #333" }}>
-                  <div style={{ fontSize:9, color:"#ef4444", letterSpacing:1, marginBottom:6 }}>{analysis.confirmingHeader}</div>
-                  <div style={{ fontSize:10, color:"#888", lineHeight:1.6 }}>
+                <div style={{ padding:12, background:"#FFFFFF", borderRadius:6, border:"1px solid #DDDDDD" }}>
+                  <div style={{ fontSize:9, color:"#DC2626", letterSpacing:1, marginBottom:6 }}>{analysis.confirmingHeader}</div>
+                  <div style={{ fontSize:10, color:"#6E6E6E", lineHeight:1.6 }}>
                     {parseBullets(analysis.confirmingBullets).map((b,i,a)=>(
                       <React.Fragment key={i}>• {b}{i<a.length-1&&<br/>}</React.Fragment>
                     ))}
                   </div>
                 </div>
-                <div style={{ padding:12, background:"#121212", borderRadius:6, border:"1px solid #333" }}>
-                  <div style={{ fontSize:9, color:"#22c55e", letterSpacing:1, marginBottom:6 }}>{analysis.contradictingHeader}</div>
-                  <div style={{ fontSize:10, color:"#888", lineHeight:1.6 }}>
+                <div style={{ padding:12, background:"#FFFFFF", borderRadius:6, border:"1px solid #DDDDDD" }}>
+                  <div style={{ fontSize:9, color:"#15803D", letterSpacing:1, marginBottom:6 }}>{analysis.contradictingHeader}</div>
+                  <div style={{ fontSize:10, color:"#6E6E6E", lineHeight:1.6 }}>
                     {parseBullets(analysis.contradictingBullets).map((b,i,a)=>(
                       <React.Fragment key={i}>• {b}{i<a.length-1&&<br/>}</React.Fragment>
                     ))}
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop:12, fontSize:11, color:"#999", lineHeight:1.7, borderTop:"1px solid #333", paddingTop:12 }}>
-                <strong style={{ color:"#F5C542" }}>Read:</strong>{" "}{renderBold(analysis.readParagraph)}
+              <div style={{ marginTop:12, fontSize:11, color:"#999", lineHeight:1.7, borderTop:"1px solid #DDDDDD", paddingTop:12 }}>
+                <strong style={{ color:"#B8860B" }}>Read:</strong>{" "}{renderBold(analysis.readParagraph)}
               </div>
             </div>
 
             {/* ── EDIT PANEL ────────────────────────────────────────── */}
             {editOpen && draft && (
-              <div style={{ background:"#1E1E1E", borderRadius:"0 0 8px 8px", border:"1px solid #F5C542", borderTop:"none", padding:24, marginBottom:20 }}>
-                <div style={{ fontSize:9, letterSpacing:2, color:"#F5C542", marginBottom:16 }}>UPDATE MONTHLY ANALYSIS</div>
+              <div style={{ background:"#FAFAFA", borderRadius:"0 0 8px 8px", border:"1px solid #B8860B", borderTop:"none", padding:24, marginBottom:20 }}>
+                <div style={{ fontSize:9, letterSpacing:2, color:"#B8860B", marginBottom:16 }}>UPDATE MONTHLY ANALYSIS</div>
 
                 {/* Step 1: Paste */}
                 <div style={{ marginBottom:16 }}>
                   <label style={{ ...labelStyle }}>STEP 1 — PASTE CLAUDE'S OUTPUT, THEN CLICK PARSE (OR SKIP AND EDIT FIELDS DIRECTLY)</label>
                   <textarea value={pasteText} onChange={e=>setPasteText(e.target.value)} rows={7} placeholder={"Paste Claude's output here — it should contain ===THESIS===, ===BODY===, etc. sections…"} style={{ ...taStyle }}/>
                   <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:8 }}>
-                    <button onClick={handleParse} style={{ padding:"5px 16px", background:"#242424", border:"1px solid #F5C542", borderRadius:4, color:"#F5C542", fontSize:9, letterSpacing:1, cursor:"pointer", fontFamily:"'JetBrains Mono',monospace" }}>
+                    <button onClick={handleParse} style={{ padding:"5px 16px", background:"#F2F2F2", border:"1px solid #B8860B", borderRadius:4, color:"#B8860B", fontSize:9, letterSpacing:1, cursor:"pointer", fontFamily:"'JetBrains Mono',monospace" }}>
                       PARSE &amp; FILL FIELDS
                     </button>
-                    {parseMsg && <span style={{ fontSize:9, color:parseMsg.startsWith("✓")?"#22c55e":"#f97316", fontFamily:"'JetBrains Mono',monospace" }}>{parseMsg}</span>}
+                    {parseMsg && <span style={{ fontSize:9, color:parseMsg.startsWith("✓")?"#15803D":"#C2410C", fontFamily:"'JetBrains Mono',monospace" }}>{parseMsg}</span>}
                   </div>
                 </div>
 
-                <div style={{ height:1, background:"#333", margin:"16px 0" }}/>
-                <div style={{ fontSize:9, letterSpacing:2, color:"#888", marginBottom:16 }}>STEP 2 — REVIEW &amp; EDIT FIELDS</div>
+                <div style={{ height:1, background:"#DDDDDD", margin:"16px 0" }}/>
+                <div style={{ fontSize:9, letterSpacing:2, color:"#6E6E6E", marginBottom:16 }}>STEP 2 — REVIEW &amp; EDIT FIELDS</div>
 
                 {/* Thesis */}
                 <div style={{ marginBottom:12 }}>
@@ -742,13 +742,13 @@ FLOW: [...]`;
                 {/* Confirming + Contradicting */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
                   <div>
-                    <label style={{ ...labelStyle, color:"#ef4444" }}>CONFIRMING SECTION HEADER</label>
+                    <label style={{ ...labelStyle, color:"#DC2626" }}>CONFIRMING SECTION HEADER</label>
                     <input value={draft.confirmingHeader||""} onChange={setD("confirmingHeader")} style={{ ...inputStyle, marginBottom:8 }}/>
                     <label style={{ ...labelStyle }}>CONFIRMING BULLETS — one per line, no bullet symbol</label>
                     <textarea value={draft.confirmingBullets||""} onChange={setD("confirmingBullets")} rows={7} style={{ ...taStyle }}/>
                   </div>
                   <div>
-                    <label style={{ ...labelStyle, color:"#22c55e" }}>CONTRADICTING SECTION HEADER</label>
+                    <label style={{ ...labelStyle, color:"#15803D" }}>CONTRADICTING SECTION HEADER</label>
                     <input value={draft.contradictingHeader||""} onChange={setD("contradictingHeader")} style={{ ...inputStyle, marginBottom:8 }}/>
                     <label style={{ ...labelStyle }}>CONTRADICTING BULLETS — one per line, no bullet symbol</label>
                     <textarea value={draft.contradictingBullets||""} onChange={setD("contradictingBullets")} rows={7} style={{ ...taStyle }}/>
@@ -769,15 +769,15 @@ FLOW: [...]`;
 
                 {/* Save / Cancel */}
                 <div style={{ display:"flex", justifyContent:"flex-end", gap:10 }}>
-                  <button onClick={handleCancel} style={{ padding:"6px 18px", background:"transparent", border:"1px solid #333", borderRadius:4, color:"#888", fontSize:9, letterSpacing:1, cursor:"pointer", fontFamily:"'JetBrains Mono',monospace" }}>CANCEL</button>
-                  <button onClick={handleSave}   style={{ padding:"6px 18px", background:"#F5C542", border:"none", borderRadius:4, color:"#121212", fontSize:9, letterSpacing:1, cursor:"pointer", fontWeight:700, fontFamily:"'JetBrains Mono',monospace" }}>SAVE &amp; CLOSE</button>
+                  <button onClick={handleCancel} style={{ padding:"6px 18px", background:"transparent", border:"1px solid #DDDDDD", borderRadius:4, color:"#6E6E6E", fontSize:9, letterSpacing:1, cursor:"pointer", fontFamily:"'JetBrains Mono',monospace" }}>CANCEL</button>
+                  <button onClick={handleSave}   style={{ padding:"6px 18px", background:"#B8860B", border:"none", borderRadius:4, color:"#FFFFFF", fontSize:9, letterSpacing:1, cursor:"pointer", fontWeight:700, fontFamily:"'JetBrains Mono',monospace" }}>SAVE &amp; CLOSE</button>
                 </div>
               </div>
             )}
 
             {/* HISTORICAL ANALOGS */}
-            <div style={{ background:"#1E1E1E", borderRadius:8, border:"1px solid #333", padding:20, marginBottom:20 }}>
-              <div style={{ fontSize:9, letterSpacing:2, color:"#888", marginBottom:16 }}>HISTORICAL ANALOGS — PREVIOUS BENNER B-PEAK YEARS</div>
+            <div style={{ background:"#FAFAFA", borderRadius:8, border:"1px solid #DDDDDD", padding:20, marginBottom:20 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"#6E6E6E", marginBottom:16 }}>HISTORICAL ANALOGS — PREVIOUS BENNER B-PEAK YEARS</div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8 }}>
                 {[
                   { year:1972, event:"Pre-oil shock. Nixon price controls. Inflation hidden.",  next:"1973 oil embargo, -48% S&P bear", descent:"3yr" },
@@ -785,20 +785,20 @@ FLOW: [...]`;
                   { year:1999, event:"Dot-com mania. Tech speculation peak.",                   next:"2000-02 crash, -49% NASDAQ", descent:"6yr" },
                   { year:2007, event:"Housing bubble. Subprime excess.",                       next:"2008 financial crisis, -57% S&P", descent:"5yr" },
                 ].map(a=>(
-                  <div key={a.year} style={{ padding:12, background:"#121212", borderRadius:6, border:"1px solid #333" }}>
-                    <div style={{ fontSize:18, fontWeight:700, color:"#ef4444", marginBottom:6 }}>{a.year}</div>
-                    <div style={{ fontSize:9, color:"#888", lineHeight:1.5, marginBottom:8 }}>{a.event}</div>
-                    <div style={{ fontSize:9, color:"#888", lineHeight:1.5 }}><span style={{ color:"#F5C542" }}>&#8594;</span> {a.next}</div>
-                    <div style={{ fontSize:8, color:"#777", marginTop:6 }}>Descent: {a.descent}</div>
+                  <div key={a.year} style={{ padding:12, background:"#FFFFFF", borderRadius:6, border:"1px solid #DDDDDD" }}>
+                    <div style={{ fontSize:18, fontWeight:700, color:"#DC2626", marginBottom:6 }}>{a.year}</div>
+                    <div style={{ fontSize:9, color:"#6E6E6E", lineHeight:1.5, marginBottom:8 }}>{a.event}</div>
+                    <div style={{ fontSize:9, color:"#6E6E6E", lineHeight:1.5 }}><span style={{ color:"#B8860B" }}>&#8594;</span> {a.next}</div>
+                    <div style={{ fontSize:8, color:"#7A7A7A", marginTop:6 }}>Descent: {a.descent}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* DATA INPUTS — rendered from analysis state */}
-            <div style={{ padding:"16px 20px", borderRadius:8, border:"1px solid #242424", marginBottom:20 }}>
-              <div style={{ fontSize:9, letterSpacing:2, color:"#777", marginBottom:8 }}>DATA INPUTS — AS OF {MONTH_LABEL.toUpperCase()}</div>
-              <div style={{ fontSize:10, color:"#888", lineHeight:1.8 }}>
+            <div style={{ padding:"16px 20px", borderRadius:8, border:"1px solid #F2F2F2", marginBottom:20 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"#7A7A7A", marginBottom:8 }}>DATA INPUTS — AS OF {MONTH_LABEL.toUpperCase()}</div>
+              <div style={{ fontSize:10, color:"#6E6E6E", lineHeight:1.8 }}>
                 {parseDataLines(analysis.dataInputs).map(({ color, body, key }) => (
                   <React.Fragment key={key}><span style={{ color }}>&#9632;</span> {body}<br/></React.Fragment>
                 ))}
@@ -806,9 +806,9 @@ FLOW: [...]`;
             </div>
 
             {/* METHODOLOGY */}
-            <div style={{ padding:"16px 20px", borderRadius:8, border:"1px solid #242424", marginBottom:20 }}>
-              <div style={{ fontSize:9, letterSpacing:2, color:"#777", marginBottom:8 }}>METHODOLOGY</div>
-              <div style={{ fontSize:10, color:"#888", lineHeight:1.6 }}>
+            <div style={{ padding:"16px 20px", borderRadius:8, border:"1px solid #F2F2F2", marginBottom:20 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"#7A7A7A", marginBottom:8 }}>METHODOLOGY</div>
+              <div style={{ fontSize:10, color:"#6E6E6E", lineHeight:1.6 }}>
                 Composite = (Mechanical &#215; 0.60 + Clock &#215; 0.40) &#215; Regime Multiplier. Mechanical score averages credit, rate, and flow sub-scores (&#8722;2 to +2 scale). Clock score derived from Benner cycle progress toward predicted peak. Regime multiplier adjusts for structural conditions. Signal range: &#8722;2.0 (strong expansion) to +2.0 (elevated risk). Benner cycle rows: B-peaks 8-9-10yr, C-troughs 7-11-9yr, A-panics 18-20-16yr. Backtested: 11/11 peaks, 11/12 troughs, 5/6 panics within 0–2 years (1924–2023). This is a framework, not financial advice.
               </div>
             </div>

@@ -10,8 +10,8 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #121212;
-      color: #FFFFFF;
+      background: #FFFFFF;
+      color: #1A1A1A;
       font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
       min-height: 100vh;
     }
@@ -21,7 +21,7 @@
       align-items: center;
       gap: 6px;
       padding: 8px 14px;
-      color: #CCCCCC;
+      color: #555555;
       text-decoration: none;
       font-size: 12px;
       letter-spacing: 0.5px;
@@ -29,12 +29,12 @@
       top: 12px;
       left: 16px;
       z-index: 100;
-      border: 1px solid #555555;
+      border: 1px solid #DDDDDD;
       border-radius: 6px;
-      background: #3A3A3A;
+      background: #F2F2F2;
       transition: color 0.2s, border-color 0.2s;
     }
-    .back-link:hover { color: #F5C542; border-color: #F5C542; }
+    .back-link:hover { color: #B8860B; border-color: #B8860B; }
 
     .page {
       max-width: 1400px;
@@ -56,9 +56,9 @@
     .badge {
       display: inline-block;
       padding: 3px 10px;
-      background: #3A3A3A;
-      color: #F5C542;
-      border: 1px solid #F5C542;
+      background: #FBF3DC;
+      color: #B8860B;
+      border: 1px solid #B8860B;
       border-radius: 4px;
       font-size: 10px;
       letter-spacing: 1.5px;
@@ -67,19 +67,19 @@
       margin-left: 12px;
     }
 
-    h1 { font-size: 22px; font-weight: 700; color: #FFFFFF; letter-spacing: 0.3px; }
+    h1 { font-size: 22px; font-weight: 700; color: #1A1A1A; letter-spacing: 0.3px; }
 
     .subtitle {
       font-size: 11px;
-      color: #C0C0C0;
+      color: #444444;
       letter-spacing: 0.3px;
       margin-top: 6px;
       line-height: 1.6;
     }
 
-    #status-bar { font-size: 11px; color: #C0C0C0; text-align: right; letter-spacing: 0.5px; }
-    #status-bar.error   { color: #ef4444; }
-    #status-bar.loading { color: #F5C542; }
+    #status-bar { font-size: 11px; color: #444444; text-align: right; letter-spacing: 0.5px; }
+    #status-bar.error   { color: #C42F2F; }
+    #status-bar.loading { color: #B8860B; }
 
     /* ─── Current readings strip ─── */
     .readings {
@@ -92,24 +92,24 @@
     @media (max-width: 600px)  { .readings { grid-template-columns: 1fr 1fr; } }
 
     .reading-tile {
-      background: #3A3A3A;
-      border: 1px solid #505050;
+      background: #F2F2F2;
+      border: 1px solid #DDDDDD;
       border-radius: 8px;
       padding: 14px 16px;
     }
-    .reading-tile.hero { border-color: #F5C542; }
-    .reading-label { font-size: 9px; letter-spacing: 1.5px; color: #888888; margin-bottom: 8px; }
-    .reading-value { font-size: 22px; font-weight: 700; color: #FFFFFF; }
-    .reading-tile.hero .reading-value { font-size: 30px; color: #F5C542; }
-    .reading-sub { font-size: 10px; color: #AAAAAA; margin-top: 6px; line-height: 1.5; }
-    .reading-sub .regime { color: #F5C542; font-weight: 700; }
-    .reading-sub .z-pos { color: #ef4444; }
-    .reading-sub .z-neg { color: #4ade80; }
+    .reading-tile.hero { border-color: #B8860B; }
+    .reading-label { font-size: 9px; letter-spacing: 1.5px; color: #6E6E6E; margin-bottom: 8px; }
+    .reading-value { font-size: 22px; font-weight: 700; color: #1A1A1A; }
+    .reading-tile.hero .reading-value { font-size: 30px; color: #B8860B; }
+    .reading-sub { font-size: 10px; color: #666666; margin-top: 6px; line-height: 1.5; }
+    .reading-sub .regime { color: #B8860B; font-weight: 700; }
+    .reading-sub .z-pos { color: #C42F2F; }
+    .reading-sub .z-neg { color: #0B8A0B; }
 
     .chart-container {
       position: relative;
-      background: #3A3A3A;
-      border: 1px solid #505050;
+      background: #F2F2F2;
+      border: 1px solid #DDDDDD;
       border-radius: 8px;
       overflow: hidden;
       margin-bottom: 20px;
@@ -121,15 +121,15 @@
     .chart-title {
       font-size: 10px;
       letter-spacing: 2px;
-      color: #888888;
+      color: #6E6E6E;
       padding: 14px 18px 0;
     }
 
     .range-toggle { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
     .range-btn {
-      background: #3A3A3A;
-      border: 1px solid #505050;
-      color: #AAAAAA;
+      background: #F2F2F2;
+      border: 1px solid #DDDDDD;
+      color: #666666;
       font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
       letter-spacing: 1px;
@@ -138,8 +138,8 @@
       cursor: pointer;
       transition: color 0.2s, border-color 0.2s;
     }
-    .range-btn:hover { border-color: #F5C542; color: #F5C542; }
-    .range-btn.active { background: #F5C542; border-color: #F5C542; color: #1A1A1A; font-weight: 700; }
+    .range-btn:hover { border-color: #B8860B; color: #B8860B; }
+    .range-btn.active { background: #966C08; border-color: #966C08; color: #FFFFFF; font-weight: 700; }
 
     .watermark {
       position: absolute;
@@ -160,8 +160,8 @@
     @media (max-width: 700px) { .meta-grid { grid-template-columns: 1fr; } }
 
     .meta-card {
-      background: #3A3A3A;
-      border: 1px solid #505050;
+      background: #F2F2F2;
+      border: 1px solid #DDDDDD;
       border-radius: 8px;
       padding: 20px 24px;
     }
@@ -169,19 +169,19 @@
     .meta-card-label {
       font-size: 9px;
       letter-spacing: 2px;
-      color: #888888;
+      color: #6E6E6E;
       margin-bottom: 12px;
     }
 
-    .meta-card p { font-size: 11px; color: #C0C0C0; line-height: 1.7; }
+    .meta-card p { font-size: 11px; color: #444444; line-height: 1.7; }
 
     .formula-box {
-      background: #2D2D2D;
-      border: 1px solid #555555;
+      background: #F2F2F2;
+      border: 1px solid #DDDDDD;
       border-radius: 6px;
       padding: 14px 18px;
       font-size: 12px;
-      color: #F5C542;
+      color: #B8860B;
       letter-spacing: 0.5px;
       margin-top: 10px;
       text-align: center;
@@ -193,21 +193,21 @@
       align-items: center;
       gap: 10px;
       font-size: 11px;
-      color: #C0C0C0;
+      color: #444444;
       padding: 5px 0;
-      border-bottom: 1px solid #505050;
+      border-bottom: 1px solid #DDDDDD;
     }
     .data-row:last-child { border-bottom: none; }
-    .data-row .sid { color: #F5C542; min-width: 130px; font-size: 10px; }
+    .data-row .sid { color: #B8860B; min-width: 130px; font-size: 10px; }
 
     .zone-row {
       display: flex;
       align-items: center;
       gap: 12px;
       font-size: 11px;
-      color: #C0C0C0;
+      color: #444444;
       padding: 6px 0;
-      border-bottom: 1px solid #505050;
+      border-bottom: 1px solid #DDDDDD;
     }
     .zone-row:last-child { border-bottom: none; }
     .zone-chip {
@@ -219,15 +219,15 @@
       border-radius: 4px;
       border: 1px solid;
     }
-    .zone-calm   { color: #4ade80; border-color: #4ade80; background: rgba(74,222,128,0.08); }
-    .zone-stable { color: #AAAAAA; border-color: #777777; background: rgba(170,170,170,0.08); }
-    .zone-strain { color: #F5C542; border-color: #F5C542; background: rgba(245,197,66,0.08); }
-    .zone-spiral { color: #ef4444; border-color: #ef4444; background: rgba(239,68,68,0.08);  }
+    .zone-calm   { color: #0B8A0B; border-color: #0B8A0B; background: rgba(11,138,11,0.10); }
+    .zone-stable { color: #666666; border-color: #999999; background: rgba(110,110,110,0.10); }
+    .zone-strain { color: #B8860B; border-color: #B8860B; background: rgba(184,134,11,0.10); }
+    .zone-spiral { color: #C42F2F; border-color: #C42F2F; background: rgba(196,47,47,0.10);  }
 
     .footer-note {
       text-align: center;
       font-size: 9px;
-      color: #888888;
+      color: #6E6E6E;
       letter-spacing: 2px;
       padding: 12px 0 4px;
     }
@@ -298,10 +298,10 @@
       <div class="watermark">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 220 200" width="260" height="236">
           <polygon points="50,0 150,0 200,87 150,174 50,174 0,87"
-            fill="none" stroke="white" stroke-width="10" stroke-linejoin="round"/>
+            fill="none" stroke="#1A1A1A" stroke-width="10" stroke-linejoin="round"/>
           <text x="100" y="128" text-anchor="middle"
             font-size="84" font-family="'Segoe UI', system-ui, sans-serif"
-            font-weight="500" fill="white">A</text>
+            font-weight="500" fill="#1A1A1A">A</text>
         </svg>
       </div>
       <div id="chart"></div>
@@ -320,12 +320,12 @@
         <div class="meta-card-label">FORMULA</div>
         <div class="formula-box">
           FDDS = 50 + 16.7 &times; &Sigma; w<sub>i</sub> &middot; z<sub>i</sub><br>
-          <span style="color:#C0C0C0;font-size:10px;">
+          <span style="color:#444444;font-size:10px;">
             z<sub>i</sub> = 10-year rolling z-score of each input, clipped at &plusmn;3
           </span><br>
           w: Interest/GDP <b>30%</b> &middot; Core PCE <b>20%</b> &middot; Fed Assets <b>20%</b> &middot; Term Premium <b>15%</b> &middot; M2 <b>15%</b>
         </div>
-        <p style="font-size:10px;color:#888;margin-top:12px;line-height:1.6;">
+        <p style="font-size:10px;color:#6E6E6E;margin-top:12px;line-height:1.6;">
           The debt burden (interest/GDP) carries the largest weight &mdash; it is the engine of the spiral.
           Inflation and balance-sheet growth measure whether the Fed is accommodating it.
           The term premium is the bond market's verdict on fiscal credibility, and M2 confirms
@@ -335,12 +335,12 @@
 
       <div class="meta-card">
         <div class="meta-card-label">SPIRAL CONDITION &mdash; RED MARKERS</div>
-        <div class="formula-box" style="color:#ef4444;">
+        <div class="formula-box" style="color:#C42F2F;">
           z(Interest/GDP) &gt; 0.5 &nbsp;AND&nbsp; Core PCE &gt; 2.5%<br>
           AND ( z(Fed Assets) &gt; 0 &nbsp;OR&nbsp; z(M2) &gt; 0 )<br>
           AND&nbsp; Fed Funds &minus; Core PCE &lt; 1%
         </div>
-        <p style="font-size:10px;color:#888;margin-top:12px;line-height:1.6;">
+        <p style="font-size:10px;color:#6E6E6E;margin-top:12px;line-height:1.6;">
           The textbook fiscal-dominance signature: debt service is historically heavy, inflation is above
           target, money is easier than its decade norm, and the real policy rate is pinned below +1% &mdash;
           the central bank is financing the Treasury, not fighting inflation. Flagged months: 1967&ndash;68
@@ -357,7 +357,7 @@
         <div class="zone-row"><span class="zone-chip zone-stable">25&ndash;50</span><span><b>Stable Funding</b> &mdash; deficits absorbed without monetary help. Normal regime.</span></div>
         <div class="zone-row"><span class="zone-chip zone-strain">50&ndash;75</span><span><b>Fiscal Strain</b> &mdash; interest costs crowding the budget; policy independence eroding.</span></div>
         <div class="zone-row"><span class="zone-chip zone-spiral">75&ndash;100</span><span><b>Debt Spiral Risk</b> &mdash; rates feed deficits feed issuance feed rates. Historically resolved by inflation, financial repression, or QE.</span></div>
-        <p style="font-size:10px;color:#888;margin-top:12px;line-height:1.6;">
+        <p style="font-size:10px;color:#6E6E6E;margin-top:12px;line-height:1.6;">
           Direction matters as much as level: a fast rise through 50 with red markers
           appearing is the actionable signal &mdash; long duration becomes dangerous, hard assets and
           inflation hedges historically outperform.
@@ -373,7 +373,7 @@
         <div class="data-row"><span class="sid">BOGMBASE</span><span>Monetary base &mdash; Fed footprint proxy before Dec 2003, YoY % derived</span></div>
         <div class="data-row"><span class="sid">ACMTP10</span><span>10Y term premium, NY Fed ACM model &mdash; monthly, from Jun 1961 (not on FRED)</span></div>
         <div class="data-row"><span class="sid">M2SL</span><span>M2 money stock &mdash; YoY % derived</span></div>
-        <p style="font-size:10px;color:#888;margin-top:14px;line-height:1.6;">
+        <p style="font-size:10px;color:#6E6E6E;margin-top:14px;line-height:1.6;">
           Index begins May 1964 &mdash; the ACM term premium starts Jun 1961 and z-scores need 3 years of warm-up.<br>
           Fed footprint is spliced: WALCL only exists from Dec 2002, so the monetary base stands in for the
           balance sheet before Dec 2003. Data baked by fetch_fdds.py; the page falls back to live FRED
@@ -407,10 +407,10 @@
     ];
 
     const ZONES = [
-      { y0: 0,  y1: 25,  color: 'rgba(74,222,128,0.05)',  label: 'FISCAL DISCIPLINE', lc: '#4ade80' },
-      { y0: 25, y1: 50,  color: 'rgba(170,170,170,0.04)', label: 'STABLE FUNDING',    lc: '#888888' },
-      { y0: 50, y1: 75,  color: 'rgba(245,197,66,0.06)',  label: 'FISCAL STRAIN',     lc: '#F5C542' },
-      { y0: 75, y1: 100, color: 'rgba(239,68,68,0.08)',   label: 'DEBT SPIRAL RISK',  lc: '#ef4444' },
+      { y0: 0,  y1: 25,  color: 'rgba(11,138,11,0.07)',  label: 'FISCAL DISCIPLINE', lc: '#0B8A0B' },
+      { y0: 25, y1: 50,  color: 'rgba(110,110,110,0.06)', label: 'STABLE FUNDING',    lc: '#6E6E6E' },
+      { y0: 50, y1: 75,  color: 'rgba(184,134,11,0.08)',  label: 'FISCAL STRAIN',     lc: '#B8860B' },
+      { y0: 75, y1: 100, color: 'rgba(196,47,47,0.10)',   label: 'DEBT SPIRAL RISK',  lc: '#C42F2F' },
     ];
 
     /* ─── HELPERS ────────────────────────────────────────────────────────── */
@@ -648,9 +648,9 @@
 
       /* ─── Main chart ─── */
       const axisStyle = {
-        gridcolor: '#4A4A4A', zerolinecolor: '#4A4A4A',
-        tickfont: { family: 'JetBrains Mono, monospace', size: 10, color: '#AAAAAA' },
-        linecolor: '#505050',
+        gridcolor: '#E8E8E8', zerolinecolor: '#D5D5D5',
+        tickfont: { family: 'JetBrains Mono, monospace', size: 10, color: '#666666' },
+        linecolor: '#DDDDDD',
       };
 
       const shapes = [
@@ -660,7 +660,7 @@
         })),
         ...RECESSIONS.map(r => ({
           type: 'rect', x0: r.x0, x1: r.x1, yref: 'paper', y0: 0, y1: 1,
-          fillcolor: 'rgba(160,160,160,0.13)', line: { width: 0 }, layer: 'below',
+          fillcolor: 'rgba(120,120,120,0.13)', line: { width: 0 }, layer: 'below',
         })),
       ];
 
@@ -679,33 +679,33 @@
       Plotly.newPlot('chart', [
         {
           x: dates, y: values, mode: 'lines', name: 'FDDS',
-          line: { color: '#F5C542', width: 2 },
+          line: { color: '#B8860B', width: 2 },
           hovertemplate: '%{x|%b %Y}<br>FDDS: %{y:.1f}<extra></extra>',
         },
         {
           x: spiralDates, y: spiralValues, mode: 'markers', name: 'Spiral condition',
-          marker: { color: '#ef4444', size: 6, symbol: 'diamond' },
+          marker: { color: '#C42F2F', size: 6, symbol: 'diamond' },
           hovertemplate: '%{x|%b %Y}<br>SPIRAL CONDITION ACTIVE<br>FDDS: %{y:.1f}<extra></extra>',
         },
       ], {
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-        font: { family: 'JetBrains Mono, monospace', color: '#AAAAAA' },
+        font: { family: 'JetBrains Mono, monospace', color: '#666666' },
         margin: { l: 50, r: 130, t: 24, b: 40 },
         xaxis: { ...axisStyle },
         yaxis: { ...axisStyle, range: [0, 100], title: { text: 'FDDS (0–100)', font: { size: 10 } } },
         shapes, annotations: zoneAnnotations(0, 100),
         legend: { orientation: 'h', x: 0, y: 1.06, font: { size: 10 } },
         hovermode: 'x unified',
-        hoverlabel: { bgcolor: '#2D2D2D', bordercolor: '#555555', font: { family: 'JetBrains Mono, monospace', size: 11, color: '#FFFFFF' } },
+        hoverlabel: { bgcolor: '#F2F2F2', bordercolor: '#DDDDDD', font: { family: 'JetBrains Mono, monospace', size: 11, color: '#1A1A1A' } },
       }, { responsive: true, displayModeBar: false });
 
       /* ─── Component chart ─── */
       const compTraces = [
-        { name: 'Interest/GDP',  z: zInt,   color: '#F5C542' },
-        { name: 'Core PCE',      z: zPce,   color: '#ef4444' },
-        { name: 'Fed Assets',    z: zWalcl, color: '#4ade80' },
-        { name: 'Term Premium',  z: zTp,    color: '#60a5fa' },
-        { name: 'M2 Growth',     z: zM2,    color: '#AAAAAA' },
+        { name: 'Interest/GDP',  z: zInt,   color: '#B8860B' },
+        { name: 'Core PCE',      z: zPce,   color: '#C42F2F' },
+        { name: 'Fed Assets',    z: zWalcl, color: '#0B8A0B' },
+        { name: 'Term Premium',  z: zTp,    color: '#2F72C4' },
+        { name: 'M2 Growth',     z: zM2,    color: '#666666' },
       ].filter(t => !(t.name === 'Term Premium' && !useTp))
        .map(t => ({
           x: months.map(ym => ym + '-01'), y: t.z, mode: 'lines', name: t.name,
@@ -715,17 +715,17 @@
 
       Plotly.newPlot('chart-components', compTraces, {
         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-        font: { family: 'JetBrains Mono, monospace', color: '#AAAAAA' },
+        font: { family: 'JetBrains Mono, monospace', color: '#666666' },
         margin: { l: 50, r: 30, t: 14, b: 40 },
         xaxis: { ...axisStyle, range: [dates[0], dates.at(-1)] },
         yaxis: { ...axisStyle, range: [-3.3, 3.3], title: { text: 'z-score (σ)', font: { size: 10 } } },
         shapes: RECESSIONS.map(r => ({
           type: 'rect', x0: r.x0, x1: r.x1, yref: 'paper', y0: 0, y1: 1,
-          fillcolor: 'rgba(160,160,160,0.13)', line: { width: 0 }, layer: 'below',
+          fillcolor: 'rgba(120,120,120,0.13)', line: { width: 0 }, layer: 'below',
         })),
         legend: { orientation: 'h', x: 0, y: 1.1, font: { size: 10 } },
         hovermode: 'x unified',
-        hoverlabel: { bgcolor: '#2D2D2D', bordercolor: '#555555', font: { family: 'JetBrains Mono, monospace', size: 11, color: '#FFFFFF' } },
+        hoverlabel: { bgcolor: '#F2F2F2', bordercolor: '#DDDDDD', font: { family: 'JetBrains Mono, monospace', size: 11, color: '#1A1A1A' } },
       }, { responsive: true, displayModeBar: false });
 
       /* ─── Range toggle (1Y / 5Y / ALL) — re-ranges x and re-fits y ─── */

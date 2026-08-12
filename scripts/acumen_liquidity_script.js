@@ -2,21 +2,21 @@
 const ACUMEN_LIQUIDITY = __STATIC_DATA__;
 // ===== END STATIC DATA =====
 
-const GOLD   = '#F5C542';
-const WHITE  = '#FFFFFF';
-const GRAY   = '#AAAAAA';
-const PANEL  = '#1E1E1E';
-const GRID   = '#2A2A2A';
-const GREEN  = '#4ade80';
-const RED    = '#f87171';
+const GOLD   = '#B8860B';
+const WHITE  = '#1A1A1A';
+const GRAY   = '#666666';
+const PANEL  = '#FAFAFA';
+const GRID   = '#E5E5E5';
+const GREEN  = '#0B8A0B';
+const RED    = '#C9484A';
 
 const TIER_COLOR = {
-  exceptional: '#4ade80',
-  strong:      '#86efac',
-  buy:         '#bbf7d0',
-  flat:        '#888888',
-  miss:        '#f87171',
-  pending:     '#F5C542',
+  exceptional: '#0B6B2E',
+  strong:      '#2F9E52',
+  buy:         '#66B37E',
+  flat:        '#6E6E6E',
+  miss:        '#C9484A',
+  pending:     '#B8860B',
 };
 const TIER_LABEL = {
   exceptional: 'EXCEPTIONAL',
@@ -142,20 +142,20 @@ function renderChart(data) {
   const traceBuy = {
     x: buyDates, y: buyYs,
     type: 'scatter', mode: 'markers', name: 'BUY',
-    marker: { symbol: 'triangle-up', size: 14, color: buyColors, line: { color: '#121212', width: 1.5 } },
+    marker: { symbol: 'triangle-up', size: 14, color: buyColors, line: { color: '#FFFFFF', width: 1.5 } },
     text: buyText, hovertemplate: '%{text}<extra></extra>',
   };
   const traceExit = {
     x: exitDates, y: exitYs,
     type: 'scatter', mode: 'markers', name: 'CLOSE',
-    marker: { symbol: 'triangle-down', size: 14, color: RED, line: { color: '#121212', width: 1.5 } },
+    marker: { symbol: 'triangle-down', size: 14, color: RED, line: { color: '#FFFFFF', width: 1.5 } },
     text: exitText, hovertemplate: '%{text}<extra></extra>',
   };
   const traceShade = {
     x: [lastEqDate, lastEqDate, meta.proj_end_date, meta.proj_end_date],
     y: [yMin, yMax, yMax, yMin],
     type: 'scatter', mode: 'none', fill: 'toself',
-    fillcolor: 'rgba(245,197,66,0.05)', line: { width: 0 },
+    fillcolor: 'rgba(184,134,11,0.07)', line: { width: 0 },
     showlegend: false, hoverinfo: 'skip',
   };
 
@@ -177,26 +177,26 @@ function renderChart(data) {
     yaxis: {
       title: { text: 'Z-score (\u03c3 from 2015 mean)', font: { size: 10 }, standoff: 8 },
       gridcolor: GRID, gridwidth: 1, tickcolor: GRAY, linecolor: GRID,
-      zeroline: true, zerolinecolor: '#444444', zerolinewidth: 1,
+      zeroline: true, zerolinecolor: '#C8C8C8', zerolinewidth: 1,
       tickfont: { size: 10 },
       showspikes: true, spikecolor: GRAY, spikethickness: 1,
     },
     legend: {
       orientation: 'v', x: 1.01, xanchor: 'left', y: 1.0, yanchor: 'top',
-      bgcolor: 'rgba(30,30,30,0.85)', bordercolor: '#333333', borderwidth: 1,
+      bgcolor: 'rgba(255,255,255,0.95)', bordercolor: '#D5D5D5', borderwidth: 1,
       font: { size: 10 },
     },
     shapes: [
       { type: 'line', x0: lastEqDate, x1: lastEqDate, y0: yMin, y1: yMax,
-        line: { color: '#555555', width: 1, dash: 'dot' } },
+        line: { color: '#B0B0B0', width: 1, dash: 'dot' } },
     ],
     annotations: [
       { x: lastEqDate, y: yMax * 0.92, text: 'today', showarrow: false,
-        font: { size: 9, color: '#888888' }, xanchor: 'left', yanchor: 'top' },
+        font: { size: 9, color: '#6E6E6E' }, xanchor: 'left', yanchor: 'top' },
     ],
     hovermode: 'x unified',
     hoverlabel: {
-      bgcolor: '#242424', bordercolor: '#444444',
+      bgcolor: '#F2F2F2', bordercolor: '#C8C8C8',
       font: { family: "'JetBrains Mono', monospace", size: 11 },
     },
   };

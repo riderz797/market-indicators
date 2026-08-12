@@ -46,14 +46,14 @@ MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
 ELECTION_CYCLE = {
     "id": "election", "label": "Election", "anchor": 2025,
     "names":  ["1 Post-Election", "2 Midterm", "3 Pre-Election", "4 Election"],
-    "colors": ["#4FC3F7", "#81C784", "#CE93D8", "#FF8A65"],
+    "colors": ["#0277BD", "#2E7D32", "#7B1FA2", "#D84315"],
     "note": "Based on the U.S. presidential cycle. Liquidity and risk appetite "
             "vary by cycle phase.",
 }
 HALVING_CYCLE = {
     "id": "halving", "label": "Halving", "anchor": 2024,
     "names":  ["1 Halving", "2 Post-Halving", "3 Mid-Cycle", "4 Pre-Halving"],
-    "colors": ["#FF7043", "#66BB6A", "#42A5F5", "#AB47BC"],
+    "colors": ["#C1441A", "#2E7D32", "#1565C0", "#6A1B9A"],
     "note": "Halvings: Nov 2012, Jul 2016, May 2020, Apr 2024. The supply cut "
             "drives a 4-year cycle.",
 }

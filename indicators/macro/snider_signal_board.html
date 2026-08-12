@@ -10,31 +10,32 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      /* Surfaces & ink — Premium Dark Gold */
-      --page:        #121212;
-      --surface:     #1E1E1E;
-      --surface-2:   #242424;
-      --ink:         #FFFFFF;
-      --ink-2:       #C0C0C0;
-      --muted:       #898781;
-      --grid:        #2C2C2A;
-      --baseline:    #383835;
-      --hairline:    #2A2A2A;
-      --accent:      #F5C542;   /* UI chrome only — fails the dark series band */
+      /* Surfaces & ink — light theme */
+      --page:        #FFFFFF;
+      --surface:     #FAFAFA;
+      --surface-2:   #F2F2F2;
+      --ink:         #1A1A1A;
+      --ink-2:       #444444;
+      --muted:       #6E6E6E;
+      --grid:        #E8E8E8;
+      --baseline:    #D5D5D5;
+      --hairline:    #E5E5E5;
+      --accent:      #B8860B;   /* darkened gold — brand accent, readable on white */
+      --accent-tint: #FBF3DC;
 
-      /* Chart series — validated all-pairs on #1E1E1E (OKLab, dark mode) */
-      --series-gold: #C98500;   /* in-band gold, emphasis series */
-      --series-blue: #3987e5;
-      --series-orng: #d95926;
-      --series-aqua: #199e70;
+      /* Chart series — hues held, luminance lowered to clear 3:1 on #FAFAFA */
+      --series-gold: #A8730A;   /* emphasis series */
+      --series-blue: #2F72C4;
+      --series-orng: #C2451A;
+      --series-aqua: #12805A;
 
       /* Diverging + status */
-      --div-pos:     #3987e5;
-      --div-neg:     #e66767;
-      --good:        #0ca30c;
-      --warning:     #fab219;
-      --serious:     #ec835a;
-      --critical:    #d03b3b;
+      --div-pos:     #2F72C4;
+      --div-neg:     #C9484A;
+      --good:        #0B8A0B;
+      --warning:     #B57F0A;
+      --serious:     #C05A2B;
+      --critical:    #C42F2F;
     }
 
     body {
@@ -46,10 +47,10 @@
 
     .back-link {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 14px; color: #CCCCCC; text-decoration: none;
+      padding: 8px 14px; color: #555555; text-decoration: none;
       font-size: 12px; letter-spacing: 0.5px;
       position: fixed; top: 12px; left: 16px; z-index: 100;
-      border: 1px solid #555555; border-radius: 6px; background: #3A3A3A;
+      border: 1px solid #DDDDDD; border-radius: 6px; background: #F2F2F2;
       transition: color 0.2s, border-color 0.2s;
     }
     .back-link:hover { color: var(--accent); border-color: var(--accent); }
@@ -63,7 +64,7 @@
 
     .badge {
       display: inline-block; padding: 3px 10px;
-      background: #3A3A3A; color: var(--accent);
+      background: var(--accent-tint); color: var(--accent);
       border: 1px solid var(--accent); border-radius: 4px;
       font-size: 10px; letter-spacing: 1.5px; font-weight: 700;
       vertical-align: middle; margin-left: 12px;
@@ -87,14 +88,14 @@
     .tab-btn {
       padding: 9px 18px; font-family: inherit; font-size: 11px;
       letter-spacing: 1px; font-weight: 600;
-      background: var(--surface-2); color: #888888;
-      border: 1px solid #333333; border-radius: 4px; cursor: pointer;
+      background: var(--surface-2); color: #6E6E6E;
+      border: 1px solid #DDDDDD; border-radius: 4px; cursor: pointer;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
       display: flex; align-items: center; gap: 8px;
     }
-    .tab-btn:hover { color: var(--ink); border-color: #555555; }
+    .tab-btn:hover { color: var(--ink); border-color: #B0B0B0; }
     .tab-btn.active {
-      color: var(--accent); border-color: var(--accent); background: #2A2517;
+      color: var(--accent); border-color: var(--accent); background: var(--accent-tint);
     }
     .tab-num {
       font-size: 9px; opacity: 0.7; font-weight: 700;
@@ -135,13 +136,13 @@
       border-radius: 8px; padding: 16px 18px;
     }
     .signal-label {
-      font-size: 9px; letter-spacing: 2px; color: #888888;
+      font-size: 9px; letter-spacing: 2px; color: #6E6E6E;
       margin-bottom: 8px; text-transform: uppercase; line-height: 1.5;
     }
     .signal-value { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
-    .signal-sub { font-size: 10px; color: #888888; margin-top: 5px; line-height: 1.5; }
-    .signal-value.positive { color: #4ade80; }
-    .signal-value.negative { color: #f87171; }
+    .signal-sub { font-size: 10px; color: #6E6E6E; margin-top: 5px; line-height: 1.5; }
+    .signal-value.positive { color: var(--good); }
+    .signal-value.negative { color: var(--div-neg); }
     .signal-value.neutral  { color: var(--accent); }
 
     /* ── Charts ──────────────────────────────────────────────── */
@@ -160,11 +161,11 @@
     .range-btn {
       padding: 5px 14px; font-family: inherit; font-size: 11px;
       letter-spacing: 1px; font-weight: 600;
-      background: var(--surface-2); color: #888888;
-      border: 1px solid #333333; border-radius: 4px; cursor: pointer;
+      background: var(--surface-2); color: #6E6E6E;
+      border: 1px solid #DDDDDD; border-radius: 4px; cursor: pointer;
       transition: color 0.15s, border-color 0.15s;
     }
-    .range-btn:hover { color: var(--ink); border-color: #555555; }
+    .range-btn:hover { color: var(--ink); border-color: #B0B0B0; }
     .range-btn.active { color: var(--accent); border-color: var(--accent); }
     .plot { width: 100%; height: 420px; }
     .plot.tall { height: 460px; }
@@ -195,15 +196,15 @@
       font-size: 9px; letter-spacing: 1.5px; font-weight: 700;
       padding: 3px 9px; border-radius: 3px; border: 1px solid;
     }
-    .quad.is-live  { background: #2A2517; }
+    .quad.is-live  { background: var(--accent-tint); }
     .quad.is-live  .quad-name { color: var(--accent); }
     .quad.is-live  .quad-status { color: var(--accent); border-color: var(--accent); }
     .quad.is-watch .quad-name { color: var(--ink-2); }
-    .quad.is-watch .quad-status { color: var(--muted); border-color: #444444; }
-    .quad.is-dead  { background: #191919; }
-    .quad.is-dead  .quad-name { color: #4A4A4A; text-decoration: line-through; }
-    .quad.is-dead  .quad-desc { color: #3D3D3D; }
-    .quad.is-dead  .quad-status { color: #5A5A5A; border-color: #333333; }
+    .quad.is-watch .quad-status { color: var(--muted); border-color: #C8C8C8; }
+    .quad.is-dead  { background: #F0F0F0; }
+    .quad.is-dead  .quad-name { color: #A0A0A0; text-decoration: line-through; }
+    .quad.is-dead  .quad-desc { color: #B0B0B0; }
+    .quad.is-dead  .quad-status { color: #999999; border-color: #DDDDDD; }
     .axis-x {
       grid-column: 2; text-align: center; font-size: 9px;
       letter-spacing: 2px; color: var(--muted); padding-top: 8px;
@@ -217,7 +218,7 @@
       border-radius: 8px; padding: 18px 20px;
     }
     .meter-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
-    .meter-label { font-size: 9px; letter-spacing: 2px; color: #888888; text-transform: uppercase; }
+    .meter-label { font-size: 9px; letter-spacing: 2px; color: #6E6E6E; text-transform: uppercase; }
     .meter-val { font-size: 20px; font-weight: 700; color: var(--accent); }
     .meter-track { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
     .meter-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
@@ -229,18 +230,18 @@
       border-radius: 8px; padding: 18px 20px; margin-bottom: 22px; overflow-x: auto;
     }
     .tbl-label {
-      font-size: 9px; letter-spacing: 2px; color: #888888;
+      font-size: 9px; letter-spacing: 2px; color: #6E6E6E;
       margin-bottom: 14px; text-transform: uppercase;
     }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th {
-      text-align: left; color: #888888; font-weight: 600; font-size: 9px;
+      text-align: left; color: #6E6E6E; font-weight: 600; font-size: 9px;
       letter-spacing: 1.5px; text-transform: uppercase;
       padding: 0 14px 10px 0; border-bottom: 1px solid var(--hairline); white-space: nowrap;
     }
     td {
       padding: 11px 14px 11px 0; color: var(--ink-2);
-      border-bottom: 1px solid #232323; vertical-align: top; line-height: 1.6;
+      border-bottom: 1px solid #EEEEEE; vertical-align: top; line-height: 1.6;
     }
     tr:last-child td { border-bottom: none; }
     td.num { font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
@@ -260,28 +261,28 @@
       border-radius: 8px; padding: 18px 22px;
     }
     .meta-card-label {
-      font-size: 9px; letter-spacing: 2px; color: #888888;
+      font-size: 9px; letter-spacing: 2px; color: #6E6E6E;
       margin-bottom: 12px; text-transform: uppercase;
     }
     .meta-card p { font-size: 11px; color: var(--ink-2); line-height: 1.8; margin-bottom: 10px; }
     .meta-card p:last-child { margin-bottom: 0; }
     .meta-card strong { color: var(--ink); font-weight: 700; }
     .meta-card code {
-      background: var(--surface-2); border: 1px solid #333333; border-radius: 3px;
+      background: var(--surface-2); border: 1px solid #DDDDDD; border-radius: 3px;
       padding: 1px 5px; font-size: 10px; color: var(--accent);
     }
     .caveat {
-      background: #201C10; border: 1px solid #4A3F1C; border-left: 3px solid var(--warning);
+      background: #FDF8E8; border: 1px solid #E8D9A8; border-left: 3px solid var(--warning);
       border-radius: 6px; padding: 14px 18px; margin-bottom: 22px;
     }
-    .caveat p { font-size: 11px; color: #D8CFB4; line-height: 1.8; }
+    .caveat p { font-size: 11px; color: #6B5E33; line-height: 1.8; }
     .caveat strong { color: var(--warning); }
 
     footer {
       margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--hairline);
-      font-size: 10px; color: #6A6A6A; line-height: 1.9;
+      font-size: 10px; color: #7A7A7A; line-height: 1.9;
     }
-    footer a { color: #8A8A8A; }
+    footer a { color: #777777; }
   </style>
 </head>
 <body>
@@ -615,11 +616,11 @@
 <script>
 // ═══ Theme constants — mirror the CSS custom properties ═══════════════
 const C = {
-  surface: '#1E1E1E', grid: '#2C2C2A', baseline: '#383835',
-  ink: '#FFFFFF', ink2: '#C0C0C0', muted: '#898781', accent: '#F5C542',
-  gold: '#C98500', blue: '#3987e5', orange: '#d95926', aqua: '#199e70',
-  pos: '#3987e5', neg: '#e66767',
-  good: '#0ca30c', warning: '#fab219', serious: '#ec835a', critical: '#d03b3b'
+  surface: '#FAFAFA', grid: '#E8E8E8', baseline: '#D5D5D5',
+  ink: '#1A1A1A', ink2: '#444444', muted: '#6E6E6E', accent: '#B8860B',
+  gold: '#A8730A', blue: '#2F72C4', orange: '#C2451A', aqua: '#12805A',
+  pos: '#2F72C4', neg: '#C9484A',
+  good: '#0B8A0B', warning: '#B57F0A', serious: '#C05A2B', critical: '#C42F2F'
 };
 
 const FONT = { family: "'JetBrains Mono', monospace", size: 10, color: C.muted };
@@ -632,13 +633,13 @@ function layout(over) {
     margin: { l: 56, r: 24, t: 52, b: 40 },
     hovermode: 'x unified',
     hoverlabel: {
-      bgcolor: '#141414', bordercolor: '#3A3A3A',
+      bgcolor: '#FFFFFF', bordercolor: '#D5D5D5',
       font: { family: "'JetBrains Mono', monospace", size: 11, color: C.ink }
     },
     xaxis: {
       gridcolor: C.grid, zeroline: false, linecolor: C.baseline,
       tickfont: FONT, showspikes: true, spikemode: 'across',
-      spikecolor: '#555555', spikethickness: 1, spikedash: 'dot'
+      spikecolor: '#AAAAAA', spikethickness: 1, spikedash: 'dot'
     },
     yaxis: { gridcolor: C.grid, zeroline: false, linecolor: C.baseline, tickfont: FONT },
     legend: {
@@ -663,7 +664,7 @@ function eventShapes(dates) {
   const lo = dates[0], hi = dates[dates.length - 1];
   return EVENTS.filter(e => e.date >= lo && e.date <= hi).map(e => ({
     type: 'line', x0: e.date, x1: e.date, yref: 'paper', y0: 0, y1: 1,
-    line: { color: '#4A4A4A', width: 1, dash: 'dot' }
+    line: { color: '#B8B8B8', width: 1, dash: 'dot' }
   }));
 }
 function eventNotes(dates) {
@@ -769,10 +770,10 @@ function drawB1(range) {
   Plotly.react('c1b', [
     { x, y: anchor.map(v => v === null ? null : Math.max(v, 0)), name: 'forward above spot',
       mode: 'lines', line: { color: C.pos, width: 0 }, fill: 'tozeroy',
-      fillcolor: 'rgba(57,135,229,0.35)', hoverinfo: 'skip' },
+      fillcolor: 'rgba(47,114,196,0.20)', hoverinfo: 'skip' },
     { x, y: anchor.map(v => v === null ? null : Math.min(v, 0)), name: 'shock (spot above forward)',
       mode: 'lines', line: { color: C.neg, width: 0 }, fill: 'tozeroy',
-      fillcolor: 'rgba(230,103,103,0.35)', hoverinfo: 'skip' },
+      fillcolor: 'rgba(201,72,74,0.20)', hoverinfo: 'skip' },
     { x, y: anchor, name: 'anchor spread', mode: 'lines',
       line: { color: C.ink2, width: 1.6 },
       hovertemplate: '%{y:.2f} pp<extra>anchor spread</extra>' }
@@ -803,7 +804,7 @@ function drawB2(range) {
   Plotly.react('c2a', [
     { x, y: b.composite.slice(i0), name: 'composite', mode: 'lines',
       line: { color: C.gold, width: 2.6 }, fill: 'tozeroy',
-      fillcolor: 'rgba(201,133,0,0.14)',
+      fillcolor: 'rgba(168,115,10,0.16)',
       customdata: b.n_components.slice(i0),
       hovertemplate: '%{y:.2f}&sigma; · %{customdata} of 5 components<extra>composite</extra>' }
   ], layout({
@@ -873,7 +874,7 @@ function drawB3(range) {
   Plotly.react('c3b', [
     { x, y: b.composite.slice(i0), name: 'composite', mode: 'lines',
       line: { color: C.gold, width: 2.6 }, fill: 'tozeroy',
-      fillcolor: 'rgba(201,133,0,0.14)',
+      fillcolor: 'rgba(168,115,10,0.16)',
       hovertemplate: '%{y:.2f}&sigma;<extra>composite</extra>' },
     { x, y: b.z_ndfa.slice(i0), name: 'offshore funding', mode: 'lines',
       line: { color: C.blue, width: 1.6 },
@@ -953,7 +954,7 @@ function drawB4(range) {
 
   Plotly.react('c4a', [
     { x: pts.map(p => p[0]), y: pts.map(p => p[1]), mode: 'lines',
-      name: 'path', line: { color: '#4A4A4A', width: 1.2 },
+      name: 'path', line: { color: '#B8B8B8', width: 1.2 },
       hoverinfo: 'skip', showlegend: false },
     { x: pts.map(p => p[0]), y: pts.map(p => p[1]), mode: 'markers',
       name: 'weekly', marker: { color: C.blue, size: 5, opacity: 0.55 },
