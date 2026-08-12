@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heat Map Corroboration — Acumen</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --page:        #FFFFFF;
+      --surface:     #FAFAFA;
+      --surface-2:   #F2F2F2;
+      --ink:         #1A1A1A;
+      --ink-2:       #444444;
+      --muted:       #6E6E6E;
+      --hairline:    #E5E5E5;
+      --accent:      #B8860B;
+      --accent-tint: #FBF3DC;
+      --pos:         #15803D;
+      --neg:         #C42F2F;
+    }
+
+    body {
+      background: var(--page);
+      color: var(--ink);
+      font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+      min-height: 100vh;
+    }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; color: #555555; text-decoration: none;
+      font-size: 12px; letter-spacing: 0.5px;
+      position: fixed; top: 12px; left: 16px; z-index: 100;
+      border: 1px solid #DDDDDD; border-radius: 6px; background: var(--surface-2);
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .back-link:hover { color: var(--accent); border-color: var(--accent); }
+
+    .page { max-width: 1500px; margin: 0 auto; padding: 60px 24px 48px; }
+    .header { margin-bottom: 24px; padding-top: 12px; }
+    .header-top {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px; margin-bottom: 6px;
+    }
+    .badge {
+      display: inline-block; padding: 3px 10px;
+      background: var(--accent-tint); color: var(--accent);
+      border: 1px solid var(--accent); border-radius: 4px;
+      font-size: 10px; letter-spacing: 1.5px; font-weight: 700;
+      vertical-align: middle; margin-left: 12px;
+    }
+    h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+    .subtitle {
+      font-size: 11px; color: var(--ink-2); letter-spacing: 0.3px;
+      margin-top: 8px; line-height: 1.7; max-width: 940px;
+    }
+    #status-bar { font-size: 11px; color: var(--ink-2); text-align: right; letter-spacing: 0.5px; }
+    #status-bar.error { color: var(--neg); }
+    #status-bar.loading { color: var(--accent); }
+
+    /* ── Panels ──────────────────────────────────────────────── */
+    .panel {
+      background: var(--surface); border: 1px solid var(--hairline);
+      border-radius: 10px; padding: 22px 24px; margin-bottom: 22px;
+    }
+    .panel-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 1.8px;
+      color: var(--accent); text-transform: uppercase; margin-bottom: 6px;
+    }
+    .panel-desc { font-size: 10px; color: var(--muted); letter-spacing: 0.3px; margin-bottom: 16px; line-height: 1.6; }
+
+    /* ── Legend ──────────────────────────────────────────────── */
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 22px;
+      padding: 12px 16px; margin-bottom: 16px;
+      background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 6px;
+    }
+    .legend-item { font-size: 9.5px; color: var(--ink-2); line-height: 1.6; }
+    .legend-item b { display: block; font-size: 9px; letter-spacing: 1.4px; color: var(--muted); text-transform: uppercase; margin-bottom: 3px; }
+    .swatches { display: inline-flex; gap: 3px; vertical-align: middle; margin-left: 6px; }
+    .sw { width: 15px; height: 10px; border-radius: 2px; border: 1px solid rgba(0,0,0,0.10); }
+
+    #treemap { width: 100%; height: 620px; }
+
+    /* ── Table ───────────────────────────────────────────────── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+    th {
+      text-align: right; color: var(--muted); font-weight: 600; font-size: 8.5px;
+      letter-spacing: 1.2px; text-transform: uppercase;
+      padding: 0 10px 9px 0; border-bottom: 1px solid var(--hairline); white-space: nowrap;
+    }
+    th:first-child, td:first-child { text-align: left; }
+    td {
+      padding: 8px 10px 8px 0; color: var(--ink-2);
+      border-bottom: 1px solid #EEEEEE; text-align: right;
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    td.name { color: var(--ink); font-weight: 500; }
+    tr.grp td {
+      color: var(--accent); font-size: 8.5px; letter-spacing: 1.6px;
+      text-transform: uppercase; font-weight: 700; padding-top: 14px; border-bottom: none;
+    }
+    .pos { color: var(--pos); }
+    .neg { color: var(--neg); }
+    .dim { color: #9A9A9A; }
+    .agree-cell { display: inline-flex; gap: 2px; }
+    .ad { width: 6px; height: 6px; border-radius: 1px; background: #D5D5D5; display: inline-block; }
+    .ad.on { background: var(--accent); }
+
+    footer {
+      margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--hairline);
+      font-size: 10px; color: #7A7A7A; line-height: 1.9;
+    }
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-link">&larr; Indicators</a>
+
+  <div class="page">
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <h1>Heat Map Corroboration<span class="badge">ALLOCATION</span></h1>
+          <p class="subtitle">
+            Where three independent frameworks &mdash; Dale's regime model, Snider's signal board
+            and Howell-style global liquidity &mdash; actually <strong>agree</strong> about
+            positioning capital. Tile size is the weight the readings
+            jointly justify; colour is direction; colour <em>intensity</em> is corroboration. A large
+            pale tile is the warning case: the arithmetic says size it, but the frameworks are fighting.
+          </p>
+        </div>
+        <div id="status-bar" class="loading">Loading&hellip;</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Corroboration heat map</div>
+      <div class="panel-desc">
+        Grouped by asset family. Area is normalised so all tiles sum to 100% of a notional risk budget.
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <b>Size</b>Justified weight, % of book
+        </div>
+        <div class="legend-item">
+          <b>Colour</b>Favour / avoid
+          <span class="swatches">
+            <span class="sw" style="background:#C42F2F"></span>
+            <span class="sw" style="background:#E8E8E8"></span>
+            <span class="sw" style="background:#15803D"></span>
+          </span>
+        </div>
+        <div class="legend-item">
+          <b>Intensity</b>How many frameworks agree
+          <span class="swatches">
+            <span class="sw" style="background:rgba(21,128,61,0.22)"></span>
+            <span class="sw" style="background:rgba(21,128,61,0.48)"></span>
+            <span class="sw" style="background:rgba(21,128,61,0.80)"></span>
+          </span>
+        </div>
+      </div>
+
+      <div id="treemap"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Vote detail</div>
+      <div class="panel-desc">
+        Each framework's score for every class, on a &minus;1 to +1 scale, with the corroboration count
+        and the resulting weight. Blank means the framework has no view on that class.
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset class</th><th>Snider</th><th>Dale</th><th>Liquidity</th>
+              <th>Bitcoin</th><th>Net</th><th>Agree</th><th>Weight</th>
+            </tr>
+          </thead>
+          <tbody id="votes"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>
+      <p id="foot-updated">&mdash;</p>
+      <p>Regime and signal-board readings are fetched live; liquidity and the bitcoin thrust are
+         baked at build time and refresh with their source pages.</p>
+      <p><strong>Not investment advice, and not a portfolio.</strong> These are framework-consistent
+         positioning weights against a notional book, blind to tax, sizing, liquidity needs and
+         everything already held.</p>
+    </footer>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// BAKED INPUTS — refreshed alongside their source pages
+// ═══════════════════════════════════════════════════════════════
+// @@BAKED_DATA_START@@
+const BAKED = {
+  as_of: "2026-08-12",
+  acumen:  { z: -0.69, proj_z: -0.69, as_of: "2026-08-11" },
+  btcliq:  { roc13w: 0.0101, thrust_threshold: 0.0373, gap: -0.57,
+             tier: "active", as_of: "2026-08-11" },
+  // Fallbacks used only if the live fetches fail
+  snider:  { growth: 0.0487, inflation: 0.1812, conviction: 0.2874, agreement: 0.5,
+             quadrant: "INFLATIONARY BOOM", as_of: "2026-08-11" },
+  dale:    { growth: -0.22, inflation: 2.51, signal_strength: 37, risk_on_prob: 64,
+             regime: "INFLATION", market_regime: "REFLATION", as_of: "2026-07-01" }
+};
+// @@BAKED_DATA_END@@
+
+// ═══════════════════════════════════════════════════════════════
+// ASSET UNIVERSE
+//   base : neutral weight before any signal is applied (normalised later)
+//   g/i  : growth and inflation sensitivity, -1 to +1
+//   liq  : global-liquidity sensitivity
+//   node : legacy Capital Flows grouping, retained for reference only — not scored
+// ═══════════════════════════════════════════════════════════════
+const GROUPS = ['Cash & duration', 'Credit', 'US equities', 'International',
+                'Commodities', 'Real assets', 'Digital', 'Currency'];
+
+const CLASSES = [
+  { id:'bills',  label:'Cash / T-Bills',      grp:'Cash & duration', base: 9,   g:-0.30, i:-0.40, liq:-0.30, node:'Fixed Income' },
+  { id:'tsy_i',  label:'Treasurys 3-7y',      grp:'Cash & duration', base: 7,   g:-0.50, i:-0.50, liq:-0.10, node:'Fixed Income' },
+  { id:'tsy_l',  label:'Treasurys 20y+',      grp:'Cash & duration', base: 5,   g:-0.80, i:-0.80, liq:-0.20, node:'Fixed Income' },
+  { id:'tips',   label:'TIPS',                grp:'Cash & duration', base: 5,   g:-0.20, i: 0.70, liq: 0.00, node:'Fixed Income' },
+
+  { id:'hy',     label:'High Yield',          grp:'Credit', base: 4,   g: 0.70, i: 0.10, liq: 0.60, node:null },
+  { id:'ig',     label:'Investment Grade',    grp:'Credit', base: 5,   g:-0.10, i:-0.45, liq: 0.20, node:null },
+
+  { id:'tech',   label:'Technology',          grp:'US equities', base: 8,   g: 0.80, i:-0.40, liq: 0.70, node:'Speculation' },
+  { id:'fin',    label:'Financials',          grp:'US equities', base: 5,   g: 0.70, i: 0.20, liq: 0.30, node:'Cyclical' },
+  { id:'hlth',   label:'Healthcare',          grp:'US equities', base: 4.5, g:-0.30, i: 0.00, liq:-0.10, node:'Defensive' },
+  { id:'cyc',    label:'Consumer Cyclical',   grp:'US equities', base: 4,   g: 0.90, i:-0.30, liq: 0.50, node:'Cyclical' },
+  { id:'comm',   label:'Communication Svcs',  grp:'US equities', base: 3.5, g: 0.60, i:-0.30, liq: 0.50, node:'Speculation' },
+  { id:'ind',    label:'Industrials',         grp:'US equities', base: 4,   g: 0.80, i: 0.20, liq: 0.30, node:'Cyclical' },
+  { id:'def',    label:'Consumer Defensive',  grp:'US equities', base: 3.5, g:-0.40, i: 0.20, liq:-0.10, node:'Defensive' },
+  { id:'engy',   label:'Energy',              grp:'US equities', base: 3,   g: 0.40, i: 0.90, liq: 0.20, node:'Commodities' },
+  { id:'util',   label:'Utilities',           grp:'US equities', base: 2,   g:-0.40, i:-0.10, liq:-0.20, node:'Defensive' },
+  { id:'mat',    label:'Basic Materials',     grp:'US equities', base: 1.5, g: 0.60, i: 0.60, liq: 0.30, node:'Commodities' },
+  { id:'reit',   label:'Real Estate (listed)',grp:'US equities', base: 1.5, g: 0.30, i: 0.30, liq: 0.60, node:'Defensive' },
+
+  { id:'intl',   label:'Intl Developed',      grp:'International', base: 6, g: 0.60, i: 0.10, liq: 0.50, node:'Cyclical' },
+  { id:'em',     label:'Emerging Markets',    grp:'International', base: 4, g: 0.80, i: 0.20, liq: 0.90, node:'Cyclical' },
+
+  // The commodity complex proper, distinct from the Energy equity sector above:
+  // industrial vs agricultural is the pair that flips between reflation and
+  // stagflation in the regime models, so they are split rather than blended.
+  { id:'cmdty',  label:'Commodities Broad',   grp:'Commodities', base: 3,   g: 0.50, i: 0.90, liq: 0.30, node:'Commodities' },
+  { id:'indmet', label:'Industrial Metals',   grp:'Commodities', base: 2.5, g: 0.80, i: 0.70, liq: 0.40, node:'Commodities' },
+  { id:'agri',   label:'Agriculture',         grp:'Commodities', base: 2.5, g: 0.10, i: 0.80, liq: 0.10, node:'Commodities' },
+
+  { id:'land',   label:'Land / Farmland',     grp:'Real assets', base: 5,   g: 0.00, i: 0.80, liq: 0.10, node:'Commodities' },
+  { id:'metals', label:'Precious Metals',     grp:'Real assets', base: 6,   g:-0.20, i: 0.70, liq: 0.50, node:'Debasement' },
+
+  { id:'btc',    label:'Bitcoin',             grp:'Digital', base: 4,       g: 0.50, i: 0.40, liq: 1.00, node:'Debasement' },
+
+  { id:'usd',    label:'US Dollar',           grp:'Currency', base: 4,      g:-0.10, i:-0.20, liq:-0.70, node:'Fixed Income' }
+];
+
+// ═══════════════════════════════════════════════════════════════
+// SCORING
+// ═══════════════════════════════════════════════════════════════
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const tanh  = x => Math.tanh(x);
+const ABSTAIN = 0.05;   // |score| below this is treated as "no view", not a neutral vote
+
+// Framework priors. Capital Flows was removed after attribution testing: it was
+// the only input that lost to the neutral book in BOTH halves of a 2016-2026
+// backtest, and in the 2016-21 half it carried materially worse risk (17.9% vol
+// and -19.0% drawdown against 12.6% and -12.2% for doing nothing). The remaining
+// three carry the vote; the bitcoin thrust still acts on its one tile.
+const PRIOR = { snider: 0.35, dale: 0.35, liq: 0.30, btc: 0.20 };
+
+let LIVE = { snider: null, dale: null };
+
+function readings() {
+  const sn = LIVE.snider || BAKED.snider;
+  const dl = LIVE.dale   || BAKED.dale;
+  return { sn, dl, ac: BAKED.acumen, bl: BAKED.btcliq };
+}
+
+function scoreClass(c, R) {
+  const out = {};
+
+  // Snider — growth/inflation coordinates, damped by its own conviction
+  out.snider = {
+    v: tanh(1.8 * (c.g * R.sn.growth + c.i * R.sn.inflation)),
+    w: clamp(R.sn.conviction, 0, 1)
+  };
+
+  // Dale — same sensitivity model, its own coordinates, damped by signal strength
+  const dg = clamp(R.dl.growth / 2.5, -1, 1);
+  const di = clamp(R.dl.inflation / 2.5, -1, 1);
+  out.dale = {
+    v: tanh(1.4 * (c.g * dg + c.i * di)),
+    w: clamp(R.dl.signal_strength / 100, 0, 1)
+  };
+
+  // Howell-style global liquidity — acts through the liquidity beta only
+  const lz = (R.ac.z + R.ac.proj_z) / 2;
+  out.liq = {
+    v: tanh(1.1 * c.liq * lz),
+    w: clamp(Math.abs(lz) / 1.5, 0, 1)
+  };
+
+  // Bitcoin liquidity thrust — bitcoin tile only
+  if (c.id === 'btc') {
+    const b = R.bl;
+    let v;
+    if (b.roc13w >= b.thrust_threshold)      v =  0.85;   // thrust live
+    else if (b.tier === 'active')            v =  0.30;   // cheap + rising
+    else if (b.roc13w > 0)                   v =  0.12;   // rising, no edge
+    else                                     v = -0.45;   // contracting
+    out.btc = { v, w: 0.75 };
+  } else {
+    out.btc = null;
+  }
+
+  // Net: confidence-weighted mean over frameworks that actually hold a view
+  let num = 0, den = 0, possible = 0;
+  const voters = [];
+  for (const k of ['snider', 'dale', 'liq', 'btc']) {
+    const s = out[k];
+    if (!s) continue;                       // framework has no channel to this class
+    possible++;
+    if (Math.abs(s.v) < ABSTAIN || s.w <= 0) continue;   // abstains: no view, not a neutral vote
+    const w = s.w * PRIOR[k];
+    num += s.v * w; den += w;
+    voters.push(s.v);
+  }
+  const net = den ? num / den : 0;
+
+  // Agreement: share of voting frameworks whose sign matches the net
+  const nAgree = voters.filter(v => Math.sign(v) === Math.sign(net)).length;
+  const agree = voters.length ? nAgree / voters.length : 0;
+
+  // Corroboration drives colour intensity and weight. Agreement alone would let
+  // two frameworks agreeing while two abstain look as settled as four agreeing,
+  // so it is discounted by coverage. Abstention is not disagreement, hence the
+  // square root rather than a straight ratio.
+  const coverage = possible ? Math.sqrt(voters.length / possible) : 0;
+  const corrob = agree * coverage;
+
+  return { ...out, net, agree, corrob, nAgree, voters: voters.length, possible };
+}
+
+function build() {
+  const R = readings();
+  const rows = CLASSES.map(c => ({ c, s: scoreClass(c, R) }));
+
+  // Weight: neutral base moved by net score AND agreement together
+  rows.forEach(r => {
+    const adj = 1 + 0.9 * r.s.net * r.s.corrob;
+    r.raw = Math.max(r.c.base * 0.20, r.c.base * adj);
+  });
+  const tot = rows.reduce((a, r) => a + r.raw, 0);
+  rows.forEach(r => r.wt = 100 * r.raw / tot);
+
+  renderTreemap(rows);
+  renderVotes(rows);
+
+  const stale = [R.ac.as_of, R.bl.as_of].sort()[0];
+  document.getElementById('foot-updated').textContent =
+    `Regime ${R.dl.as_of} · signal board ${R.sn.as_of} · baked inputs from ${stale}`;
+}
+
+// ── Colour: hue from direction, alpha from corroboration ────────
+function tileColor(net, corrob) {
+  const a = 0.14 + 0.66 * corrob * Math.min(1, Math.abs(net) / 0.45);
+  if (net >  0.06) return `rgba(21,128,61,${a.toFixed(3)})`;
+  if (net < -0.06) return `rgba(196,47,47,${a.toFixed(3)})`;
+  return `rgba(150,150,150,${(0.10 + 0.18 * corrob).toFixed(3)})`;
+}
+
+function renderTreemap(rows) {
+  const labels = [], parents = [], values = [], colors = [], custom = [];
+
+  GROUPS.forEach(g => {
+    const kids = rows.filter(r => r.c.grp === g);
+    if (!kids.length) return;
+    const sum = kids.reduce((a, r) => a + r.wt, 0);
+    labels.push(g); parents.push(''); values.push(0);
+    colors.push('rgba(0,0,0,0)');
+    custom.push([`${sum.toFixed(1)}% of book`, '', '']);
+  });
+
+  rows.forEach(r => {
+    labels.push(r.c.label);
+    parents.push(r.c.grp);
+    values.push(r.wt);
+    colors.push(tileColor(r.s.net, r.s.corrob));
+    custom.push([
+      `${r.wt.toFixed(1)}% of book`,
+      `net ${r.s.net >= 0 ? '+' : ''}${r.s.net.toFixed(2)}`,
+      `${r.s.voters} of ${r.s.possible} held a view · ${r.s.nAgree} agree`
+    ]);
+  });
+
+  const data = [{
+    type: 'treemap',
+    branchvalues: 'remainder',
+    labels, parents, values,
+    customdata: custom,
+    marker: { colors, line: { width: 1.5, color: '#FFFFFF' } },
+    tiling: { packing: 'squarify', pad: 2 },
+    texttemplate: '<b>%{label}</b><br>%{value:.1f}%',
+    textposition: 'middle center',
+    textfont: { family: "'JetBrains Mono', monospace", size: 11, color: '#1A1A1A' },
+    hovertemplate:
+      '<b>%{label}</b><br>%{customdata[0]}<br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>',
+    pathbar: { visible: false }
+  }];
+
+  Plotly.newPlot('treemap', data, {
+    margin: { l: 0, r: 0, t: 0, b: 0 },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: "'JetBrains Mono', monospace", color: '#1A1A1A' },
+    hoverlabel: {
+      bgcolor: '#FFFFFF', bordercolor: '#D5D5D5',
+      font: { family: "'JetBrains Mono', monospace", size: 11, color: '#1A1A1A' }
+    }
+  }, { responsive: true, displayModeBar: false });
+}
+
+function cell(s) {
+  if (!s || Math.abs(s.v) < ABSTAIN) return '<td class="dim">&middot;</td>';
+  const cls = s.v > 0 ? 'pos' : 'neg';
+  return `<td class="${cls}">${s.v >= 0 ? '+' : ''}${s.v.toFixed(2)}</td>`;
+}
+
+function renderVotes(rows) {
+  let html = '';
+  GROUPS.forEach(g => {
+    const kids = rows.filter(r => r.c.grp === g);
+    if (!kids.length) return;
+    html += `<tr class="grp"><td colspan="8">${g}</td></tr>`;
+    kids.sort((a, b) => b.wt - a.wt).forEach(r => {
+      const s = r.s;
+      const dots = Array.from({ length: s.possible },
+        (_, i) => `<span class="ad ${i < s.nAgree ? 'on' : ''}"></span>`).join('');
+      const netCls = Math.abs(s.net) < 0.06 ? 'dim' : (s.net > 0 ? 'pos' : 'neg');
+      html += `<tr>
+        <td class="name">${r.c.label}</td>
+        ${cell(s.snider)}${cell(s.dale)}${cell(s.liq)}${cell(s.btc)}
+        <td class="${netCls}">${s.net >= 0 ? '+' : ''}${s.net.toFixed(2)}</td>
+        <td><span class="agree-cell">${dots}</span></td>
+        <td><b>${r.wt.toFixed(1)}%</b></td>
+      </tr>`;
+    });
+  });
+  document.getElementById('votes').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD — two inputs are live, the rest are baked
+// ═══════════════════════════════════════════════════════════════
+async function load() {
+  const bar = document.getElementById('status-bar');
+  const results = await Promise.allSettled([
+    fetch('snider_data.json').then(r => r.ok ? r.json() : Promise.reject(r.status)),
+    fetch('regime_data.json').then(r => r.ok ? r.json() : Promise.reject(r.status))
+  ]);
+
+  if (results[0].status === 'fulfilled') {
+    const d = results[0].value, b4 = d.board4;
+    LIVE.snider = {
+      growth: b4.current.growth, inflation: b4.current.inflation,
+      conviction: b4.conviction, agreement: b4.agreement,
+      quadrant: b4.quadrant, as_of: d.as_of
+    };
+  }
+  if (results[1].status === 'fulfilled') {
+    const d = results[1].value;
+    LIVE.dale = {
+      growth: d.growth.score, inflation: d.inflation.score,
+      signal_strength: d.signal_strength, risk_on_prob: d.risk_on_prob,
+      regime: d.regime, market_regime: d.market_regime, as_of: d.as_of
+    };
+  }
+
+  const nLive = (LIVE.snider ? 1 : 0) + (LIVE.dale ? 1 : 0);
+  bar.className = nLive === 2 ? '' : 'error';
+  bar.textContent = nLive === 2
+    ? `Live · ${BAKED.as_of}`
+    : `${2 - nLive} live feed(s) unavailable — using baked values`;
+
+  build();
+}
+
+load();
+</script>
+</body>
+</html>

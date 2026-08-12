@@ -38,3 +38,4 @@ archive/
 *.log
 bake_btc_log.txt
 update_log.txt
+.backtest_cache.json
