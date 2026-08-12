@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strategy Trigger Board — Acumen</title>
+<style>
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --page:      #121212;
+    --card:      #1E1E1E;
+    --surface-2: #242424;
+    --hairline:  #2A2A2A;
+    --ink:       #FFFFFF;
+    --ink-2:     #AAAAAA;
+    --muted:     #8A8A8A;
+    --accent:    #F5C542;
+    /* Status scale — reserved meaning, never used for anything else on this page.
+       Every status is rendered as glyph + word, so colour is never load-bearing. */
+    --st-live:   #4ADE80;
+    --st-form:   #F5C542;
+    --st-off:    #AAAAAA;
+  }
+
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    padding: 40px 24px 60px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1000px; margin: 0 auto; }
+
+  .back {
+    display: inline-block; margin-bottom: 22px; padding: 7px 13px;
+    color: var(--ink-2); text-decoration: none; font-size: 12.5px;
+    border: 1px solid var(--hairline); border-radius: 6px; background: var(--card);
+    transition: color .2s, border-color .2s;
+  }
+  .back:hover { color: var(--accent); border-color: var(--accent); }
+
+  header { padding-bottom: 24px; margin-bottom: 26px; border-bottom: 1px solid var(--hairline); }
+  h1 { font-size: 1.5em; font-weight: 600; letter-spacing: .2px; }
+  .sub { color: var(--ink-2); font-size: .88em; margin-top: 8px; max-width: 640px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; }
+
+  .strat {
+    background: var(--card); border: 1px solid var(--hairline);
+    border-radius: 12px; padding: 22px 24px 18px;
+  }
+
+  .strat-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: .68em; font-weight: 700; letter-spacing: 1.3px;
+    padding: 4px 10px; border-radius: 4px; white-space: nowrap;
+    border: 1px solid currentColor;
+  }
+  .pill .glyph { font-size: 1.15em; line-height: 1; }
+  .st-live { color: var(--st-live); }
+  .st-form { color: var(--st-form); }
+  .st-off  { color: var(--st-off);  }
+
+  .meta { font-size: .72em; color: var(--muted); letter-spacing: .4px; text-align: right; }
+
+  .strat h2 { font-size: 1.02em; font-weight: 600; margin-bottom: 16px; }
+  .strat h2 .num { color: var(--muted); font-weight: 400; margin-right: 7px; }
+
+  dl { display: grid; grid-template-columns: 74px 1fr; gap: 9px 14px; font-size: .84em; }
+  dt { color: var(--muted); font-size: .92em; letter-spacing: .3px; padding-top: 1px; }
+  dd { color: var(--ink-2); }
+
+  .reading { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .reading .val { font-size: 1.5em; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .reading .gap { font-size: .82em; color: var(--muted); }
+
+  dd.action { color: var(--ink); }
+
+  .viz { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+  .viz figcaption {
+    font-size: .8em; color: var(--muted); letter-spacing: .4px;
+    margin-bottom: 12px; line-height: 1.5;
+  }
+  .viz svg { display: block; overflow: visible; }
+  .viz text { font-family: inherit; }
+
+  footer {
+    margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--hairline);
+    font-size: .75em; color: #666666; line-height: 1.85;
+  }
+
+  @media (max-width: 560px) {
+    body { padding: 28px 16px 48px; }
+    dl { grid-template-columns: 68px 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <a href="../../index.html" class="back">&larr; Dashboard</a>
+
+  <header>
+    <h1>Strategy Trigger Board</h1>
+    <p class="sub">
+      Each strategy's entry condition, its current reading, and whether that condition
+      is met. A trigger is a condition, not a recommendation.
+    </p>
+  </header>
+
+  <div class="grid" id="board"></div>
+
+  <footer>
+    <p id="asof">&mdash;</p>
+    <p>Both readings are baked and refresh with their source pages.
+       Money supply is published only through <span id="m2through">&mdash;</span>, so recent liquidity growth is
+       driven largely by the dollar index.</p>
+    <p><b>Not investment advice.</b> Both triggers rest on small samples &mdash; 14 and 11 independent episodes respectively.</p>
+  </footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// BAKED INPUTS — refreshed alongside their source pages
+// ═══════════════════════════════════════════════════════════════════
+// @@BAKED_DATA_START@@
+// btcliq.log_gap is log(btc / model) — NOT a percentage. The tier thresholds
+// below are in the same log units; only the display is converted.
+// roc13w recomputed from the BTC page's own weekly grid (M2 forward-filled onto
+// the dollar-index dates), which is where the signal-tier logic reads it from.
+// Both inputs are baked. The liquidity page inlines its own payload rather than
+// shipping acumen_liquidity_baked.js, so reading that file would work locally and
+// 404 in production — the two values used here are copied in instead.
+const BAKED = {
+  as_of: "2026-08-14",
+  acumen: {
+    z:     -0.69,              // meta.latest_lqi_z
+    as_of: "2026-08-11"        // meta.last_equity_date
+  },
+  btcliq: {
+    roc13w:  -0.0013,
+    thrust:   0.0373,
+    log_gap: -0.51,
+    as_of:   "2026-08-14",
+    m2_through: "2026-06-05"   // M2 held flat after this date — see the caveat note
+  }
+};
+// @@BAKED_DATA_END@@
+
+// Forward 200-day return of the US equity basket, bucketed by the liquidity
+// z-score at the signal date. From the walk-forward test, 2015-2026.
+// Ordinal buckets: the order is the variable, so they take a one-hue ramp.
+const Z_BUCKETS = {
+  unconditional: 7.9,
+  rows: [
+    { label: "z ≤ −1.0",  ret: -4.5, win: 39,  lo: -99,  hi: -1.0 },
+    { label: "−1.0 to −0.3", ret:  6.0, win: 69,  lo: -1.0, hi: -0.3 },
+    { label: "−0.3 to +0.3", ret:  8.8, win: 88,  lo: -0.3, hi:  0.3 },
+    { label: "+0.3 to +1.0", ret: 10.3, win: 98,  lo:  0.3, hi:  1.0 },
+    { label: "z > +1.0",  ret: 16.4, win: 100, lo:  1.0, hi:  99 }
+  ]
+};
+
+
+// ═══════════════════════════════════════════════════════════════════
+// VISUALS — inline SVG, no libraries. Each returns a string; a strategy
+// that supplies one via read().viz gets it rendered under the readings.
+// ═══════════════════════════════════════════════════════════════════
+
+// Ordinal one-hue ramp, dim -> bright with the bucket order. Validated for
+// lightness monotonicity, adjacent step gap and surface contrast on #1E1E1E.
+const RAMP = ["#6B5620", "#8A6E22", "#B8912C", "#DCB33A", "#F5C542"];
+
+/** Bar with rounded corners on the DATA end only, square against the baseline. */
+function barPath(x0, x1, y, h, r = 4) {
+  const dir = x1 >= x0 ? 1 : -1;
+  const rr = Math.min(r, Math.abs(x1 - x0));
+  const e = x1 - dir * rr;
+  return `M${x0},${y} L${e},${y} Q${x1},${y} ${x1},${y + rr} `
+       + `L${x1},${y + h - rr} Q${x1},${y + h} ${e},${y + h} L${x0},${y + h} Z`;
+}
+
+/** Strategy 1 — forward 200d return by liquidity z-bucket, current bucket flagged. */
+function zBucketSVG(zNow) {
+  const W = 460, PAD_L = 116, PAD_R = 10, ROW = 34, TOP = 32;
+  const D0 = -8, D1 = 19;                                  // value domain, %
+  const x = v => PAD_L + 8 + ((v - D0) / (D1 - D0)) * (W - PAD_L - PAD_R - 8);
+  const H = TOP + Z_BUCKETS.rows.length * ROW + 18;
+  const zeroX = x(0), refX = x(Z_BUCKETS.unconditional);
+
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" `
+        + `aria-label="Forward 200-day equity return by liquidity z-score bucket">`;
+
+  // reference: unconditional average
+  s += `<line x1="${refX}" x2="${refX}" y1="${TOP - 10}" y2="${H - 14}" `
+     + `stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>`
+     + `<text x="${refX}" y="${TOP - 16}" text-anchor="middle" font-size="12" `
+     + `fill="var(--muted)">avg +${Z_BUCKETS.unconditional}%</text>`;
+
+  Z_BUCKETS.rows.forEach((r, i) => {
+    const y = TOP + i * ROW, h = 20, bx = x(r.ret);
+    const isNow = zNow > r.lo && zNow <= r.hi;
+    const ty = y + 15;
+
+    if (isNow) {
+      s += `<rect x="0" y="${y - 6}" width="${W}" height="${h + 12}" rx="5" `
+         + `fill="var(--accent)" opacity="0.07"/>`;
+    }
+    s += `<text x="${PAD_L}" y="${ty}" text-anchor="end" font-size="13" `
+       + `fill="${isNow ? "var(--ink)" : "var(--ink-2)"}">${r.label}</text>`;
+    s += `<path d="${barPath(zeroX, bx, y, h)}" fill="${RAMP[i]}">`
+       + `<title>${r.label}: mean ${r.ret > 0 ? "+" : "−"}${Math.abs(r.ret).toFixed(1)}% `
+       + `over the next 200 days, ${r.win}% of the time positive</title></path>`;
+
+    const lx = bx + (r.ret >= 0 ? 8 : -8);
+    s += `<text x="${lx}" y="${ty}" text-anchor="${r.ret >= 0 ? "start" : "end"}" `
+       + `font-size="13" font-weight="600" fill="${isNow ? "var(--accent)" : "var(--ink-2)"}">`
+       + `${r.ret > 0 ? "+" : "−"}${Math.abs(r.ret).toFixed(1)}%</text>`;
+    if (isNow) {
+      s += `<text x="${W - PAD_R}" y="${ty}" text-anchor="end" font-size="11" `
+         + `fill="var(--accent)" letter-spacing="1">NOW</text>`;
+    }
+  });
+
+  // zero baseline drawn last so it sits above the fills
+  s += `<line x1="${zeroX}" x2="${zeroX}" y1="${TOP - 10}" y2="${H - 14}" `
+     + `stroke="var(--hairline)" stroke-width="1.5"/>`;
+  return s + `</svg>`;
+}
+
+/** Strategy 2 — where the valuation sits against the excluded band. */
+function gapStripSVG(logGap, linGap) {
+  const W = 460, H = 96, X0 = 14, X1 = W - 14;
+  const D0 = -0.85, D1 = 0.5;                              // log-gap domain
+  const x = v => X0 + ((Math.max(D0, Math.min(D1, v)) - D0) / (D1 - D0)) * (X1 - X0);
+  const yT = 44, hT = 15;
+  const bandA = x(0.10), bandB = x(0.30), atModel = x(0), cur = x(logGap);
+  const pc = v => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(0)}%`;
+
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" `
+        + `aria-label="Bitcoin valuation against the excluded overvaluation band">`;
+
+  s += `<rect x="${X0}" y="${yT}" width="${X1 - X0}" height="${hT}" rx="7" fill="var(--surface-2)"/>`;
+  s += `<rect x="${bandA}" y="${yT}" width="${bandB - bandA}" height="${hT}" `
+     + `fill="#F87171" opacity="0.30"/>`
+     + `<rect x="${bandA}" y="${yT}" width="${bandB - bandA}" height="${hT}" `
+     + `fill="none" stroke="#F87171" stroke-width="1" opacity="0.75"/>`;
+  s += `<text x="${(bandA + bandB) / 2}" y="${yT - 9}" text-anchor="middle" font-size="11" `
+     + `fill="#F87171" letter-spacing=".6">EXCLUDED</text>`;
+
+  s += `<line x1="${atModel}" x2="${atModel}" y1="${yT - 4}" y2="${yT + hT + 4}" `
+     + `stroke="var(--muted)" stroke-width="1"/>`
+     + `<text x="${atModel}" y="${yT + hT + 19}" text-anchor="middle" font-size="11" `
+     + `fill="var(--muted)">at model</text>`;
+
+  // current position: ring + stem, on the good end of the scale
+  s += `<line x1="${cur}" x2="${cur}" y1="${yT - 8}" y2="${yT + hT + 8}" `
+     + `stroke="var(--st-live)" stroke-width="2"/>`
+     + `<circle cx="${cur}" cy="${yT + hT / 2}" r="7" fill="var(--st-live)" `
+     + `stroke="var(--card)" stroke-width="2"/>`;
+  s += `<text x="${cur}" y="${yT - 16}" text-anchor="middle" font-size="13" `
+     + `font-weight="600" fill="var(--st-live)">${pc(linGap)} vs model</text>`;
+  s += `<text x="${X0}" y="${H - 5}" font-size="11" fill="var(--muted)">cheap</text>`
+     + `<text x="${X1}" y="${H - 5}" text-anchor="end" font-size="11" fill="var(--muted)">expensive</text>`;
+  return s + `</svg>`;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// STRATEGIES
+//
+// To add one, append an object to this array. Nothing else changes.
+//   name, horizon, instrument, trigger : display strings
+//   evidence                           : honest note on how well tested it is
+//   vizCaption                         : caption above the visual, if read() returns one
+//   read()                             : returns the live assessment —
+//        status  'live' | 'forming' | 'off'
+//        val     the headline number, already formatted
+//        gap     distance to the trigger, or '' if met
+//        action  what the reading implies, one line
+//        asOf    date of the underlying reading
+//        viz     optional SVG string rendered beneath the readings
+// ═══════════════════════════════════════════════════════════════════
+const STRATEGIES = [
+  {
+    name: "Liquidity Gate",
+    horizon: "Long hold",
+    instrument: "Broad equity beta",
+    trigger: "Acumen liquidity z > −0.5",
+    vizCaption: "Mean forward 200-day equity return, by liquidity z at the signal date",
+    read() {
+      const GATE = -0.5;
+      const z = BAKED.acumen.z;
+      const open = z > GATE;
+      return {
+        status: open ? "live" : "off",
+        val:    z.toFixed(2),
+        gap:    open ? "gate open" : `needs +${(GATE - z).toFixed(2)} to re-arm`,
+        action: open ? "Hold equity exposure." : "Equity exposure reduced.",
+        asOf:   BAKED.acumen.as_of,
+        viz:    zBucketSVG(z)
+      };
+    }
+  },
+  {
+    name: "Bitcoin Liquidity Thrust",
+    horizon: "8–13 weeks",
+    instrument: "Dated calls or a time-stopped spot position",
+    trigger: "13-week global liquidity growth > +3.73%",
+    vizCaption: "Valuation against the excluded band — log(price ÷ model)",
+    read() {
+      const { roc13w, thrust, log_gap } = BAKED.btcliq;
+      const pct = (v, dp = 2) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(dp)}%`;
+      // log(btc/model) -> the plain percentage a reader expects
+      const linGap = Math.exp(log_gap) - 1;
+      const excluded = log_gap >= 0.10 && log_gap < 0.30;
+      let status, action;
+      if (excluded) {
+        status = "off";
+        action = "Excluded — bitcoin is inside the overvaluation band.";
+      } else if (roc13w >= thrust) {
+        status = "live";
+        action = "Thrust live. Buy dated exposure; size to lose the premium.";
+      } else if (roc13w > 0) {
+        status = "forming";
+        action = `Rising but below the thrust. Valuation ${pct(linGap, 0)} vs model.`;
+      } else {
+        status = "off";
+        action = "Liquidity contracting — no tested edge. Trigger is growth crossing back above zero.";
+      }
+      return {
+        status,
+        val:  pct(roc13w),
+        gap:  roc13w >= thrust ? "threshold met"
+              : `needs +${((thrust - roc13w) * 100).toFixed(2)}pp`,
+        asOf: BAKED.btcliq.as_of,
+        action,
+        viz:  gapStripSVG(log_gap, linGap)
+      };
+    }
+  }
+];
+
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════
+// Status is always glyph + word, so the colour is reinforcement and never the
+// only thing carrying the state.
+const STATUS = {
+  live:    { cls: "st-live", glyph: "●", label: "LIVE"     },
+  forming: { cls: "st-form", glyph: "◐", label: "FORMING"  },
+  off:     { cls: "st-off",  glyph: "○", label: "NOT LIVE" }
+};
+
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function render() {
+  const board = document.getElementById("board");
+  const dates = [];
+
+  board.innerHTML = STRATEGIES.map((s, i) => {
+    const r = s.read();
+    const st = STATUS[r.status];
+    if (r.asOf) dates.push(r.asOf);
+
+    return `<section class="strat">
+      <div class="strat-top">
+        <span class="pill ${st.cls}"><span class="glyph">${st.glyph}</span>${st.label}</span>
+        <span class="meta">${esc(s.horizon)}<br>${esc(s.instrument)}</span>
+      </div>
+
+      <h2><span class="num">${i + 1}</span>${esc(s.name)}</h2>
+
+      <dl>
+        <dt>Trigger</dt><dd>${esc(s.trigger)}</dd>
+        <dt>Now</dt>
+        <dd class="reading">
+          <span class="val">${esc(r.val)}</span>
+          <span class="gap">${esc(r.gap)}</span>
+        </dd>
+        <dt>Implies</dt><dd class="action">${esc(r.action)}</dd>
+      </dl>
+
+      ${r.viz ? `<figure class="viz">
+        <figcaption>${esc(s.vizCaption)}</figcaption>
+        ${r.viz}
+      </figure>` : ""}
+    </section>`;
+  }).join("");
+
+  const stale = dates.sort()[0] || BAKED.as_of;
+  document.getElementById("asof").textContent = `Readings as of ${stale}.`;
+  document.getElementById("m2through").textContent = BAKED.btcliq.m2_through;
+}
+
+render();
+</script>
+</body>
+</html>
