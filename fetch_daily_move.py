@@ -11,13 +11,15 @@ Sources (all free, no registration beyond the shared FRED key):
   1. Yahoo ^GSPC    — S&P 500 daily closes since Dec 1927, % change
   2. LBMA gold PM   — gold fix USD/oz since 1968; trimmed to Aug 1971
                       (the end of the fixed $35 gold window), % change.
-                      The fix publishes with a ~1-day lag, so the CURRENT
-                      move comes from COMEX futures (Yahoo GC=F) whenever
-                      futures have a fresher date than the fix.
+                      The fix is a single 3pm London auction print, so a
+                      fix-to-fix change is not the close-to-close change any
+                      gold chart shows. The CURRENT move therefore comes from
+                      COMEX futures (Yahoo GC=F) whenever those are at least
+                      as fresh as the fix — which is every trading day.
   3. FRED DCOILBRENTEU — Brent crude spot USD/bbl since May 1987, % change.
                       Spot publishes a few days behind, so the CURRENT move
-                      comes from Brent futures (Yahoo BZ=F) when fresher —
-                      the same arrangement gold uses.
+                      comes from Brent futures (Yahoo BZ=F) — the same
+                      arrangement gold uses.
   4. Yahoo DX-Y.NYB — ICE US Dollar Index since 1971, % change
   5. Yahoo BTC-USD  — Bitcoin since Sep 2014, % change
   6. Yahoo ^TNX     — CBOE 10-year Treasury yield since 1962,
@@ -143,13 +145,36 @@ def fetch_yahoo(symbol):
     return out
 
 
+def _with_retry(label, call, retries=4):
+    """Retry a single-endpoint fetch with exponential backoff. Yahoo has its own
+    retry loop across two hosts; LBMA, FRED and Barchart each have exactly one
+    endpoint, so without this a lone timeout or 5xx takes the whole bake down."""
+    last_err = None
+    for attempt in range(retries):
+        try:
+            return call()
+        except Exception as e:
+            last_err = f"{type(e).__name__}: {e}"
+        if attempt < retries - 1:
+            backoff = 2 ** attempt + random.uniform(0, 1)
+            print(f"  {label}: attempt {attempt + 1}/{retries} failed "
+                  f"({last_err}); retrying in {backoff:.1f}s")
+            time.sleep(backoff)
+    raise RuntimeError(f"{label} failed after {retries} attempts "
+                       f"(last error: {last_err})")
+
+
 def fetch_lbma_gold():
     """LBMA gold PM fix, daily USD/oz -> [(date_str, price)]."""
     url = "https://prices.lbma.org.uk/json/gold_pm.json"
-    r = requests.get(url, headers=HEADERS, timeout=120)
-    r.raise_for_status()
+
+    def call():
+        r = requests.get(url, headers=HEADERS, timeout=120)
+        r.raise_for_status()
+        return r.json()
+
     out = []
-    for rec in r.json():                       # records are date-ascending
+    for rec in _with_retry("LBMA gold PM", call):   # records are date-ascending
         v = rec.get("v")
         if v and v[0]:
             out.append((rec["d"][:10], float(v[0])))
@@ -158,15 +183,18 @@ def fetch_lbma_gold():
 
 def fetch_fred(series_id):
     """A daily FRED series -> [(date_str, value)], missing prints ('.') dropped."""
-    r = requests.get("https://api.stlouisfed.org/fred/series/observations",
-                     params={"series_id":         series_id,
-                             "api_key":           FRED_API_KEY,
-                             "file_type":         "json",
-                             "observation_start": "1900-01-01",
-                             "sort_order":        "asc"},
-                     headers=HEADERS, timeout=120)
-    r.raise_for_status()
-    return [(o["date"], float(o["value"])) for o in r.json()["observations"]
+    def call():
+        r = requests.get("https://api.stlouisfed.org/fred/series/observations",
+                         params={"series_id":         series_id,
+                                 "api_key":           FRED_API_KEY,
+                                 "file_type":         "json",
+                                 "observation_start": "1900-01-01",
+                                 "sort_order":        "asc"},
+                         headers=HEADERS, timeout=120)
+        r.raise_for_status()
+        return r.json()["observations"]
+
+    return [(o["date"], float(o["value"])) for o in _with_retry(f"FRED {series_id}", call)
             if o["value"] not in (".", "")]
 
 
@@ -176,21 +204,25 @@ def fetch_barchart_move():
     Barchart gates its data proxy behind an XSRF cookie handed out by the quote
     page, so load that first and echo the token back. Capped at 5000 sessions
     on their side, which currently reaches back to May 2006."""
-    s = requests.Session()
-    s.headers.update(HEADERS)
     quote_page = "https://www.barchart.com/stocks/quotes/%24MOVE/interactive-chart"
-    s.get(quote_page, timeout=60)
-    token = urllib.parse.unquote(s.cookies.get("XSRF-TOKEN", ""))
-    if not token:
-        raise RuntimeError("Barchart handed back no XSRF-TOKEN cookie")
-    r = s.get("https://www.barchart.com/proxies/timeseries/queryeod.ashx",
-              params={"symbol": "$MOVE", "data": "daily",
-                      "maxrecords": "10000", "order": "asc"},
-              headers={"x-xsrf-token": token, "Referer": quote_page},
-              timeout=120)
-    r.raise_for_status()
+
+    def call():
+        s = requests.Session()                 # fresh session: the token is per-session
+        s.headers.update(HEADERS)
+        s.get(quote_page, timeout=60)
+        token = urllib.parse.unquote(s.cookies.get("XSRF-TOKEN", ""))
+        if not token:
+            raise RuntimeError("Barchart handed back no XSRF-TOKEN cookie")
+        r = s.get("https://www.barchart.com/proxies/timeseries/queryeod.ashx",
+                  params={"symbol": "$MOVE", "data": "daily",
+                          "maxrecords": "10000", "order": "asc"},
+                  headers={"x-xsrf-token": token, "Referer": quote_page},
+                  timeout=120)
+        r.raise_for_status()
+        return r.text
+
     out = []
-    for line in r.text.strip().splitlines():
+    for line in _with_retry("Barchart $MOVE", call).strip().splitlines():
         parts = line.split(",")                # symbol,date,open,high,low,close,volume
         if len(parts) >= 6 and parts[5]:
             out.append((parts[1], float(parts[5])))
@@ -290,16 +322,22 @@ def build_asset(spec, series, cur_override=None):
     moves = compute_moves(series, spec["kind"], spec["max_abs"])
     n = len(moves)
     if n < MIN_MOVES[spec["id"]]:
-        raise SystemExit(f"ERROR: {spec['name']} produced only {n} moves "
-                         f"(< {MIN_MOVES[spec['id']]}) — refusing to bake degraded data.")
+        raise RuntimeError(f"produced only {n} moves (< {MIN_MOVES[spec['id']]}) "
+                           f"— refusing to bake degraded data")
 
     vals = [m for _, m in moves]
     mean = sum(vals) / n
     sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / n)
 
     cur_d, cur_v = moves[-1]
-    if cur_override and cur_override[0] > cur_d:
-        cur_d, cur_v = cur_override          # fresher quote from the live source
+    # Gold and Brent build their distribution from one feed (the LBMA fix, Brent
+    # spot) but quote today's move from another (COMEX / ICE futures), so the
+    # headline number matches the chart everyone else is looking at. The test has
+    # to be >=, not >: the LBMA fix publishes mid-afternoon London, so by the
+    # 22:30 UTC bake it already carries the same date as the futures close, and a
+    # strict > would fall back to a 3pm-fix-to-3pm-fix change every single day.
+    if cur_override and cur_override[0] >= cur_d:
+        cur_d, cur_v = cur_override          # live quote from the matching feed
     rec_min = min(moves, key=lambda t: t[1])
     rec_max = max(moves, key=lambda t: t[1])
 
@@ -370,24 +408,65 @@ def fetch_yahoo_tnx():
     return series
 
 
-assets = []
+def load_previous_assets(html):
+    """The entries baked by the previous run, keyed by id. These are the fallback
+    when a source is down: one dead feed should cost that board its refresh, not
+    freeze the other seven."""
+    block = re.search(r"// @@BAKED_DATA_START@@([\s\S]*?)// @@BAKED_DATA_END@@", html)
+    if not block:
+        return {}
+    # Greedy inside the marked block is safe — the only "];" there closes the array.
+    m = re.search(r"const DMHD_ASSETS\s*=\s*(\[[\s\S]*\]);", block.group(1))
+    if not m:
+        return {}
+    try:
+        return {a["id"]: a for a in json.loads(m.group(1))}
+    except (ValueError, KeyError, TypeError):
+        return {}
+
+
+with open(HTML_PATH, "r", encoding="utf-8") as f:
+    html = f.read()
+
+previous = load_previous_assets(html)
+
+assets, stale = [], []
 for spec in SPECS:
     print(f"Fetching {spec['name']}...")
-    series = spec["fetch"]()
-    cur_override = None
-    if "live" in spec:
-        live_moves = compute_moves(spec["live"](), spec["kind"], spec["max_abs"])
-        if live_moves:
-            cur_override = live_moves[-1]
-    a = build_asset(spec, series, cur_override)
+    try:
+        series = spec["fetch"]()
+        cur_override = None
+        if "live" in spec:
+            # A dead live feed only costs this board its matching-feed quote;
+            # the history feed still carries a (staler, different-source) move.
+            try:
+                live_moves = compute_moves(spec["live"](), spec["kind"], spec["max_abs"])
+                if live_moves:
+                    cur_override = live_moves[-1]
+            except Exception as e:
+                print(f"  WARNING: live quote unavailable ({type(e).__name__}: {e}) "
+                      f"— falling back to the history feed")
+        a = build_asset(spec, series, cur_override)
+    except Exception as e:
+        prev = previous.get(spec["id"])
+        if prev is None:
+            raise SystemExit(f"ERROR: {spec['name']} failed ({type(e).__name__}: {e}) "
+                             f"with no previously baked data to fall back on.")
+        print(f"  WARNING: {spec['name']} failed ({type(e).__name__}: {e}) "
+              f"— keeping the last baked values (through {prev['cur']['d']})")
+        assets.append(prev)
+        stale.append(f"{spec['name']} (through {prev['cur']['d']})")
+        continue
     assets.append(a)
     print(f"  {a['name']:30s}: {a['n']:6d} moves since {a['start']}, "
           f"last {a['cur']['d']} = {a['cur']['v']:+.2f}{a['unit']} "
           f"(z {a['z']:+.2f}, {a['pctile']:.1f} pctile, 1-in-{a['oneIn']})")
 
+if stale:
+    print(f"\nWARNING: {len(stale)} of {len(SPECS)} boards kept stale data: "
+          f"{', '.join(stale)}")
+
 # ── INJECT INTO HTML ───────────────────────────────────────────────────────────
-with open(HTML_PATH, "r", encoding="utf-8") as f:
-    html = f.read()
 
 today = datetime.now().strftime("%Y-%m-%d")
 baked_block = (
