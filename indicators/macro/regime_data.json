@@ -1,26 +1,26 @@
 {
   "as_of": "2026-07-01",
-  "updated_utc": "2026-08-10T10:21:54Z",
+  "updated_utc": "2026-08-17T09:49:01Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -0.22
+    "score": -0.43
   },
   "inflation": {
     "dir": "Rising",
-    "score": 2.51
+    "score": 2.37
   },
   "market_regime": "REFLATION",
   "market_regime_raw": "REFLATION",
   "shares": {
     "GOLDILOCKS": 27,
-    "REFLATION": 37,
+    "REFLATION": 31,
     "INFLATION": 24,
-    "DEFLATION": 12
+    "DEFLATION": 18
   },
-  "signal_strength": 37,
-  "risk_on_prob": 64,
+  "signal_strength": 31,
+  "risk_on_prob": 58,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
@@ -51,9 +51,9 @@
         "score": 0.58
       },
       "Real Retail Sales": {
-        "yoy": 3.7,
-        "accel6m": 3.49,
-        "score": 2.67
+        "yoy": 2.5,
+        "accel6m": 2.92,
+        "score": 1.65
       }
     },
     "inflation": {
@@ -63,9 +63,9 @@
         "score": 3.0
       },
       "Core CPI": {
-        "yoy": 2.81,
-        "accel6m": -0.03,
-        "score": 2.02
+        "yoy": 2.79,
+        "accel6m": -0.16,
+        "score": 1.73
       }
     },
     "markets": [
@@ -135,10 +135,10 @@
       },
       {
         "name": "Agriculture",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
@@ -190,10 +190,10 @@
       },
       {
         "name": "Cyclicals / Defensives",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
