@@ -135,16 +135,16 @@
 // shipping acumen_liquidity_baked.js, so reading that file would work locally and
 // 404 in production — the two values used here are copied in instead.
 const BAKED = {
-  as_of: "2026-08-14",
+  as_of: "2026-08-24",
   acumen: {
-    z:     -0.69,              // meta.latest_lqi_z
-    as_of: "2026-08-11"        // meta.last_equity_date
+    z:     -0.85,              // meta.latest_lqi_z
+    as_of: "2026-08-24"        // meta.last_equity_date
   },
   btcliq: {
-    roc13w:  -0.0013,
+    roc13w:   0.0041,
     thrust:   0.0373,
-    log_gap: -0.51,
-    as_of:   "2026-08-14",
+    log_gap: -0.32,
+    as_of:   "2026-08-28",
     m2_through: "2026-06-05"   // M2 held flat after this date — see the caveat note
   }
 };
