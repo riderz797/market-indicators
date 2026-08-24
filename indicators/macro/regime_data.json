@@ -1,6 +1,6 @@
 {
   "as_of": "2026-07-01",
-  "updated_utc": "2026-08-17T09:49:01Z",
+  "updated_utc": "2026-08-24T09:53:44Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
@@ -14,13 +14,13 @@
   "market_regime": "REFLATION",
   "market_regime_raw": "REFLATION",
   "shares": {
-    "GOLDILOCKS": 27,
-    "REFLATION": 31,
-    "INFLATION": 24,
-    "DEFLATION": 18
+    "GOLDILOCKS": 29,
+    "REFLATION": 37,
+    "INFLATION": 20,
+    "DEFLATION": 14
   },
-  "signal_strength": 31,
-  "risk_on_prob": 58,
+  "signal_strength": 37,
+  "risk_on_prob": 66,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
@@ -41,9 +41,9 @@
         "score": -1.65
       },
       "Industrial Production": {
-        "yoy": 1.14,
-        "accel6m": -0.02,
-        "score": 0.29
+        "yoy": 1.08,
+        "accel6m": 0.11,
+        "score": 0.3
       },
       "Real Mfg & Trade Sales": {
         "yoy": 2.32,
@@ -119,10 +119,10 @@
       },
       {
         "name": "Bitcoin",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
@@ -135,10 +135,10 @@
       },
       {
         "name": "Agriculture",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
@@ -175,9 +175,11 @@
       },
       {
         "name": "Gold",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION"
+          "GOLDILOCKS",
+          "REFLATION",
+          "DEFLATION"
         ]
       },
       {
