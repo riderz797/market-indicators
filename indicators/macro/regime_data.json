@@ -1,31 +1,31 @@
 {
   "as_of": "2026-07-01",
-  "updated_utc": "2026-08-24T09:53:44Z",
+  "updated_utc": "2026-08-31T16:56:39Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -0.43
+    "score": -0.54
   },
   "inflation": {
     "dir": "Rising",
     "score": 2.37
   },
   "market_regime": "REFLATION",
-  "market_regime_raw": "REFLATION",
+  "market_regime_raw": "INFLATION",
   "shares": {
-    "GOLDILOCKS": 29,
-    "REFLATION": 37,
-    "INFLATION": 20,
-    "DEFLATION": 14
+    "GOLDILOCKS": 15,
+    "REFLATION": 24,
+    "INFLATION": 37,
+    "DEFLATION": 24
   },
   "signal_strength": 37,
-  "risk_on_prob": 66,
+  "risk_on_prob": 39,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
-    "pending_regime": null,
-    "pending_weeks": 0,
+    "pending_regime": "INFLATION",
+    "pending_weeks": 1,
     "confirmed_since": "2026-06-16"
   },
   "components": {
@@ -36,9 +36,9 @@
         "score": -3.0
       },
       "Real Income ex-Transfers": {
-        "yoy": 0.14,
-        "accel6m": -0.14,
-        "score": -1.65
+        "yoy": -0.38,
+        "accel6m": -0.57,
+        "score": -2.08
       },
       "Industrial Production": {
         "yoy": 1.08,
@@ -46,9 +46,9 @@
         "score": 0.3
       },
       "Real Mfg & Trade Sales": {
-        "yoy": 2.32,
-        "accel6m": 1.06,
-        "score": 0.58
+        "yoy": 2.19,
+        "accel6m": 0.79,
+        "score": 0.44
       },
       "Real Retail Sales": {
         "yoy": 2.5,
@@ -58,8 +58,8 @@
     },
     "inflation": {
       "Core PCE": {
-        "yoy": 3.29,
-        "accel6m": 0.32,
+        "yoy": 3.34,
+        "accel6m": 0.24,
         "score": 3.0
       },
       "Core CPI": {
@@ -79,10 +79,10 @@
       },
       {
         "name": "Nasdaq 100",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
@@ -95,10 +95,10 @@
       },
       {
         "name": "Emerging Mkts",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
@@ -127,10 +127,10 @@
       },
       {
         "name": "Base Metals",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
@@ -143,10 +143,10 @@
       },
       {
         "name": "Crude Oil",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
@@ -175,19 +175,17 @@
       },
       {
         "name": "Gold",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION",
-          "DEFLATION"
+          "INFLATION"
         ]
       },
       {
         "name": "High Beta / Low Beta",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
@@ -200,10 +198,10 @@
       },
       {
         "name": "Small / Large Cap",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       }
     ]
