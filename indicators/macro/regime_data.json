@@ -1,39 +1,39 @@
 {
-  "as_of": "2026-07-01",
-  "updated_utc": "2026-08-31T16:56:39Z",
+  "as_of": "2026-08-01",
+  "updated_utc": "2026-09-07T14:56:47Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -0.54
+    "score": -0.44
   },
   "inflation": {
     "dir": "Rising",
     "score": 2.37
   },
   "market_regime": "REFLATION",
-  "market_regime_raw": "INFLATION",
+  "market_regime_raw": "REFLATION",
   "shares": {
-    "GOLDILOCKS": 15,
-    "REFLATION": 24,
-    "INFLATION": 37,
-    "DEFLATION": 24
+    "GOLDILOCKS": 23,
+    "REFLATION": 37,
+    "INFLATION": 26,
+    "DEFLATION": 14
   },
   "signal_strength": 37,
-  "risk_on_prob": 39,
+  "risk_on_prob": 60,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
-    "pending_regime": "INFLATION",
-    "pending_weeks": 1,
+    "pending_regime": null,
+    "pending_weeks": 0,
     "confirmed_since": "2026-06-16"
   },
   "components": {
     "growth": {
       "Nonfarm Payrolls": {
-        "yoy": 0.2,
-        "accel6m": -0.01,
-        "score": -3.0
+        "yoy": 0.38,
+        "accel6m": 0.3,
+        "score": -2.49
       },
       "Real Income ex-Transfers": {
         "yoy": -0.38,
@@ -79,10 +79,10 @@
       },
       {
         "name": "Nasdaq 100",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
@@ -95,10 +95,10 @@
       },
       {
         "name": "Emerging Mkts",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
@@ -127,10 +127,10 @@
       },
       {
         "name": "Base Metals",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
@@ -175,17 +175,19 @@
       },
       {
         "name": "Gold",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION"
+          "GOLDILOCKS",
+          "REFLATION",
+          "DEFLATION"
         ]
       },
       {
         "name": "High Beta / Low Beta",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
