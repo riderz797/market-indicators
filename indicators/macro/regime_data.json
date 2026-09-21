@@ -1,31 +1,31 @@
 {
   "as_of": "2026-08-01",
-  "updated_utc": "2026-09-14T15:48:29Z",
+  "updated_utc": "2026-09-21T15:47:53Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -0.44
+    "score": -0.56
   },
   "inflation": {
     "dir": "Rising",
     "score": 2.51
   },
   "market_regime": "REFLATION",
-  "market_regime_raw": "INFLATION",
+  "market_regime_raw": "REFLATION",
   "shares": {
-    "GOLDILOCKS": 14,
-    "REFLATION": 23,
-    "INFLATION": 34,
-    "DEFLATION": 29
+    "GOLDILOCKS": 17,
+    "REFLATION": 32,
+    "INFLATION": 31,
+    "DEFLATION": 20
   },
-  "signal_strength": 34,
-  "risk_on_prob": 37,
+  "signal_strength": 32,
+  "risk_on_prob": 49,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
-    "pending_regime": "INFLATION",
-    "pending_weeks": 1,
+    "pending_regime": null,
+    "pending_weeks": 0,
     "confirmed_since": "2026-06-16"
   },
   "components": {
@@ -41,9 +41,9 @@
         "score": -2.08
       },
       "Industrial Production": {
-        "yoy": 1.08,
-        "accel6m": 0.11,
-        "score": 0.3
+        "yoy": 1.42,
+        "accel6m": 0.62,
+        "score": 0.47
       },
       "Real Mfg & Trade Sales": {
         "yoy": 2.19,
@@ -51,9 +51,9 @@
         "score": 0.44
       },
       "Real Retail Sales": {
-        "yoy": 2.5,
-        "accel6m": 2.92,
-        "score": 1.65
+        "yoy": 2.53,
+        "accel6m": 1.01,
+        "score": 0.85
       }
     },
     "inflation": {
@@ -79,10 +79,10 @@
       },
       {
         "name": "Nasdaq 100",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
@@ -127,10 +127,10 @@
       },
       {
         "name": "Base Metals",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
+          "REFLATION",
+          "INFLATION"
         ]
       },
       {
@@ -184,10 +184,10 @@
       },
       {
         "name": "High Beta / Low Beta",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
