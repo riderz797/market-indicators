@@ -465,30 +465,52 @@ FLOW: [...]`;
       const [parseMsg,  setParseMsg]  = useState("");
 
       /* ── FRED auto-fetch ─────────────────────────────────────────── */
+      // Saved copy of the same FRED calls, refreshed weekly by fetch_macro_cycle.py.
+      // Loaded first (same origin, never blocked) so a proxy outage can't leave
+      // the indicators on their defaults; live values replace it per series.
+      const [savedAsOf, setSavedAsOf] = useState(null);
       useEffect(() => {
-        if (!FRED_API_KEY || FRED_API_KEY.length < 10) return;
         setDataStatus("loading");
+        const KEYS = ["BAMLH0A0HYM2","DRTSCILM","T10Y2Y","DFII10","FEDFUNDS","FEDFUNDS_1y","DTWEXBGS","DTWEXBGS_1y"];
+        const toRaw = o => {
+          const fedCur=latestVal(o.FEDFUNDS), fedPrior=latestVal(o.FEDFUNDS_1y);
+          const dxyCur=latestVal(o.DTWEXBGS), dxyPrior=latestVal(o.DTWEXBGS_1y);
+          return {
+            hy_spreads:latestVal(o.BAMLH0A0HYM2), sloos:latestVal(o.DRTSCILM),
+            yield_curve:latestVal(o.T10Y2Y), real_yields:latestVal(o.DFII10),
+            fed_current:fedCur, fed_prior:fedPrior,
+            dxy_current:dxyCur, dxy_prior:dxyPrior,
+            dxy_yoy:(dxyCur&&dxyPrior) ? (dxyCur-dxyPrior)/dxyPrior*100 : null,
+          };
+        };
+        const apply = obs => {
+          const raw = toRaw(obs);
+          setIndicatorValues(prev => ({ ...prev, ...mapFromFRED(raw) }));
+          setLiveData(raw);
+        };
         (async () => {
+          let saved = null;
+          try {
+            const r = await fetch("macro_cycle_data.json", { cache:"no-store" });
+            if (r.ok) saved = await r.json();
+          } catch (_) {}
+          if (saved && saved.obs) { apply(saved.obs); setSavedAsOf(saved.as_of); setDataStatus("saved"); }
+
+          if (!FRED_API_KEY || FRED_API_KEY.length < 10) { if (!saved) setDataStatus("error"); return; }
           try {
             const yearAgo = new Date(_now); yearAgo.setFullYear(_now.getFullYear()-1);
             const yAgoStr = yearAgo.toISOString().split("T")[0];
-            const [hyObs,sloosObs,ycObs,ryObs,fedCurObs,fedPriorObs,dxyCurObs,dxyPriorObs] = await Promise.all([
+            const live = await Promise.all([
               fetchFRED("BAMLH0A0HYM2",5), fetchFRED("DRTSCILM",5), fetchFRED("T10Y2Y",5), fetchFRED("DFII10",5),
               fetchFRED("FEDFUNDS",3), fetchFRED("FEDFUNDS",3,yAgoStr), fetchFRED("DTWEXBGS",5), fetchFRED("DTWEXBGS",5,yAgoStr),
             ]);
-            const fedCur=latestVal(fedCurObs), fedPrior=latestVal(fedPriorObs);
-            const dxyCur=latestVal(dxyCurObs), dxyPrior=latestVal(dxyPriorObs);
-            const raw = {
-              hy_spreads:latestVal(hyObs), sloos:latestVal(sloosObs),
-              yield_curve:latestVal(ycObs), real_yields:latestVal(ryObs),
-              fed_current:fedCur, fed_prior:fedPrior,
-              dxy_current:dxyCur, dxy_prior:dxyPrior,
-              dxy_yoy:(dxyCur&&dxyPrior) ? (dxyCur-dxyPrior)/dxyPrior*100 : null,
-            };
-            setIndicatorValues(prev => ({ ...prev, ...mapFromFRED(raw) }));
-            setLiveData(raw);
+            const nLive = live.filter(Boolean).length;
+            if (nLive === 0) { if (!saved) setDataStatus("error"); return; }
+            const merged = {};
+            KEYS.forEach((k, i) => { merged[k] = live[i] || (saved && saved.obs ? saved.obs[k] : null); });
+            apply(merged);
             setDataStatus("loaded");
-          } catch (e) { console.error(e); setDataStatus("error"); }
+          } catch (e) { console.error(e); if (!saved) setDataStatus("error"); }
         })();
       }, []);
 
@@ -532,6 +554,7 @@ FLOW: [...]`;
       const catColors = { credit:"#1D4ED8", rate:"#A16207", flow:"#7E22CE" };
       const statusChip = dataStatus==="loading" ? { text:"Fetching live data…", color:"#B8860B" }
                        : dataStatus==="loaded"  ? { text:"Live data loaded",     color:"#15803D" }
+                       : dataStatus==="saved"   ? { text:`Saved data from ${savedAsOf} — live feed unavailable`, color:"#B8860B" }
                        : dataStatus==="error"   ? { text:"Fetch failed — using defaults", color:"#DC2626" } : null;
       const autoFedIds = ["hy_spreads","sloos","yield_curve","real_yields","fed_direction","dollar_index"];
 
@@ -608,7 +631,7 @@ FLOW: [...]`;
                 {indicators.map(ind => {
                   const isOpen = expandedIndicator === ind.id;
                   const curOpt = ind.options.find(o => o.value === indicatorValues[ind.id]);
-                  const isAuto = dataStatus==="loaded" && autoFedIds.includes(ind.id);
+                  const isAuto = (dataStatus==="loaded" || dataStatus==="saved") && autoFedIds.includes(ind.id);
                   return (
                     <div key={ind.id} style={{ background:isOpen?"#F2F2F2":"transparent", borderRadius:6, overflow:"hidden", border:isOpen?"1px solid #DDDDDD":"1px solid transparent", transition:"all 0.2s ease" }}>
                       <div onClick={()=>setExpandedIndicator(isOpen?null:ind.id)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 12px", cursor:"pointer", borderLeft:`3px solid ${catColors[ind.category]}` }}>

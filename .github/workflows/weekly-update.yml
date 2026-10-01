@@ -46,6 +46,20 @@ jobs:
         continue-on-error: true
         run: python fetch_capital_flows.py
 
+      - name: Bake Macro Cycle Dashboard FRED data
+        continue-on-error: true
+        # Writes indicators/macro/macro_cycle_data.json — the dashboard's
+        # fallback when the browser-side FRED proxies are down.
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          if [ -z "$FRED_API_KEY" ]; then
+            FRED_API_KEY=$(grep -h FRED_API_KEY indicators/macro/macro_cycle_dashboard.html \
+              | grep -oE '[a-f0-9]{32}' | head -1)
+            export FRED_API_KEY
+          fi
+          python fetch_macro_cycle.py
+
       - name: Bake Strategy Board and Heat Map inputs
         continue-on-error: true
         # Derived from the pages rebuilt above (Acumen, BTC liquidity) and
