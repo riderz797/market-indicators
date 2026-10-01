@@ -4002,8 +4002,12 @@ async function fetchCoinGeckoBTC() {
         const data = await resp.json();
         if (!data.prices || data.prices.length === 0) return null;
         const dates = [], values = [];
+        // CoinGecko stamps each daily price at 00:00 UTC of the day it OPENS, so it is
+        // the previous day's close. Shift those back a day to match the baked Yahoo
+        // closes; the final intraday point is today's live price and keeps its date.
         for (const [ts, price] of data.prices) {
-            dates.push(new Date(ts).toISOString().slice(0, 10));
+            const atMidnight = ts % 86400000 === 0;
+            dates.push(new Date(atMidnight ? ts - 86400000 : ts).toISOString().slice(0, 10));
             values.push(price);
         }
         console.log(`[CoinGecko BTC] OK (${dates.length} pts, latest $${Math.round(values[values.length-1]).toLocaleString()})`);
@@ -4036,12 +4040,14 @@ async function fetchBinanceBTC() {
     return null;
 }
 
+// Dates are UTC calendar days; use UTC getters throughout so a visitor west of
+// Greenwich doesn't see every live point bucketed onto Saturday instead of Friday.
 function resampleWeekly(dates, values) {
     const weekly = new Map();
     for (let i = 0; i < dates.length; i++) {
-        const d = new Date(dates[i]);
-        const diff = (5 - d.getDay() + 7) % 7;
-        const fri = new Date(d); fri.setDate(d.getDate() + diff);
+        const d = new Date(dates[i] + 'T00:00:00Z');
+        const diff = (5 - d.getUTCDay() + 7) % 7;
+        const fri = new Date(d); fri.setUTCDate(d.getUTCDate() + diff);
         weekly.set(fri.toISOString().slice(0, 10), values[i]);
     }
     const sorted = [...weekly.entries()].sort((a, b) => a[0].localeCompare(b[0]));
@@ -4079,7 +4085,7 @@ function linReg(x, y) {
 }
 
 function shiftDatesForward(dates, weeks) {
-    return dates.map(d => { const dt = new Date(d); dt.setDate(dt.getDate() + weeks * 7); return dt.toISOString().slice(0, 10); });
+    return dates.map(d => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + weeks * 7); return dt.toISOString().slice(0, 10); });
 }
 
 // ── Call-option signal (from backtest_btc_liquidity.py, walk-forward 2017-2026) ──
