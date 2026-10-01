@@ -46,6 +46,12 @@ jobs:
         continue-on-error: true
         run: python fetch_capital_flows.py
 
+      - name: Bake Strategy Board and Heat Map inputs
+        continue-on-error: true
+        # Derived from the pages rebuilt above (Acumen, BTC liquidity) and
+        # snider_data.json — must run after rebuild_all and fetch_snider.
+        run: python bake_boards.py
+
       - name: Bake cross-asset seasonality data
         continue-on-error: true
         # Writes data/seasonality/*.json for the S&P 500, Bitcoin, gold, Brent
