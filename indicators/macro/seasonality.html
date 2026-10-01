@@ -913,7 +913,6 @@
         encodeURIComponent(symbol) + `?period1=${period1}` +
         `&period2=${Math.floor(Date.now() / 1000)}&interval=1d`;
       const proxies = [
-        u => 'https://corsproxy.io/?' + encodeURIComponent(u),
         u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
         u => u,
       ];

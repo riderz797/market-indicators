@@ -4013,12 +4013,14 @@ async function fetchBinanceBTC() {
     return null;
 }
 
+// Dates are UTC calendar days; UTC getters keep visitors west of Greenwich from
+// bucketing every point a day late.
 function resampleWeekly(dates, values) {
     const weekly = new Map();
     for (let i = 0; i < dates.length; i++) {
-        const d = new Date(dates[i]);
-        const diff = (1 - d.getDay() + 7) % 7;
-        const mon = new Date(d); mon.setDate(d.getDate() + diff);
+        const d = new Date(dates[i] + 'T00:00:00Z');
+        const diff = (1 - d.getUTCDay() + 7) % 7;
+        const mon = new Date(d); mon.setUTCDate(d.getUTCDate() + diff);
         weekly.set(mon.toISOString().slice(0, 10), values[i]);
     }
     const sorted = [...weekly.entries()].sort((a, b) => a[0].localeCompare(b[0]));
@@ -4050,7 +4052,7 @@ function linReg(x, y) {
 }
 
 function shiftDates(dates, weeks) {
-    return dates.map(d => { const dt = new Date(d); dt.setDate(dt.getDate() + weeks * 7); return dt.toISOString().slice(0, 10); });
+    return dates.map(d => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + weeks * 7); return dt.toISOString().slice(0, 10); });
 }
 
 async function updateData() {

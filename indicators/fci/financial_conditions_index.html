@@ -4015,12 +4015,14 @@ async function fetchTGA() {
     } catch (e) { return null; }
 }
 
+// Dates are UTC calendar days; UTC getters keep visitors west of Greenwich from
+// bucketing every point a day late.
 function resampleWeekly(dates, values) {
     const weekly = new Map();
     for (let i = 0; i < dates.length; i++) {
-        const d = new Date(dates[i]);
-        const diff = (5 - d.getDay() + 7) % 7;
-        const fri = new Date(d); fri.setDate(d.getDate() + diff);
+        const d = new Date(dates[i] + 'T00:00:00Z');
+        const diff = (5 - d.getUTCDay() + 7) % 7;
+        const fri = new Date(d); fri.setUTCDate(d.getUTCDate() + diff);
         weekly.set(fri.toISOString().slice(0, 10), values[i]);
     }
     const sorted = [...weekly.entries()].sort((a, b) => a[0].localeCompare(b[0]));

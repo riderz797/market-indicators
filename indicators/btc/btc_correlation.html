@@ -232,7 +232,6 @@ async function fetchCoinGeckoBTC(days) {
 async function fetchYahoo(ticker, range) {
   const baseUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=1d`;
   const proxies = [
-    `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`,
   ];
   for (const proxyUrl of proxies) {
