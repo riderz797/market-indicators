@@ -1,11 +1,11 @@
 {
-  "as_of": "2026-08-01",
-  "updated_utc": "2026-09-28T17:31:21Z",
+  "as_of": "2026-09-01",
+  "updated_utc": "2026-10-05T18:11:26Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -0.56
+    "score": -0.63
   },
   "inflation": {
     "dir": "Rising",
@@ -25,20 +25,20 @@
   "persistence": {
     "filter_weeks": 3,
     "pending_regime": "INFLATION",
-    "pending_weeks": 1,
+    "pending_weeks": 2,
     "confirmed_since": "2026-06-16"
   },
   "components": {
     "growth": {
       "Nonfarm Payrolls": {
-        "yoy": 0.38,
-        "accel6m": 0.3,
-        "score": -2.49
+        "yoy": 0.31,
+        "accel6m": 0.14,
+        "score": -2.89
       },
       "Real Income ex-Transfers": {
-        "yoy": -0.38,
-        "accel6m": -0.57,
-        "score": -2.08
+        "yoy": 0.8,
+        "accel6m": -0.46,
+        "score": -1.41
       },
       "Industrial Production": {
         "yoy": 1.42,
@@ -46,9 +46,9 @@
         "score": 0.47
       },
       "Real Mfg & Trade Sales": {
-        "yoy": 2.19,
-        "accel6m": 0.79,
-        "score": 0.44
+        "yoy": 2.27,
+        "accel6m": -1.27,
+        "score": -0.15
       },
       "Real Retail Sales": {
         "yoy": 2.53,
@@ -58,8 +58,8 @@
     },
     "inflation": {
       "Core PCE": {
-        "yoy": 3.34,
-        "accel6m": 0.24,
+        "yoy": 3.01,
+        "accel6m": 0.05,
         "score": 3.0
       },
       "Core CPI": {
