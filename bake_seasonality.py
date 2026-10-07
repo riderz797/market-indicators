@@ -22,7 +22,12 @@ Assets:
             the adjusted one has the seasonality removed by construction and
             would chart a flat line.
 
-Run:  python bake_seasonality.py
+Each file holds the complete years from the source above plus the partial
+current year, taken from the asset's `live` Yahoo symbol where it has one (the
+same series the page tops up from in-browser). If a history source fails, the
+complete years already baked are reused — they never change.
+
+Run:  python bake_seasonality.py   (daily via daily-move-update.yml, and weekly)
 Requires: requests  (pip install requests)
 """
 
@@ -163,13 +168,43 @@ def month_ticks(reference):
     return [first.get(m, 0) for m in range(1, 13)]
 
 
-def build(spec):
-    series = spec["fetch"]()
-    if not series:
-        raise RuntimeError(f"{spec['name']}: source returned nothing")
+def previous_years(spec):
+    """Complete years from the last baked file — history that cannot change,
+    reused when the primary source is down (LBMA has been Cloudflare-blocking
+    scripted requests since Oct 2026)."""
+    try:
+        with open(os.path.join(OUT_DIR, f"{spec['id']}.json"), encoding="utf-8") as f:
+            old = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    cy = datetime.now().year
+    return {y: v for y, v in old.get("years", {}).items() if int(y) < cy}
 
-    years = group_by_year(series, spec["start"], spec["mode"])
+
+def build(spec):
     current_year = datetime.now().year
+    try:
+        series = spec["fetch"]()
+        if not series:
+            raise RuntimeError("source returned nothing")
+        years = group_by_year(series, spec["start"], spec["mode"])
+    except Exception as e:
+        years = previous_years(spec)
+        if not years or not spec["live"]:
+            raise
+        print(f"  WARNING: {spec['name']} history source failed ({type(e).__name__}: {e}) "
+              f"— reusing baked complete years through {max(years)}")
+
+    # The current year comes from the same Yahoo symbol the page extends with
+    # live, so the baked partial year and a live refresh are one series.
+    if spec["live"]:
+        live = [(d, v) for d, v in fetch_yahoo(spec["live"]["symbol"])
+                if d.startswith(str(current_year))]
+        cur = group_by_year(live, spec["start"], spec["mode"]).get(str(current_year))
+        years.pop(str(current_year), None)
+        if cur:
+            years[str(current_year)] = cur
+
     complete = sorted(y for y in years if int(y) < current_year)
     if not complete:
         raise RuntimeError(f"{spec['name']}: no complete years")
@@ -184,18 +219,20 @@ def build(spec):
         "bakedThrough": baked_through,
         "bakedOn": datetime.now().strftime("%Y-%m-%d"),
         "monthLabels": MONTH_LABELS,
-        # Complete years only. The current year is fetched live in-browser for
-        # assets that have a `live` symbol, so baking a partial year would just
-        # go stale between weekly runs.
+        # Complete years plus the partial current year. The page draws the
+        # current year from here, then tops it up in-browser when a live feed
+        # answers — so a dead CORS proxy no longer leaves the year blank.
+        # Re-baked daily by daily-move-update.yml to keep the partial year fresh.
         "years": {y: years[y] for y in complete},
     }
+    if str(current_year) in years:
+        cur = years[str(current_year)]
+        payload["years"][str(current_year)] = cur
+        payload["currentThrough"] = f"{current_year}-{cur['d'][-1]}"
     if spec["mode"] == "daily":
         payload["monthTicks"] = month_ticks(years[complete[-1]])
     else:
         payload["monthTicks"] = list(range(1, 13))
-        # No live feed, so the page must show the partial current year from here.
-        if str(current_year) in years:
-            payload["years"][str(current_year)] = years[str(current_year)]
 
     return payload, len(complete)
 

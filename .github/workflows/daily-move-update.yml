@@ -30,11 +30,18 @@ jobs:
       - name: Run Daily Move update
         run: python fetch_daily_move.py
 
+      - name: Re-bake seasonality current year
+        continue-on-error: true   # a failed bake must not block the daily move commit
+        # Keeps the partial current year in data/seasonality/*.json fresh, so
+        # the Seasonality page has today's line even when its live CORS proxy
+        # is down.
+        run: python bake_seasonality.py
+
       - name: Commit and push if data changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add indicators/macro/daily_move_distribution.html
+          git add indicators/macro/daily_move_distribution.html data/seasonality/
           if git diff --staged --quiet; then
             echo "No new daily move data"
           else

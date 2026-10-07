@@ -903,66 +903,98 @@
     }
 
     // ================================================================
-    // LIVE CURRENT-YEAR FETCH
-    // Baked files hold complete years only, so for assets with a live symbol
-    // the current year is pulled from Yahoo on load (via CORS proxies, since
-    // Yahoo blocks direct cross-origin calls).
+    // LIVE CURRENT-YEAR TOP-UP
+    // The baked files carry the partial current year (re-baked daily), so
+    // the chart is complete without any live call. For assets with a live
+    // symbol, a fresher copy of the current year is then fetched and used
+    // only if it reaches a later date. Yahoo needs a CORS proxy; bitcoin
+    // goes to CoinGecko first, which answers browsers directly.
     // ================================================================
-    async function fetchYahoo(symbol, period1) {
+    const LIVE_TIMEOUT_MS = 12000;
+
+    async function fetchJSON(url) {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), LIVE_TIMEOUT_MS);
+      try {
+        const resp = await fetch(url, { cache: 'no-store', signal: ctl.signal });
+        return resp.ok ? await resp.json() : null;
+      } catch (e) {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    const ymd = ms => new Date(ms).toISOString().slice(0, 10);
+
+    // -> [[YYYY-MM-DD, close], ...] ascending, or null
+    async function fetchYahooDaily(symbol, period1) {
       const base = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
         encodeURIComponent(symbol) + `?period1=${period1}` +
         `&period2=${Math.floor(Date.now() / 1000)}&interval=1d`;
-      const proxies = [
+      const routes = [
         u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
         u => u,
       ];
-      for (const wrap of proxies) {
-        try {
-          const resp = await fetch(wrap(base), { cache: 'no-store' });
-          if (!resp.ok) continue;
-          const json = await resp.json();
-          const r = json && json.chart && json.chart.result && json.chart.result[0];
-          if (r && r.timestamp) return r;
-        } catch (e) { /* try next proxy */ }
+      for (const wrap of routes) {
+        const json = await fetchJSON(wrap(base));
+        const r = json && json.chart && json.chart.result && json.chart.result[0];
+        if (!r || !r.timestamp) continue;
+        const closes = r.indicators.quote[0].close, out = [];
+        for (let i = 0; i < r.timestamp.length; i++) {
+          if (closes[i] != null) out.push([ymd(r.timestamp[i] * 1000), closes[i]]);
+        }
+        if (out.length) return out;
       }
       return null;
     }
 
-    async function fetchMissingYears() {
-      if (!asset.live) return 0;
-      const missing = [];
-      for (let y = asset.bakedThrough + 1; y <= CURRENT_YEAR; y++) {
-        if (!yearPct[String(y)]) missing.push(y);
+    async function fetchCoinGeckoBTC(sinceYear) {
+      const days = Math.ceil((Date.now() - Date.UTC(sinceYear, 0, 1)) / 86400000) + 1;
+      const json = await fetchJSON('https://api.coingecko.com/api/v3/coins/bitcoin/' +
+        `market_chart?vs_currency=usd&days=${days}&interval=daily`);
+      if (!json || !Array.isArray(json.prices) || !json.prices.length) return null;
+      // CoinGecko stamps each daily price at 00:00 UTC of the day it opens —
+      // the previous day's close. Shift those back a day to line up with the
+      // baked Yahoo closes; the trailing intraday point is today's price.
+      const byDate = new Map();
+      for (const [ts, p] of json.prices) {
+        byDate.set(ymd(ts % 86400000 === 0 ? ts - 86400000 : ts), p);
       }
-      if (!missing.length) return 0;
+      return [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    }
 
-      const p1 = Math.floor(new Date(missing[0], 0, 1).getTime() / 1000);
-      let result = null;
-      for (let attempt = 0; attempt < 3 && !result; attempt++) {
-        result = await fetchYahoo(asset.live.symbol, p1);
-        if (!result && attempt < 2) await new Promise(r => setTimeout(r, 2000));
+    // Returns the number of years refreshed from the live feed.
+    async function refreshLiveYears(a, isStale) {
+      let from = CURRENT_YEAR;
+      for (let y = a.bakedThrough + 1; y < CURRENT_YEAR; y++) {
+        if (!yearPct[String(y)]) { from = y; break; }
       }
-      if (!result) return 0;
+      const p1 = Math.floor(Date.UTC(from, 0, 1) / 1000);
+      let rows = null;
+      if (a.live.symbol === 'BTC-USD') rows = await fetchCoinGeckoBTC(from);
+      if (!rows) rows = await fetchYahooDaily(a.live.symbol, p1);
+      if (!rows || isStale()) return 0;
 
-      const closes = result.indicators.quote[0].close;
       const byYear = {};
-      for (let i = 0; i < result.timestamp.length; i++) {
-        if (closes[i] == null) continue;
-        const d = new Date(result.timestamp[i] * 1000);
-        const yr = String(d.getUTCFullYear());
-        const md = String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
-                   String(d.getUTCDate()).padStart(2, '0');
+      for (const [date, c] of rows) {
+        const yr = date.slice(0, 4);
+        if (+yr < from) continue;
         (byYear[yr] = byYear[yr] || { d: [], c: [] });
-        byYear[yr].d.push(md);
-        byYear[yr].c.push(closes[i]);
+        byYear[yr].d.push(date.slice(5));
+        byYear[yr].c.push(c);
       }
 
       let filled = 0;
       for (const [yr, data] of Object.entries(byYear)) {
         if (!data.c.length) continue;
+        // Keep the baked copy if the live one ends earlier. Same day still
+        // swaps in: bitcoin trades 24/7, so today's live print is fresher.
+        const have = yearDates[yr];
+        if (have && have.length && data.d[data.d.length - 1] < have[have.length - 1]) continue;
         yearDates[yr] = data.d;
         yearPct[yr] = toPctChange(data.c);
-        yearX[yr] = xPositions(data.d, asset.mode);
+        yearX[yr] = xPositions(data.d, a.mode);
         filled++;
       }
       if (yearPct[String(CURRENT_YEAR)]) visibleYears.add(String(CURRENT_YEAR));
@@ -980,7 +1012,13 @@
     // ================================================================
     // ASSET LOADING
     // ================================================================
+    // Bumped on every load so a slow live fetch for one asset can't land on
+    // the chart after the reader has switched to another.
+    let loadSeq = 0;
+
     async function loadAsset(id, pushUrl = true) {
+      const seq = ++loadSeq;
+      const isStale = () => seq !== loadSeq;
       ASSETS.forEach(a => $('asset-btn-' + a.id).classList.toggle('active', a.id === id));
       $('chart-overlay').classList.remove('hidden');
       $('chart-overlay').textContent = 'Loading…';
@@ -993,6 +1031,7 @@
           if (!resp.ok) throw new Error('HTTP ' + resp.status);
           cache[id] = await resp.json();
         } catch (e) {
+          if (isStale()) return;
           $('chart-overlay').textContent =
             'Could not load ' + id + ' data — run bake_seasonality.py';
           setDataStatus('Data unavailable', 'error');
@@ -1001,6 +1040,7 @@
         }
       }
 
+      if (isStale()) return;
       asset = cache[id];
       if (pushUrl) {
         history.replaceState(null, '', '?asset=' + id);
@@ -1050,32 +1090,41 @@
       runPatternRecognition();
       rebuildChart();
 
-      // Extend with the live current year where a feed exists
-      if (asset.live) {
-        setDataStatus('Fetching live data…', 'fetching');
-        $('status-bar').textContent = 'Fetching live data…';
-        try {
-          const filled = await fetchMissingYears();
-          if (filled > 0) {
-            runPatternRecognition();
-            rebuildChart();
-            const n = (yearPct[String(CURRENT_YEAR)] || []).length;
-            $('status-bar').textContent = `${CURRENT_YEAR}: ${n} days (live)`;
-            setDataStatus(`Live data — ${n} days`, 'live');
-          } else {
-            $('status-bar').textContent = 'Baked data only';
-            setDataStatus('Baked ' + asset.bakedOn, '');
-          }
-        } catch (e) {
-          console.warn('Live fetch failed:', e);
-          $('status-bar').textContent = 'Live fetch failed';
-          setDataStatus('Baked ' + asset.bakedOn, 'error');
-        }
-      } else {
-        const latest = Object.keys(asset.years).sort().pop();
-        $('status-bar').textContent = `Through ${latest} · no live feed`;
-        setDataStatus('Baked ' + asset.bakedOn, '');
+      // Top up the current year from a live feed where one exists
+      const a = asset;
+      const through = () => {
+        const d = yearDates[String(CURRENT_YEAR)];
+        return d && d.length ? fmtMonthDay(d[d.length - 1]) : String(a.bakedThrough);
+      };
+      const days = () => (yearPct[String(CURRENT_YEAR)] || []).length;
+      $('status-bar').textContent = `${CURRENT_YEAR}: ${days()} days through ${through()}`;
+      if (!a.live) {
+        setDataStatus(`Saved data through ${through()} · no live feed`, '');
+        return;
       }
+      setDataStatus(`Saved through ${through()} · checking live…`, 'fetching');
+      let filled = 0;
+      try {
+        filled = await refreshLiveYears(a, isStale);
+      } catch (e) {
+        console.warn('Live fetch failed:', e);
+      }
+      if (isStale()) return;
+      if (filled > 0) {
+        runPatternRecognition();
+        rebuildChart();
+        setDataStatus(`Live data through ${through()}`, 'live');
+      } else {
+        // Either no feed answered or it had nothing newer than the bake.
+        setDataStatus(`Saved data through ${through()}`, '');
+      }
+      $('status-bar').textContent = `${CURRENT_YEAR}: ${days()} days through ${through()}`;
+    }
+
+    // "10-07" -> "Oct 7"
+    function fmtMonthDay(md) {
+      const [m, d] = md.split('-').map(Number);
+      return (asset.monthLabels || [])[m - 1] + ' ' + d;
     }
 
     // ================================================================
