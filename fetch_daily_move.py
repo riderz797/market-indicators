@@ -181,6 +181,31 @@ def fetch_lbma_gold():
     return out
 
 
+def fetch_gold_history():
+    """LBMA PM fix since Aug 1971. LBMA has put its JSON feed behind a
+    Cloudflare bot block (403 since Oct 2026), so on failure the history is
+    rebuilt from the LBMA fixes already baked into data/seasonality/gold.json
+    (complete years, which cannot change) and extended with COMEX futures
+    (GC=F) from there — the feed this board already quotes its current move
+    from. Only the moves after the last baked fix come from futures."""
+    try:
+        return [(d, v) for d, v in fetch_lbma_gold() if d >= "1971-08-16"]
+    except Exception as e:
+        print(f"  WARNING: LBMA gold unavailable ({type(e).__name__}: {e}) "
+              f"— using baked LBMA fixes + GC=F")
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "data", "seasonality", "gold.json")
+    with open(path, encoding="utf-8") as f:
+        baked = json.load(f)
+    series = []
+    for yr in sorted(y for y in baked["years"] if int(y) <= baked["bakedThrough"]):
+        b = baked["years"][yr]
+        series += [(f"{yr}-{md}", float(c)) for md, c in zip(b["d"], b["c"])]
+    last = series[-1][0]
+    series += [(d, v) for d, v in fetch_yahoo("GC=F") if d > last]
+    return [(d, v) for d, v in series if d >= "1971-08-16"]
+
+
 def fetch_fred(series_id):
     """A daily FRED series -> [(date_str, value)], missing prints ('.') dropped."""
     def call():
@@ -377,7 +402,7 @@ SPECS = [
      "sub": "% change vs prior close", "fetch": lambda: fetch_yahoo("^GSPC")},
     {"id": "gold",   "name": "Gold",     "kind": "pct", "max_abs": 30,
      "sub": "% change vs prior close",
-     "fetch": lambda: [(d, v) for d, v in fetch_lbma_gold() if d >= "1971-08-16"],
+     "fetch": fetch_gold_history,
      "live":  lambda: fetch_yahoo("GC=F")},
     {"id": "brent",  "name": "Oil (Brent Crude)", "kind": "pct", "max_abs": 60,
      "sub": "% change vs prior close",
