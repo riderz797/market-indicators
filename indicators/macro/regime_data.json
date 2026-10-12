@@ -1,6 +1,6 @@
 {
   "as_of": "2026-09-01",
-  "updated_utc": "2026-10-05T18:11:26Z",
+  "updated_utc": "2026-10-12T18:49:25Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
@@ -11,22 +11,22 @@
     "dir": "Rising",
     "score": 2.51
   },
-  "market_regime": "REFLATION",
+  "market_regime": "INFLATION",
   "market_regime_raw": "INFLATION",
   "shares": {
-    "GOLDILOCKS": 15,
-    "REFLATION": 30,
-    "INFLATION": 37,
-    "DEFLATION": 18
+    "GOLDILOCKS": 14,
+    "REFLATION": 29,
+    "INFLATION": 34,
+    "DEFLATION": 23
   },
-  "signal_strength": 37,
-  "risk_on_prob": 45,
+  "signal_strength": 34,
+  "risk_on_prob": 43,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
-    "pending_regime": "INFLATION",
-    "pending_weeks": 2,
-    "confirmed_since": "2026-06-16"
+    "pending_regime": null,
+    "pending_weeks": 0,
+    "confirmed_since": "2026-10-12"
   },
   "components": {
     "growth": {
@@ -95,10 +95,10 @@
       },
       {
         "name": "Emerging Mkts",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
@@ -175,9 +175,11 @@
       },
       {
         "name": "Gold",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION"
+          "GOLDILOCKS",
+          "REFLATION",
+          "DEFLATION"
         ]
       },
       {
