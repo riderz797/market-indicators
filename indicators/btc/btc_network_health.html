@@ -766,8 +766,6 @@
   }
 
   // ── Weight sliders ────────────────────────────────────────────────────────
-  const DEFAULT_WEIGHTS = Object.assign({}, BNHI_DATA ? BNHI_DATA.weights : {});
-
   function renderWeightSliders() {
     const container = document.getElementById('weight-sliders');
     for (const [cat, mlist] of Object.entries(D.categories_config)) {

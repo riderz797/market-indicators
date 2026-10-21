@@ -297,6 +297,17 @@ def compute_moves(series, kind, max_abs):
     return moves
 
 
+def drop_unsettled(series):
+    """Drop bars dated after the US trading day in progress. Futures (GC=F,
+    BZ=F, DX-Y.NYB) reopen at 6pm ET under the NEXT day's date, and BTC-USD
+    rolls its bar at 00:00 UTC, so a bake after either point (GitHub usually
+    starts the 22:30 UTC run 1-3h late) would otherwise quote minutes of a new
+    session, stamped tomorrow, as the day's move. UTC-5 is the ET date across
+    the whole run window under both EST and EDT."""
+    today_us = (datetime.now(timezone.utc) - timedelta(hours=5)).strftime("%Y-%m-%d")
+    return [(d, v) for d, v in series if d <= today_us]
+
+
 def quantum(vals):
     """The smallest step every value is a multiple of — i.e. the precision the
     source publishes at. Series quoted at full float precision bottom out at the
@@ -359,8 +370,9 @@ def build_asset(spec, series, cur_override=None):
     # spot) but quote today's move from another (COMEX / ICE futures), so the
     # headline number matches the chart everyone else is looking at. The test has
     # to be >=, not >: the LBMA fix publishes mid-afternoon London, so by the
-    # 22:30 UTC bake it already carries the same date as the futures close, and a
-    # strict > would fall back to a 3pm-fix-to-3pm-fix change every single day.
+    # evening bake it already carries the same date as the (settled, see
+    # drop_unsettled) futures close, and a strict > would fall back to a
+    # 3pm-fix-to-3pm-fix change every single day.
     if cur_override and cur_override[0] >= cur_d:
         cur_d, cur_v = cur_override          # live quote from the matching feed
     rec_min = min(moves, key=lambda t: t[1])
@@ -459,13 +471,14 @@ assets, stale = [], []
 for spec in SPECS:
     print(f"Fetching {spec['name']}...")
     try:
-        series = spec["fetch"]()
+        series = drop_unsettled(spec["fetch"]())
         cur_override = None
         if "live" in spec:
             # A dead live feed only costs this board its matching-feed quote;
             # the history feed still carries a (staler, different-source) move.
             try:
-                live_moves = compute_moves(spec["live"](), spec["kind"], spec["max_abs"])
+                live_moves = compute_moves(drop_unsettled(spec["live"]()),
+                                           spec["kind"], spec["max_abs"])
                 if live_moves:
                     cur_override = live_moves[-1]
             except Exception as e:
