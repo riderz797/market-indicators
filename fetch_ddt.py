@@ -17,7 +17,8 @@ Sources (all free, no registration):
      spliced into DTWEXBGS (2006-present) at Jan 2006.
   4. IMF International Liquidity (IL) — world official gold holdings in fine
      troy ounces and world FX reserves ex-gold in USD, monthly from 1995.
-  5. LBMA — gold PM fix USD/oz, daily from 1968, month-end taken.
+  5. LBMA — gold PM fix USD/oz, daily from 1968, month-end taken. While
+     LBMA blocks scripts, falls back to the baked fixes + COMEX GC=F.
 
 Dataset is small (~440 months x 5 series), so this does a full rebuild on
 every run — IMF and TIC both revise history.
@@ -30,7 +31,8 @@ import requests
 import json
 import os
 import re
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 
 # ── CONFIG ─────────────────────────────────────────────────────────────────────
 FRED_API_KEY = "824b29c5afa52f3fc7c6e7dc4925aebb"
@@ -161,6 +163,68 @@ def fetch_lbma_gold():
     return result
 
 
+YAHOO_HOSTS = ("query1.finance.yahoo.com", "query2.finance.yahoo.com")
+
+
+def fetch_yahoo_month_ends(symbol, retries=5):
+    """Daily closes for the last 5 years -> last close per month. Yahoo
+    rate-limits GitHub Actions runners (429), so retry across both hosts."""
+    last_err = None
+    for attempt in range(retries):
+        host = YAHOO_HOSTS[attempt % len(YAHOO_HOSTS)]
+        try:
+            r = requests.get(f"https://{host}/v8/finance/chart/{symbol}",
+                             params={"interval": "1d", "range": "5y"},
+                             headers=HEADERS, timeout=60)
+            if r.status_code == 200:
+                res    = r.json()["chart"]["result"][0]
+                closes = res["indicators"]["quote"][0]["close"]
+                result = {}
+                for ts, c in zip(res["timestamp"], closes):   # date-ascending
+                    if c:
+                        ym = datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m")
+                        result[ym] = float(c)                 # last close per month wins
+                return result
+            last_err = f"HTTP {r.status_code}"
+        except requests.RequestException as e:
+            last_err = f"{type(e).__name__}: {e}"
+        if attempt < retries - 1:
+            time.sleep(2 ** attempt)
+    raise RuntimeError(f"Yahoo fetch for {symbol} failed after {retries} "
+                       f"attempts (last error: {last_err})")
+
+
+def load_baked_gold():
+    """Month-end gold prices from this page's previous bake, keeping only the
+    months that had already closed on the bake date (their last fix is final)."""
+    with open(HTML_PATH, "r", encoding="utf-8") as f:
+        html = f.read()
+    months   = json.loads(re.search(r"const DDT_MONTHS\s*=\s*(\[.*?\]);", html).group(1))
+    raw      = json.loads(re.search(r"const DDT_RAW\s*=\s*(\{.*?\});", html).group(1))
+    baked_on = re.search(r'const DDT_BAKED_ON = "(\d{4}-\d{2})', html).group(1)
+    return {ym: v for ym, v in zip(months, raw["goldPx"])
+            if v is not None and ym < baked_on}
+
+
+def fetch_gold_px():
+    """Month-end gold USD/oz. LBMA has put its JSON feed behind a Cloudflare
+    bot block (403 since Oct 2026), so on failure the history is the LBMA
+    month-ends already baked into this page, extended with COMEX futures
+    (GC=F) month-end closes after them. The page only uses gold to value
+    official reserves, where the futures-vs-fix gap (typically within ±2%
+    at month-end) moves the gold share by a fraction of a point."""
+    try:
+        return fetch_lbma_gold()
+    except Exception as e:
+        print(f"  WARNING: LBMA gold unavailable ({type(e).__name__}: {e}) "
+              f"— using baked month-ends + GC=F")
+    result = load_baked_gold()
+    last   = max(result)
+    result.update({ym: v for ym, v in fetch_yahoo_month_ends("GC=F").items()
+                   if ym > last})
+    return result
+
+
 # ── MAIN ───────────────────────────────────────────────────────────────────────
 print("Fetching IMF COFER (USD share of world FX reserves)...")
 cofer_raw = fetch_imf("IMF.STA,COFER", "G001.AFXRA.CI_USD.SHRO_PT.Q", "1999")
@@ -178,7 +242,7 @@ gold_oz = fetch_imf("IMF.STA,IL", "G001.RGV_REVS.FTO.M", "1994")
 fx_usd  = fetch_imf("IMF.STA,IL", "G001.RXF11FX_REVS.USD.M", "1994")
 
 print("Fetching LBMA gold PM fix...")
-gold_px = fetch_lbma_gold()
+gold_px = fetch_gold_px()
 
 # Normalize IMF monthly periods '1995-M01' -> '1995-01'
 gold_oz = {p.replace("-M", "-"): v for p, v in gold_oz.items()}
