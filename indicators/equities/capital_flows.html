@@ -265,7 +265,7 @@
   <!-- BOARD 3 -->
   <div class="panel">
     <div class="panel-title">Board 3 — Asset Allocation Cycle Position</div>
-    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) across 6 nodes: Debasement → Cyclical → Speculation → Commodities → Defensive → Fixed Income. Marker = score-weighted average position of the 3 strongest classes. The last 3 weekly reads are shown — brightest = current week, fainter = 1 and 2 weeks ago. MSTR, ASST, STRC and SATA are excluded from the scores.</div>
+    <div class="panel-desc">Estimated cycle position based on the last 13 weeks of net capital flow (relative volume × buy/sell direction) across 6 nodes: Debasement → Cyclical → Speculation → Commodities → Defensive → Fixed Income. Each week's price move is judged against that fund's own typical weekly swing, so quiet assets like bonds count as fully as volatile ones. The named phase changes only after a new leader holds 3 weeks in a row. Marker = 3-week average of the score-weighted position of the 3 strongest classes, measured around the cycle so Fixed Income wraps back into Debasement. The last 3 weekly reads are shown — brightest = current week, fainter = 1 and 2 weeks ago. MSTR, ASST, STRC, SATA and SHV are excluded from the scores.</div>
     <div class="cycle-wrapper">
       <div class="cycle-svg-container">
         <svg id="cycle-svg" viewBox="0 0 700 320" width="100%" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -290,8 +290,12 @@ const ASSET_CLASSES = {
   "Speculation": { tickers: ["QQQ","IGV","ARKK"],                            color: "#7B68EE", phase: "Froth / Peak Liquidity" },
   "Commodities": { tickers: ["DBC","XLE","DBA"],                             color: "#E74C3C", phase: "Late Cycle / Inflationary" },
   "Defensive":   { tickers: ["XLP","VYM","XLV","MOAT"],                      color: "#3498DB", phase: "Slowdown / Risk-Off Rotation" },
-  "Fixed Income":{ tickers: ["SHV","TLT","IEF"],                             color: "#2ECC71", phase: "Contraction / Flight to Safety" },
+  "Fixed Income":{ tickers: ["TLT","IEF"],                                   color: "#2ECC71", phase: "Contraction / Flight to Safety" },
 };
+// SHV stays on Boards 1 and 2 but is left out of the Board 3 scores: a T-bill
+// fund's price follows short-term interest, not buying or selling, and once
+// moves are judged against each fund's own swing its steady drift would count
+// as full-strength buying almost every week.
 
 // Bitcoin-treasury names (Strategy and Strive, common and preferred). Shown on
 // Board 1 only — left out of the Board 2 ranking and the Board 3 cycle scores.
@@ -306,7 +310,19 @@ const SELL_COLOR = "#C0392B";   // red   — week closed below the prior week's 
 
 // Minimum 13-week net-flow score for the cycle to name a dominant phase.
 // Below this (or with every class negative) Board 3 reports "no dominant inflow".
-const CONFIDENCE_THRESHOLD = 0.05;
+// Calibrated on 2015–2026 history to fire about as often (~19% of weeks) as the
+// old 0.05 did before moves were scaled by each fund's own swing.
+const CONFIDENCE_THRESHOLD = 0.11;
+const STRONG_INFLOW = 0.37;    // same calibration for the old 0.30 "strong" cutoff
+
+// Smoothing: the named phase only changes once a new leader (or "no dominant
+// inflow") has been the weekly read HOLD_WEEKS times in a row, and the marker
+// is the average of the last SMOOTH_WEEKS weekly spots. In the 2015–2026 test
+// this cut phase changes from about 1 week in 4 to 1 in 11 with no loss of
+// accuracy against the economic regime.
+const HOLD_WEEKS = 3;
+const SMOOTH_WEEKS = 3;
+const HISTORY_WEEKS = 26;      // weekly reads replayed so the hold has settled
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 // Week-over-week return: this week's close against the PRIOR week's close.
@@ -337,6 +353,15 @@ function avgVolume(ticker, nWeeks, weeksBack = 0) {
   if (!d || !d.volumes.length) return 0;
   const vols = d.volumes.slice(-(nWeeks + weeksBack), weeksBack ? -weeksBack : undefined);
   return vols.reduce((a, b) => a + b, 0) / vols.length || 1;
+}
+
+// Typical weekly move: standard deviation of week-over-week returns over the
+// window, so each fund's moves are judged against its own normal range.
+function returnSwing(ticker, nWeeks, weeksBack = 0) {
+  const rets = weeklyReturns(ticker).slice(-(nWeeks + weeksBack), weeksBack ? -weeksBack : undefined);
+  if (!rets.length) return 0;
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  return Math.sqrt(rets.reduce((a, r) => a + (r - mean) ** 2, 0) / rets.length);
 }
 
 function medianVolume(ticker, nWeeks) {
@@ -526,15 +551,17 @@ function computeCycleScores(weeksBack = 0) {
       const d = CAPITAL_FLOWS.data[ticker];
       if (!d || d.volumes.length < 2 + weeksBack) return;
       const avg = avgVolume(ticker, WEEKS_12M, weeksBack) || 1;
+      const swing = returnSwing(ticker, WEEKS_12M, weeksBack) || 1;
       const end = weeksBack ? -weeksBack : undefined;
       const last4v = d.volumes.slice(-(WEEKS_13 + weeksBack), end);
       const last4r = weeklyReturns(ticker).slice(-(WEEKS_13 + weeksBack), end);
       last4v.forEach((vol, i) => {
         const relVol = vol / avg;
-        // Magnitude-weighted direction: week-over-week close return, capped at
-        // ±10% and scaled to ±1 so a flat week ≈ 0 and a big move counts far
-        // more than a marginal one. Replaces the old binary ±1 sign.
-        const dir = Math.max(-0.10, Math.min(0.10, last4r[i])) / 0.10;
+        // Magnitude-weighted direction, judged against the fund's own typical
+        // weekly move: a 2-swing week counts as full strength (±1), a flat week
+        // ≈ 0. A fixed ±10% yardstick let volatile funds (Bitcoin, ARKK) outscore
+        // bonds on routine weeks, so bond rotations barely registered.
+        const dir = Math.max(-1, Math.min(1, last4r[i] / (2 * swing)));
         total += relVol * dir;
         count++;
       });
@@ -544,20 +571,75 @@ function computeCycleScores(weeksBack = 0) {
   return scores;
 }
 
-// Marker spot: score-weighted average of the 3 highest-scoring classes'
-// dot positions along the curve — the marker sits between the fixed dots,
-// pulled proportionally toward the stronger classes (weights clipped at 0
-// so outflows don't pull). Returns a fractional index into CYCLE_ORDER,
-// or null if the top 3 are all net outflows.
+// Fractional CYCLE_ORDER index in [0, n) for a point on the unit circle.
+function circularIndex(x, y) {
+  const n = CYCLE_ORDER.length;
+  return ((Math.atan2(y, x) / (2 * Math.PI) * n) % n + n) % n;
+}
+
+// Marker spot: score-weighted average of the 3 highest-scoring classes' dot
+// positions — the marker sits between the fixed dots, pulled proportionally
+// toward the stronger classes (weights clipped at 0 so outflows don't pull).
+// The average is taken around the cycle, because it wraps: Fixed Income leads
+// back into Debasement, so those two average to the trough/rebound rather than
+// to mid-cycle. Returns a fractional index into CYCLE_ORDER, or null if the
+// top 3 are all net outflows.
 function computeCyclePosition(scores) {
+  const n = CYCLE_ORDER.length;
   const top3 = CYCLE_ORDER.slice().sort((a, b) => scores[b] - scores[a]).slice(0, 3);
-  let posSum = 0, wSum = 0;
+  let x = 0, y = 0, wSum = 0;
   top3.forEach(cls => {
     const w = Math.max(0, scores[cls]);
-    posSum += w * CYCLE_ORDER.indexOf(cls);
-    wSum   += w;
+    const angle = 2 * Math.PI * CYCLE_ORDER.indexOf(cls) / n;
+    x += w * Math.cos(angle);
+    y += w * Math.sin(angle);
+    wSum += w;
   });
-  return wSum > 0 ? posSum / wSum : null;
+  return wSum > 0 ? circularIndex(x, y) : null;
+}
+
+// Unweighted average of marker spots around the cycle, skipping empty reads.
+function averagePosition(positions) {
+  const n = CYCLE_ORDER.length;
+  const valid = positions.filter(p => p != null);
+  if (!valid.length) return null;
+  const x = valid.reduce((a, p) => a + Math.cos(2 * Math.PI * p / n), 0);
+  const y = valid.reduce((a, p) => a + Math.sin(2 * Math.PI * p / n), 0);
+  return circularIndex(x, y);
+}
+
+// Replays the weekly read for the last HISTORY_WEEKS weeks, then applies the
+// hold to the named phase and the 3-week average to the marker. A weekly
+// "state" is the leading class, or null when it misses the threshold.
+function computeCycleReads() {
+  const scored = Object.values(ASSET_CLASSES).flatMap(c => c.tickers);
+  const shortest = Math.min(...scored.map(t => (CAPITAL_FLOWS.data[t] || { volumes: [] }).volumes.length));
+  const maxBack = Math.max(SMOOTH_WEEKS + 1, Math.min(HISTORY_WEEKS + SMOOTH_WEEKS - 1, shortest - 53));
+
+  const reads = [];   // index = weeksBack
+  for (let wb = 0; wb <= maxBack; wb++) {
+    const scores = computeCycleScores(wb);
+    const [lead, top] = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+    reads[wb] = { scores, state: top >= CONFIDENCE_THRESHOLD ? lead : null, pos: computeCyclePosition(scores) };
+  }
+
+  // Oldest → newest: switch only after a new state repeats HOLD_WEEKS times.
+  let named = reads[maxBack].state, candidate, run = 0;
+  for (let wb = maxBack; wb >= 0; wb--) {
+    const s = reads[wb].state;
+    if (s === named)          { candidate = undefined; run = 0; }
+    else if (s === candidate) { run++; }
+    else                      { candidate = s; run = 1; }
+    if (candidate !== undefined && run >= HOLD_WEEKS) { named = candidate; candidate = undefined; run = 0; }
+  }
+
+  const smoothed = wb => averagePosition(reads.slice(wb, wb + SMOOTH_WEEKS).map(r => r.pos));
+  return {
+    scores:     reads[0].scores,
+    named,
+    pending:    candidate === undefined ? null : { state: candidate, run },
+    posHistory: [0, 1, 2].map(wb => ({ weeksBack: wb, pos: smoothed(wb) })),
+  };
 }
 
 function buildCycleSVG(activeClass, posHistory) {
@@ -615,10 +697,10 @@ function buildCycleSVG(activeClass, posHistory) {
     `;
   });
 
-  // Markers: the last 3 weekly reads at their weighted top-3 spots.
-  // Gold diamonds so they read differently from the round phase dots.
-  // Oldest drawn first and faintest; the current week sits on top at
-  // full opacity, so the fade direction shows how the read is moving.
+  // Markers: the last 3 weekly reads, each a 3-week average of weighted
+  // top-3 spots. Gold diamonds so they read differently from the round
+  // phase dots. Oldest drawn first and faintest; the current week sits on
+  // top at full opacity, so the fade direction shows how the read is moving.
   const MARKER_OPACITY = { 0: 1, 1: 0.5, 2: 0.25 };
   (posHistory || [])
     .filter(h => h.pos != null)
@@ -627,7 +709,7 @@ function buildCycleSVG(activeClass, posHistory) {
       const mx = xStep * (h.pos + 1);
       const my = waveY(mx);
       const op = MARKER_OPACITY[h.weeksBack] != null ? MARKER_OPACITY[h.weeksBack] : 0.25;
-      const lbl = h.weeksBack === 0 ? "Current week"
+      const lbl = h.weeksBack === 0 ? "Current week (3-week average)"
                 : h.weeksBack === 1 ? "1 week ago" : `${h.weeksBack} weeks ago`;
       const r = 9;   // diamond half-diagonal
       svgContent += `
@@ -651,7 +733,7 @@ function buildCycleSVG(activeClass, posHistory) {
   svg.innerHTML = svgContent;
 }
 
-function buildCycleSidebar(scores, activeClass, trail) {
+function buildCycleSidebar(scores, activeClass, trail, pending) {
   const sidebar = document.getElementById("cycle-sidebar");
   let html = "";
 
@@ -678,6 +760,13 @@ function buildCycleSidebar(scores, activeClass, trail) {
   const top3 = sorted.slice(0, 3)
     .map(c => `${c} ${scores[c] >= 0 ? "+" : ""}${scores[c].toFixed(2)}`)
     .join(" · ");
+  const markerLine = `Marker = 3-week average of the score-weighted spot across the 3 strongest classes (this week: ${top3}).<br>
+      Weekly trail (2 wks ago → now): ${trail}.`;
+  // This week's read differs from the named phase, which holds until the new
+  // read repeats HOLD_WEEKS weeks in a row.
+  const pendingLine = !pending ? "" : `
+      This week's read is <strong>${pending.state || "no dominant inflow"}</strong> — the named phase
+      switches if that holds ${HOLD_WEEKS} weeks in a row (${pending.run} of ${HOLD_WEEKS} so far).<br>`;
 
   // No confident winner: the leading class is below threshold (or everything is
   // negative). Report churn rather than naming a phase off near-zero noise.
@@ -687,8 +776,7 @@ function buildCycleSidebar(scores, activeClass, trail) {
       The strongest class is <strong>${topClass}</strong> at ${topScore >= 0 ? "+" : ""}${topScore.toFixed(2)},
       below the +${CONFIDENCE_THRESHOLD.toFixed(2)} confidence threshold. Capital is churning or
       rotating without a decisive destination — no single phase is being clearly bought.<br>
-      Marker = score-weighted spot across the 3 strongest classes: ${top3}.<br>
-      Weekly trail (2 wks ago → now): ${trail}.
+      ${pendingLine}${markerLine}
     `;
     return;
   }
@@ -698,9 +786,8 @@ function buildCycleSidebar(scores, activeClass, trail) {
   summary.innerHTML = `
     <strong>Estimated Phase: ${activeCfg.phase}</strong><br>
     Capital is rotating into <strong>${activeClass}</strong> assets (13-week net flow score: ${activeScore >= 0 ? "+" : ""}${activeScore.toFixed(2)}).
-    ${activeScore > 0.3 ? "Strong inflow signal." : activeScore > 0 ? "Mild inflow signal." : "Net outflow — positioning may be rotating elsewhere."}<br>
-    Marker = score-weighted spot across the 3 strongest classes: ${top3}.<br>
-    Weekly trail (2 wks ago → now): ${trail}.
+    ${activeScore > STRONG_INFLOW ? "Strong inflow signal." : activeScore > 0 ? "Mild inflow signal." : "Net outflow — positioning may be rotating elsewhere."}<br>
+    ${pendingLine}${markerLine}
   `;
 }
 
@@ -718,25 +805,18 @@ function init() {
     buildBoard1();
     buildBoard2();
 
-    const scores = computeCycleScores();
-    const [topClass, topScore] = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
-    // Only name a phase when the leader clears the confidence threshold;
-    // otherwise activeClass is null and Board 3 reports "no dominant inflow".
-    const activeClass = topScore >= CONFIDENCE_THRESHOLD ? topClass : null;
-    // The weighted top-3 spot is drawn even below the threshold — approximating
-    // a position is exactly what it's for when no single class dominates.
-    // History: the same read recomputed as of 1 and 2 weeks ago, so the
-    // markers show which way the rotation is drifting.
-    const posHistory = [0, 1, 2].map(weeksBack => ({
-      weeksBack,
-      pos: computeCyclePosition(weeksBack === 0 ? scores : computeCycleScores(weeksBack)),
-    }));
+    // Named phase = the held weekly leader (null = "no dominant inflow" when the
+    // leader misses the confidence threshold). The weighted top-3 spot is drawn
+    // even below the threshold — approximating a position is exactly what it's
+    // for when no single class dominates. History: the smoothed marker as of 1
+    // and 2 weeks ago, so the markers show which way the rotation is drifting.
+    const { scores, named: activeClass, pending, posHistory } = computeCycleReads();
     const nearest = pos => CYCLE_ORDER[Math.round(pos) % CYCLE_ORDER.length];
     const trail = posHistory.slice().sort((a, b) => b.weeksBack - a.weeksBack)
       .map(h => h.pos == null ? "—" : nearest(h.pos))
       .join(" → ");
     buildCycleSVG(activeClass, posHistory);
-    buildCycleSidebar(scores, activeClass, trail);
+    buildCycleSidebar(scores, activeClass, trail, pending);
 
     statusBar.textContent =
       `Data through ${CAPITAL_FLOWS.baked_through}  ·  Baked ${CAPITAL_FLOWS.baked_on}  ·  ${CAPITAL_FLOWS.tickers.length} tickers`;

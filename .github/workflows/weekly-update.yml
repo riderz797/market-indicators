@@ -46,6 +46,12 @@ jobs:
         continue-on-error: true
         run: python fetch_capital_flows.py
 
+      - name: Run Market Cycle Clock update
+        continue-on-error: true
+        # Rebuilds the full weekly history from yfinance each run (small: 13
+        # funds since 2011) and bakes it into market_cycle_clock.html.
+        run: python fetch_cycle_clock.py
+
       - name: Bake Macro Cycle Dashboard FRED data
         continue-on-error: true
         # Writes indicators/macro/macro_cycle_data.json — the dashboard's
