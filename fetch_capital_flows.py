@@ -3,8 +3,9 @@ fetch_capital_flows.py
 Incrementally updates the Capital Flows indicator.
 
 Reads existing baked data from capital_flows.html, finds the last baked week,
-fetches only new weekly OHLCV for all 22 tickers via yfinance, merges, and
-re-injects. Run weekly after markets close.
+fetches only new weekly OHLCV for every ticker via yfinance, merges, and
+re-injects. A ticker added to TICKERS since the last bake is backfilled from
+the earliest baked week. Run weekly after markets close.
 
 Run:  python fetch_capital_flows.py
 Requires: yfinance, pandas  (pip install yfinance pandas)
@@ -27,7 +28,7 @@ TICKERS = [
     "BTC", "MSTR", "STRC", "ASST", "SATA",
     "DBC", "XLE", "GLD", "DBA",
     "XLP", "VYM", "XLV", "MOAT",
-    "QQQ", "XLY", "XLF", "IWM", "IGV", "SPY",
+    "QQQ", "XLY", "XLF", "IWM", "IGV", "ARKK", "SPY",
     "SHV", "TLT", "IEF",
 ]
 
@@ -105,18 +106,24 @@ def main():
     latest_date   = ""
     total_new     = 0
 
+    # A ticker added to TICKERS since the last bake has no history yet —
+    # backfill it from the earliest baked week so it lines up with the rest.
+    first_dates   = [e["dates"][0] for e in existing_data.values() if e.get("dates")]
+    backfill_from = min(first_dates) if first_dates else fetch_from
+
     # Only bake weeks that started at least 2 days ago.  On Monday morning the
     # current week's bar (labeled with today's date) has barely begun — crypto
     # shows one holiday day of volume, US equity tickers show nothing.  Excluding
-    # it keeps all 22 tickers in sync and prevents a misleading partial bar.
+    # it keeps every ticker in sync and prevents a misleading partial bar.
     week_cutoff = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
 
     for ticker in TICKERS:
-        yf_sym    = YF_SYMBOL[ticker]
-        new_rows  = fetch_ticker(ticker, yf_sym, fetch_from)
-        new_rows  = [r for r in new_rows if r["date"] <= week_cutoff]
-
         existing_entry = existing_data.get(ticker, {"dates": [], "volumes": [], "opens": [], "closes": []})
+        start     = fetch_from if existing_entry.get("dates") else backfill_from
+
+        yf_sym    = YF_SYMBOL[ticker]
+        new_rows  = fetch_ticker(ticker, yf_sym, start)
+        new_rows  = [r for r in new_rows if r["date"] <= week_cutoff]
 
         # Build a date-keyed map of existing bars, dropping any past the cutoff
         # (e.g. a partial Monday bar baked by an earlier holiday run).
