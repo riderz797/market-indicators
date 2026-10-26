@@ -1,6 +1,6 @@
 {
   "as_of": "2026-09-01",
-  "updated_utc": "2026-10-19T16:21:00Z",
+  "updated_utc": "2026-10-26T16:00:33Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
@@ -127,18 +127,18 @@
       },
       {
         "name": "Base Metals",
-        "mom": "down",
-        "confirms": [
-          "GOLDILOCKS",
-          "DEFLATION"
-        ]
-      },
-      {
-        "name": "Agriculture",
         "mom": "up",
         "confirms": [
           "REFLATION",
           "INFLATION"
+        ]
+      },
+      {
+        "name": "Agriculture",
+        "mom": "down",
+        "confirms": [
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
