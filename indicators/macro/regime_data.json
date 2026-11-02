@@ -1,11 +1,11 @@
 {
   "as_of": "2026-09-01",
-  "updated_utc": "2026-10-26T16:00:33Z",
+  "updated_utc": "2026-11-02T19:20:46Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
     "dir": "Slowing",
-    "score": -0.64
+    "score": -0.61
   },
   "inflation": {
     "dir": "Rising",
@@ -15,12 +15,12 @@
   "market_regime_raw": "INFLATION",
   "shares": {
     "GOLDILOCKS": 12,
-    "REFLATION": 21,
+    "REFLATION": 15,
     "INFLATION": 40,
-    "DEFLATION": 27
+    "DEFLATION": 33
   },
   "signal_strength": 40,
-  "risk_on_prob": 33,
+  "risk_on_prob": 27,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
@@ -36,9 +36,9 @@
         "score": -2.89
       },
       "Real Income ex-Transfers": {
-        "yoy": 0.8,
-        "accel6m": -0.46,
-        "score": -1.41
+        "yoy": 0.54,
+        "accel6m": -0.27,
+        "score": -1.48
       },
       "Industrial Production": {
         "yoy": 2.25,
@@ -46,9 +46,9 @@
         "score": 0.85
       },
       "Real Mfg & Trade Sales": {
-        "yoy": 2.27,
-        "accel6m": -1.27,
-        "score": -0.15
+        "yoy": 2.51,
+        "accel6m": -0.92,
+        "score": 0.06
       },
       "Real Retail Sales": {
         "yoy": 2.26,
@@ -58,8 +58,8 @@
     },
     "inflation": {
       "Core PCE": {
-        "yoy": 3.01,
-        "accel6m": 0.05,
+        "yoy": 3.12,
+        "accel6m": 0.02,
         "score": 3.0
       },
       "Core CPI": {
@@ -71,18 +71,18 @@
     "markets": [
       {
         "name": "S&P 500",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
         "name": "Nasdaq 100",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
@@ -111,10 +111,10 @@
       },
       {
         "name": "Financials",
-        "mom": "down",
+        "mom": "up",
         "confirms": [
-          "INFLATION",
-          "DEFLATION"
+          "GOLDILOCKS",
+          "REFLATION"
         ]
       },
       {
@@ -127,10 +127,10 @@
       },
       {
         "name": "Base Metals",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "REFLATION",
-          "INFLATION"
+          "GOLDILOCKS",
+          "DEFLATION"
         ]
       },
       {
