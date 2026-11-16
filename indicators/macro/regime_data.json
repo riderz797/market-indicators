@@ -1,6 +1,6 @@
 {
   "as_of": "2026-10-01",
-  "updated_utc": "2026-11-09T19:39:42Z",
+  "updated_utc": "2026-11-16T19:26:22Z",
   "baseline": "2015-2019 trend",
   "regime": "INFLATION",
   "growth": {
@@ -9,18 +9,18 @@
   },
   "inflation": {
     "dir": "Rising",
-    "score": 2.62
+    "score": 2.52
   },
   "market_regime": "INFLATION",
   "market_regime_raw": "INFLATION",
   "shares": {
-    "GOLDILOCKS": 12,
-    "REFLATION": 15,
-    "INFLATION": 40,
-    "DEFLATION": 33
+    "GOLDILOCKS": 9,
+    "REFLATION": 12,
+    "INFLATION": 43,
+    "DEFLATION": 36
   },
-  "signal_strength": 40,
-  "risk_on_prob": 27,
+  "signal_strength": 43,
+  "risk_on_prob": 21,
   "n_markets": 17,
   "persistence": {
     "filter_weeks": 3,
@@ -63,9 +63,9 @@
         "score": 3.0
       },
       "Core CPI": {
-        "yoy": 2.79,
-        "accel6m": 0.12,
-        "score": 2.25
+        "yoy": 2.87,
+        "accel6m": -0.12,
+        "score": 2.04
       }
     },
     "markets": [
@@ -119,10 +119,10 @@
       },
       {
         "name": "Bitcoin",
-        "mom": "up",
+        "mom": "down",
         "confirms": [
-          "GOLDILOCKS",
-          "REFLATION"
+          "INFLATION",
+          "DEFLATION"
         ]
       },
       {
