@@ -26,13 +26,22 @@ Composite:
     See WEIGHTS below. Bands: 0–25 critical, 25–50 weak,
     50–75 healthy, 75–100 robust.
 
-    Any metric whose source is unavailable on a given day is *dropped*
-    and the remaining weights are renormalized — a missing metric never
-    silently injects a neutral 50 that would distort the composite.
+    Any metric with no score on a given day (e.g. still in its percentile
+    warm-up) is *dropped* and the remaining weights are renormalized — a
+    missing metric never silently injects a neutral 50 that would distort
+    the composite.
+
+Source outages:
+    Every source is required.  If one can't be fetched after retries, the
+    previous bnhi_baked.js is left untouched (rebuilding the whole history
+    without a metric would quietly change the index).  The run exits 0 with
+    a warning while the baked data is <= STALE_AFTER_DAYS old, so one bad
+    weekly run doesn't send a failure email; after that it exits 1.
 """
 
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -100,18 +109,53 @@ assert abs(sum(WEIGHTS.values()) - 1.0) < 1e-9, "Weights must sum to 1.0"
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; AcumenBNHI/1.0)"}
 
+# requests' `timeout` only limits the silence between chunks, so a server
+# trickling bytes can stall a download indefinitely (the 2026-11-23 CI run
+# hung for 65 minutes).  Each attempt therefore also gets a hard deadline.
+# market-cap is the big one: ~34 MB, ~10 s on a normal connection.
+CONNECT_TIMEOUT = 20          # seconds to open the connection
+READ_TIMEOUT    = 60          # max seconds of silence mid-download
+DEADLINE        = 180         # max seconds for one whole download
+RETRY_WAITS     = (15, 60)    # pauses between attempts → 3 attempts
 
-def get(url, params=None, timeout=90, retries=2):
-    for attempt in range(retries + 1):
+STALE_AFTER_DAYS = 10         # tolerate one missed weekly run, then fail
+
+
+class FetchError(RuntimeError):
+    """A required data source could not be fetched."""
+
+
+def get_json(url, params=None, waits=RETRY_WAITS):
+    """GET `url` and parse the JSON body, retrying transient failures.
+
+    Client errors (4xx other than 408/429) are not retried — they won't fix
+    themselves.  Raises FetchError once attempts are exhausted.
+    """
+    last = None
+    for attempt in range(len(waits) + 1):
+        if attempt:
+            print(f"    retry {attempt} in {waits[attempt-1]}s ({last})", file=sys.stderr)
+            time.sleep(waits[attempt - 1])
         try:
-            r = requests.get(url, params=params, headers=HEADERS, timeout=timeout)
-            r.raise_for_status()
-            return r
-        except Exception as exc:
-            if attempt == retries:
-                raise
-            print(f"    retry {attempt+1}: {exc}", file=sys.stderr)
-            time.sleep(2)
+            start = time.monotonic()
+            with requests.get(url, params=params, headers=HEADERS, stream=True,
+                              timeout=(CONNECT_TIMEOUT, READ_TIMEOUT)) as r:
+                r.raise_for_status()
+                body = bytearray()
+                for chunk in r.iter_content(chunk_size=1 << 16):
+                    body.extend(chunk)
+                    if time.monotonic() - start > DEADLINE:
+                        raise TimeoutError(f"download passed {DEADLINE}s "
+                                           f"({len(body) / 1e6:.1f} MB so far)")
+            return json.loads(body)
+        except requests.HTTPError as exc:
+            code = exc.response.status_code if exc.response is not None else None
+            if code is not None and 400 <= code < 500 and code not in (408, 429):
+                raise FetchError(f"{url}: {exc}") from exc
+            last = exc
+        except (requests.RequestException, TimeoutError, ValueError) as exc:
+            last = exc     # ValueError covers a truncated / non-JSON body
+    raise FetchError(f"{url}: {last}")
 
 
 # ── Data fetchers ─────────────────────────────────────────────────────────
@@ -120,19 +164,14 @@ def blockchain_chart(name):
     """
     Fetch full daily history from blockchain.info charts API.
     Returns a float Series indexed by date (UTC normalized).
-    Returns an empty Series (with a warning) on any HTTP error.
+    Raises FetchError if the source is unreachable or returns no data.
     """
     url = "https://api.blockchain.info/charts/" + name
     params = {"timespan": "all", "sampled": "false",
               "format": "json", "cors": "true"}
-    try:
-        r = get(url, params=params)
-    except Exception as exc:
-        print(f"  WARNING: blockchain.info/{name} failed ({exc}) — using empty series",
-              file=sys.stderr)
-        return pd.Series(dtype=float, name=name)
+    data = get_json(url, params=params)
 
-    values = r.json().get("values", [])
+    values = data.get("values", []) if isinstance(data, dict) else []
     rows = {}
     for v in values:
         if v.get("y") is None:
@@ -140,8 +179,7 @@ def blockchain_chart(name):
         ts = pd.Timestamp(v["x"], unit="s").normalize()
         rows[ts] = float(v["y"])
     if not rows:
-        print(f"  WARNING: blockchain.info/{name} returned no data", file=sys.stderr)
-        return pd.Series(dtype=float, name=name)
+        raise FetchError(f"blockchain.info/{name} returned no data")
     s = pd.Series(rows, name=name).sort_index()
     return s[~s.index.duplicated(keep="last")]
 
@@ -166,8 +204,7 @@ def fetch_pool_concentration():
     for slug in slugs:
         url = f"https://mempool.space/api/v1/mining/pool/{slug}/hashrate"
         try:
-            r = get(url, timeout=30, retries=1)
-            data = r.json()
+            data = get_json(url, waits=(10,))
             # API returns a bare list of {timestamp, avgHashrate, share, poolName}
             items = data if isinstance(data, list) else data.get("hashrates", [])
             for pt in items:
@@ -180,7 +217,7 @@ def fetch_pool_concentration():
             print(f"    pool/{slug}: {exc}", file=sys.stderr)
 
     if not daily_shares or fetched == 0:
-        return pd.Series(dtype=float, name="pool_conc")
+        raise FetchError("mempool.space: no pool hashrate history fetched")
 
     result = {}
     for ts, shares in daily_shares.items():
@@ -227,9 +264,36 @@ def to_list(s: pd.Series, dec: int = 1) -> list:
 
 # ── Main pipeline ─────────────────────────────────────────────────────────
 
+def previous_baked_through():
+    """Date the existing bnhi_baked.js runs through, or None if unreadable."""
+    try:
+        with open(OUTPUT, encoding="utf-8") as f:
+            head = f.read(500)
+    except OSError:
+        return None
+    m = re.search(r'"baked_through":"(\d{4}-\d{2}-\d{2})"', head)
+    return pd.Timestamp(m.group(1)) if m else None
+
+
 def main():
     print("=== Building Acumen BNHI ===", file=sys.stderr)
+    try:
+        build()
+    except FetchError as exc:
+        prev = previous_baked_through()
+        age = (pd.Timestamp.today().normalize() - prev).days if prev is not None else None
+        kept = (f"keeping data baked through {prev.date()} ({age} days old)"
+                if prev is not None else "no previous data found")
+        # ::warning:: / ::error:: lines become annotations on the Actions run
+        if age is not None and age <= STALE_AFTER_DAYS:
+            print(f"::warning::BNHI not refreshed, {kept}. Source down: {exc}")
+            return 0
+        print(f"::error::BNHI not refreshed, {kept}. Source down: {exc}")
+        return 1
+    return 0
 
+
+def build():
     # 1. Fetch raw data
     print("  blockchain.info: miners-revenue ...", file=sys.stderr)
     miners_rev = blockchain_chart("miners-revenue")       # USD/day
@@ -256,12 +320,8 @@ def main():
     btc_price   = fetch_btc_price()
 
     print("  mempool.space: pool concentration ...", file=sys.stderr)
-    try:
-        pool_conc = fetch_pool_concentration()
-        print(f"    {len(pool_conc)} daily data points", file=sys.stderr)
-    except Exception as exc:
-        print(f"  WARNING: mempool.space failed ({exc}) — using empty series", file=sys.stderr)
-        pool_conc = pd.Series(dtype=float, name="pool_conc")
+    pool_conc = fetch_pool_concentration()
+    print(f"    {len(pool_conc)} daily data points", file=sys.stderr)
 
     # 2. Derived pre-smoothing series
     fee_share = (fees_usd / miners_rev.clip(lower=1.0)).clip(0.0, 1.0)
@@ -390,8 +450,9 @@ def main():
           file=sys.stderr)
     for cat, val in current["categories"].items():
         w_pct = sum(WEIGHTS[m] for m in CATEGORY_METRICS[cat]) * 100
-        print(f"  {cat:<26} {val:5.1f}   (weight {w_pct:.0f}%)", file=sys.stderr)
+        shown = f"{val:5.1f}" if val is not None else "  n/a"
+        print(f"  {cat:<26} {shown}   (weight {w_pct:.0f}%)", file=sys.stderr)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

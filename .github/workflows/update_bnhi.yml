@@ -8,6 +8,9 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
+    # A normal run takes <1 min. build_bnhi.py caps each download itself;
+    # this is a backstop so a hang can't burn an hour (11/23 ran 65 min).
+    timeout-minutes: 30
     permissions:
       contents: write
 

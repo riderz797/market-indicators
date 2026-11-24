@@ -33,18 +33,31 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
-          # Upload entire repository
+          # Upload entire repository (dotfiles are excluded since v4 —
+          # the site doesn't need any)
           path: '.'
+      # GitHub's artifact lookup sometimes misses an artifact uploaded seconds
+      # earlier ("No artifacts named github-pages were found"); it failed this
+      # way 5 times 11/19-11/23. Wait and try once more before failing the run.
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - name: Wait before retrying deploy
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - name: Deploy to GitHub Pages (retry)
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
